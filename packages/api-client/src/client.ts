@@ -1,4 +1,5 @@
 import type {
+  Address,
   AIJob,
   AnalyticsBatchInput,
   AppConfig,
@@ -7,6 +8,13 @@ import type {
   AuthTokens,
   AvatarUploadInput,
   Book,
+  CreateAddressInput,
+  CreateOrderInput,
+  InitPaymentResponse,
+  Order,
+  OrderConfiguration,
+  OrderQuote,
+  UpdateAddressInput,
   SignedUploadResponse,
   VoiceRecordingUploadInput,
   Child,
@@ -188,6 +196,33 @@ export class MasalimApiClient {
         `/notifications?page=${page}`,
       ),
     markRead: (id: string) => this.http.post<NotificationItem>(`/notifications/${id}/read`),
+  };
+
+  readonly addresses = {
+    list: () => this.http.get<Address[]>('/addresses'),
+    create: (input: CreateAddressInput) => this.http.post<Address>('/addresses', input),
+    update: (id: string, input: UpdateAddressInput) =>
+      this.http.patch<Address>(`/addresses/${id}`, input),
+    remove: (id: string) => this.http.delete<void>(`/addresses/${id}`),
+  };
+
+  readonly orders = {
+    quote: (input: OrderConfiguration) => this.http.post<OrderQuote>('/orders/quote', input),
+    list: () => this.http.get<Order[]>('/orders'),
+    /** Requires an Idempotency-Key so a double tap creates exactly one order (§78). */
+    create: (input: CreateOrderInput, idempotencyKey: string) =>
+      this.http.post<Order>('/orders', input, { idempotencyKey }),
+    get: (id: string) => this.http.get<Order>(`/orders/${id}`),
+    cancel: (id: string) => this.http.post<Order>(`/orders/${id}/cancel`),
+    initPayment: (id: string, idempotencyKey: string) =>
+      this.http.post<InitPaymentResponse>(`/orders/${id}/payment`, undefined, {
+        idempotencyKey,
+      }),
+    /** Dev-only mock payment completion — rejected outside mock mode. */
+    mockCompletePayment: (providerToken: string) =>
+      this.http.post<{ status: string; orderId: string }>('/payments/mock/complete', {
+        providerToken,
+      }),
   };
 
   readonly uploads = {

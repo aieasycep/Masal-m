@@ -19,6 +19,13 @@ import {
   TextToSpeechProvider,
   VoiceCloneProvider,
 } from '@masalim/ai';
+import {
+  IyzicoPaymentProvider,
+  MockPaymentProvider,
+  MockPrintProvider,
+  PaymentProvider,
+  PrintProvider,
+} from '@masalim/payments';
 import { ENV } from '../config/config.module';
 import type { Env } from '../config/env';
 import { MailService } from './mail.service';
@@ -30,6 +37,8 @@ export const MODERATOR = Symbol('MODERATOR');
 export const TTS = Symbol('TTS');
 export const VOICE_CLONE = Symbol('VOICE_CLONE');
 export const IMAGE_AI = Symbol('IMAGE_AI');
+export const PAYMENT = Symbol('PAYMENT');
+export const PRINT = Symbol('PRINT');
 
 /**
  * Provider DI wiring — every external service is selected from env config here
@@ -110,8 +119,39 @@ export const IMAGE_AI = Symbol('IMAGE_AI');
           ? new OpenAIImageProvider({ apiKey: env.IMAGE_API_KEY, model: env.IMAGE_MODEL })
           : new MockImageProvider(),
     },
+    {
+      provide: PAYMENT,
+      inject: [ENV],
+      useFactory: (env: Env): PaymentProvider =>
+        env.PAYMENT_PROVIDER === 'iyzico'
+          ? new IyzicoPaymentProvider({
+              apiKey: env.IYZICO_API_KEY,
+              secretKey: env.IYZICO_SECRET,
+              baseUrl: env.IYZICO_BASE_URL,
+            })
+          : new MockPaymentProvider(),
+    },
+    {
+      provide: PRINT,
+      inject: [ENV],
+      useFactory: (env: Env): PrintProvider =>
+        // No Turkish print API selected yet (§33) — mock everywhere; real
+        // integrations implement PrintProvider (docs/providers.md).
+        new MockPrintProvider({ stageSeconds: env.NODE_ENV === 'development' ? 20 : 3600 }),
+    },
     MailService,
   ],
-  exports: [STORAGE, PUSH, STORY_AI, MODERATOR, TTS, VOICE_CLONE, IMAGE_AI, MailService],
+  exports: [
+    STORAGE,
+    PUSH,
+    STORY_AI,
+    MODERATOR,
+    TTS,
+    VOICE_CLONE,
+    IMAGE_AI,
+    PAYMENT,
+    PRINT,
+    MailService,
+  ],
 })
 export class ProvidersModule {}
