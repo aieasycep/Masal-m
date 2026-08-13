@@ -68,6 +68,8 @@ const envSchema = z
 
     WORKER_MODE: z.enum(['inline', 'separate', 'worker-only']).default('inline'),
     FFMPEG_PATH: z.string().default(''),
+    /** Chromium binary for the print-PDF worker; empty = auto-detect. */
+    CHROMIUM_PATH: z.string().default(''),
   })
   .superRefine((env, ctx) => {
     // Mocks must be impossible to run in production (§61).

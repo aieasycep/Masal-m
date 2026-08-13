@@ -5,12 +5,22 @@ import type {
   AppleAuthInput,
   AuthSession,
   AuthTokens,
+  AvatarUploadInput,
+  Book,
+  SignedUploadResponse,
+  VoiceRecordingUploadInput,
   Child,
+  CreateBookInput,
   CreateChildInput,
+  CreateIllustrationSetInput,
   CreateNarrationInput,
   CreateStoryInput,
   CreateVoiceProfileInput,
   DeleteAccountInput,
+  Illustration,
+  IllustrationSet,
+  RenderBookInput,
+  UpdateBookInput,
   EntitlementsResponse,
   ForgotPasswordInput,
   GoogleAuthInput,
@@ -130,6 +140,30 @@ export class MasalimApiClient {
       this.http.post<VoiceProfile>(`/voices/${id}/recreate`, input),
   };
 
+  readonly illustrations = {
+    list: (storyId: string) =>
+      this.http.get<IllustrationSet[]>(`/stories/${storyId}/illustrations`),
+    create: (storyId: string, input: CreateIllustrationSetInput) =>
+      this.http.post<{ set: IllustrationSet; jobId: string | null }>(
+        `/stories/${storyId}/illustrations`,
+        input,
+      ),
+    select: (illustrationId: string) =>
+      this.http.patch<Illustration>(`/illustrations/${illustrationId}`, { selected: true }),
+    regenerate: (illustrationId: string) =>
+      this.http.post<{ jobId: string }>(`/illustrations/${illustrationId}/regenerate`),
+  };
+
+  readonly books = {
+    list: () => this.http.get<Book[]>('/books'),
+    create: (input: CreateBookInput) => this.http.post<Book>('/books', input),
+    get: (id: string) => this.http.get<Book>(`/books/${id}`),
+    update: (id: string, input: UpdateBookInput) => this.http.patch<Book>(`/books/${id}`, input),
+    remove: (id: string) => this.http.delete<void>(`/books/${id}`),
+    render: (id: string, input: RenderBookInput) =>
+      this.http.post<{ jobId: string }>(`/books/${id}/render`, input),
+  };
+
   readonly narrations = {
     list: (storyId: string) => this.http.get<Narration[]>(`/stories/${storyId}/narrations`),
     create: (storyId: string, input: CreateNarrationInput) =>
@@ -154,6 +188,13 @@ export class MasalimApiClient {
         `/notifications?page=${page}`,
       ),
     markRead: (id: string) => this.http.post<NotificationItem>(`/notifications/${id}/read`),
+  };
+
+  readonly uploads = {
+    voiceRecording: (input: VoiceRecordingUploadInput) =>
+      this.http.post<SignedUploadResponse>('/uploads/voice-recordings', input),
+    avatar: (input: AvatarUploadInput) =>
+      this.http.post<SignedUploadResponse>('/uploads/avatars', input),
   };
 
   readonly devices = {

@@ -7,11 +7,14 @@ import {
   ElevenLabsVoiceCloneProvider,
   LlmContentModerator,
   MockContentModerator,
+  MockImageProvider,
   MockStoryProvider,
   MockTtsProvider,
   MockVoiceCloneProvider,
+  OpenAIImageProvider,
   OpenAIStoryProvider,
   ContentModerator,
+  ImageGenerationProvider,
   StoryGenerationProvider,
   TextToSpeechProvider,
   VoiceCloneProvider,
@@ -26,6 +29,7 @@ export const STORY_AI = Symbol('STORY_AI');
 export const MODERATOR = Symbol('MODERATOR');
 export const TTS = Symbol('TTS');
 export const VOICE_CLONE = Symbol('VOICE_CLONE');
+export const IMAGE_AI = Symbol('IMAGE_AI');
 
 /**
  * Provider DI wiring — every external service is selected from env config here
@@ -98,8 +102,16 @@ export const VOICE_CLONE = Symbol('VOICE_CLONE');
           ? new ElevenLabsVoiceCloneProvider({ apiKey: env.VOICE_CLONE_API_KEY })
           : new MockVoiceCloneProvider(),
     },
+    {
+      provide: IMAGE_AI,
+      inject: [ENV],
+      useFactory: (env: Env): ImageGenerationProvider =>
+        env.IMAGE_PROVIDER === 'openai'
+          ? new OpenAIImageProvider({ apiKey: env.IMAGE_API_KEY, model: env.IMAGE_MODEL })
+          : new MockImageProvider(),
+    },
     MailService,
   ],
-  exports: [STORAGE, PUSH, STORY_AI, MODERATOR, TTS, VOICE_CLONE, MailService],
+  exports: [STORAGE, PUSH, STORY_AI, MODERATOR, TTS, VOICE_CLONE, IMAGE_AI, MailService],
 })
 export class ProvidersModule {}
