@@ -138,6 +138,21 @@ Local `.env` = `.env.example` + generated JWT secrets (already present, gitignor
   dispatched with the user's api_url. masalim-admin web service added to
   render.yaml (NEXT_PUBLIC_API_URL hardcoded to the api URL above); API CORS
   accepts *.onrender.com outside production (main.ts).
+- **Startup crash FIXED (b580c47)**: release APK crashed after splash on device.
+  Root cause (found via emulator logcat): RNTP 4.1.2 @ReactMethods use `= scope.launch {}`
+  expression bodies → return Job not void → TurboModule interop ParsingException at first
+  module access. Fix: extended patches/react-native-track-player.patch — all 37 methods
+  routed through Unit-returning `launchInScope` wrapper (labels renamed to
+  `return@launchInScope`); old null-safe fromBundle hunks folded into regenerated patch.
+  NOTE: `pnpm patch` extracts PRISTINE source (existing patch NOT applied) — re-apply
+  the old patch in the edit dir before editing, else patch-commit loses prior fixes.
+- **android-crash-log.yml**: diagnostic workflow — downloads `masalim-apk` artifact by
+  run id (input `apk_run_id`), boots emulator (KVM + reactivecircus runner, API 34),
+  installs+launches, prints APP_ALIVE + FATAL EXCEPTION extract at end of job log,
+  uploads full logcat artifact. Verified fix: run 31736923379 → APP_ALIVE=yes, clean JS.
+  Use this to verify EVERY future APK before handing to user.
+- android-apk.yml default EXPO_PUBLIC_API_URL now the live Render URL (no more manual
+  api_url input needed). Working APK for user: artifact of run 31735402753.
 - Scheduled self check-ins exist via send_later for CI/APK monitoring;
   re-arm after firing while PR is open.
 
