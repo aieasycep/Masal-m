@@ -97,7 +97,9 @@
       "periler": "Fairies",
       "macera": "Adventure",
       "müzik": "Music"
-    }
+    },
+    "deleteConfirmTitle": "Delete this profile?",
+    "deleteConfirmBody": "{{name}}'s profile will be removed. Stories you created stay in your library."
   },
   "home": {
     "greetingMorning": "Good morning 👋",
@@ -412,9 +414,15 @@
   "checkout": {
     "configTitle": "Configure your book",
     "bookSize": "Book size",
-    "sizes": { "SQUARE": "Square", "STANDARD": "Standard" },
+    "sizes": {
+      "SQUARE": "Square",
+      "STANDARD": "Standard"
+    },
     "coverTypeLabel": "Cover",
-    "covers": { "HARDCOVER": "Hardcover", "SOFTCOVER": "Softcover" },
+    "covers": {
+      "HARDCOVER": "Hardcover",
+      "SOFTCOVER": "Softcover"
+    },
     "quantity": "Quantity",
     "price": "Price",
     "estimatedDelivery": "Estimated delivery: {{min}}–{{max}} business days",
@@ -477,7 +485,8 @@
       "privacy": "Privacy & Voice Data",
       "privacySub": "Secure and encrypted",
       "settings": "Settings",
-      "settingsSub": "Language, accessibility"
+      "settingsSub": "Language, accessibility",
+      "subscriptionPremiumNoDate": "Premium member"
     },
     "signOut": "Sign Out",
     "signOutConfirm": "Do you want to sign out?"
@@ -489,7 +498,10 @@
     "notifications": "Notifications",
     "pushEnabled": "Push notifications",
     "language": "Language",
-    "languages": { "tr": "Türkçe", "en": "English" },
+    "languages": {
+      "tr": "Türkçe",
+      "en": "English"
+    },
     "audio": "Audio",
     "voiceData": "My Voice Data",
     "voiceDataBody": "Manage, listen to, or delete your saved voices.",

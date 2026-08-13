@@ -97,7 +97,9 @@
       "periler": "Periler",
       "macera": "Macera",
       "müzik": "Müzik"
-    }
+    },
+    "deleteConfirmTitle": "Profili silmek istiyor musun?",
+    "deleteConfirmBody": "{{name}} için kaydedilen profil silinir. Oluşturulan hikâyeler kitaplığında kalır."
   },
   "home": {
     "greetingMorning": "Günaydın 👋",
@@ -412,9 +414,15 @@
   "checkout": {
     "configTitle": "Kitabını yapılandır",
     "bookSize": "Kitap boyutu",
-    "sizes": { "SQUARE": "Kare", "STANDARD": "Standart" },
+    "sizes": {
+      "SQUARE": "Kare",
+      "STANDARD": "Standart"
+    },
     "coverTypeLabel": "Kapak",
-    "covers": { "HARDCOVER": "Sert Kapak", "SOFTCOVER": "Yumuşak Kapak" },
+    "covers": {
+      "HARDCOVER": "Sert Kapak",
+      "SOFTCOVER": "Yumuşak Kapak"
+    },
     "quantity": "Adet",
     "price": "Fiyat",
     "estimatedDelivery": "Tahmini teslimat: {{min}}–{{max}} iş günü",
@@ -477,7 +485,8 @@
       "privacy": "Gizlilik & Ses Verilerim",
       "privacySub": "Güvenli ve şifreli",
       "settings": "Ayarlar",
-      "settingsSub": "Dil, erişilebilirlik"
+      "settingsSub": "Dil, erişilebilirlik",
+      "subscriptionPremiumNoDate": "Premium Üye"
     },
     "signOut": "Çıkış Yap",
     "signOutConfirm": "Çıkış yapmak istiyor musun?"
@@ -489,7 +498,10 @@
     "notifications": "Bildirimler",
     "pushEnabled": "Anlık bildirimler",
     "language": "Dil",
-    "languages": { "tr": "Türkçe", "en": "English" },
+    "languages": {
+      "tr": "Türkçe",
+      "en": "English"
+    },
     "audio": "Ses",
     "voiceData": "Ses Verilerim",
     "voiceDataBody": "Kayıtlı seslerini yönetebilir, dinleyebilir veya silebilirsin.",

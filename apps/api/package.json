@@ -29,6 +29,7 @@
     "@nestjs/throttler": "^6.5.0",
     "apple-signin-auth": "^2.1.0",
     "argon2": "^0.45.1",
+    "bullmq": "^6.1.0",
     "google-auth-library": "^11.0.2",
     "helmet": "^8.0.0",
     "ioredis": "^6.0.0",
@@ -56,11 +57,20 @@
     "typescript": "^5.7.3"
   },
   "jest": {
-    "moduleFileExtensions": ["js", "json", "ts"],
+    "moduleFileExtensions": [
+      "js",
+      "json",
+      "ts"
+    ],
     "rootDir": ".",
     "testRegex": ".*\\.spec\\.ts$",
     "transform": {
-      "^.+\\.ts$": ["ts-jest", { "tsconfig": "tsconfig.spec.json" }]
+      "^.+\\.ts$": [
+        "ts-jest",
+        {
+          "tsconfig": "tsconfig.spec.json"
+        }
+      ]
     },
     "testEnvironment": "node"
   }

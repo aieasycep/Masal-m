@@ -26,6 +26,8 @@ export const StorageKeys = {
   illustration: (userId: string, storyId: string, illustrationId: string) =>
     `users/${userId}/stories/${storyId}/illustrations/${illustrationId}.png`,
   bookPdf: (userId: string, bookId: string) => `users/${userId}/books/${bookId}/print.pdf`,
+  systemVoicePreview: (systemVoiceId: string, ext: string) =>
+    `system-voices/${systemVoiceId}/preview.${ext}`,
   /** Immutable order snapshot prefix — excluded from user deletion (§81). */
   orderSnapshot: (orderId: string) => `orders/${orderId}`,
   userPrefix: (userId: string) => `users/${userId}`,

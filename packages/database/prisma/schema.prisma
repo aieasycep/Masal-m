@@ -375,6 +375,7 @@ model Story {
   advanced         Json             @default("{}")
   storyText        String?
   summary          String?
+  coverIllustrationPrompt String?
   coverImageKey    String?
   language         String           @default("tr")
   status           StoryStatus      @default(DRAFT)
