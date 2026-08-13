@@ -9,7 +9,7 @@
     "lint": "eslint src",
     "typecheck": "tsc --noEmit",
     "test": "jest --testPathIgnorePatterns=test/integration",
-    "test:integration": "jest --testPathPatterns=test/integration --runInBand"
+    "test:integration": "NODE_ENV=test jest --testPathPattern=test/integration --runInBand"
   },
   "dependencies": {
     "@masalim/ai": "workspace:*",

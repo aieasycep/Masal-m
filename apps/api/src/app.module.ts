@@ -28,6 +28,7 @@ import { BooksModule } from './modules/books/books.module';
 import { AddressesModule } from './modules/addresses/addresses.module';
 import { OrdersModule } from './modules/orders/orders.module';
 import { AdminModule } from './modules/admin/admin.module';
+import { AnalyticsModule } from './modules/analytics/analytics.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { SubscriptionModule } from './modules/subscription/subscription.module';
 import { AppConfigModule } from './modules/app-config/app-config.module';
@@ -64,10 +65,13 @@ import { HealthModule } from './modules/health/health.module';
     }),
     ThrottlerModule.forRootAsync({
       imports: [RedisModule],
-      inject: [REDIS],
-      useFactory: (redis: Redis) => ({
+      inject: [REDIS, ENV],
+      useFactory: (redis: Redis, env: Env) => ({
         throttlers: [{ name: 'default', ttl: seconds(60), limit: 120 }],
         storage: new ThrottlerStorageRedisService(redis),
+        // Integration tests share Redis with the dev server — rate limits
+        // would leak between runs and flake the suite.
+        skipIf: () => env.NODE_ENV === 'test',
       }),
     }),
     JwtModule.register({ global: true }),
@@ -87,6 +91,7 @@ import { HealthModule } from './modules/health/health.module';
     AddressesModule,
     OrdersModule,
     AdminModule,
+    AnalyticsModule,
     NotificationsModule,
     SubscriptionModule,
     AppConfigModule,
