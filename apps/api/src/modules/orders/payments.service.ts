@@ -53,11 +53,12 @@ export class PaymentsService {
 
     const existing = await this.prisma.payment.findUnique({ where: { idempotencyKey } });
     if (existing != null) {
+      const raw = (existing.rawResponse ?? {}) as { checkoutUrl?: string; providerToken?: string };
       return {
         provider: existing.provider,
-        checkoutUrl:
-          ((existing.rawResponse ?? {}) as { checkoutUrl?: string }).checkoutUrl ?? null,
+        checkoutUrl: raw.checkoutUrl ?? null,
         paymentId: existing.id,
+        providerToken: existing.provider === 'mock' ? (raw.providerToken ?? null) : null,
       };
     }
 
@@ -99,7 +100,14 @@ export class PaymentsService {
       },
     });
 
-    return { provider: row.provider, checkoutUrl: result.checkoutUrl, paymentId: row.id };
+    return {
+      provider: row.provider,
+      checkoutUrl: result.checkoutUrl,
+      paymentId: row.id,
+      // The dev flow completes mock payments directly; real providers go
+      // through their hosted checkout + callback and never expose the token.
+      providerToken: this.paymentProvider.name === 'mock' ? result.providerToken : null,
+    };
   }
 
   /**

@@ -27,6 +27,7 @@ import { IllustrationsModule } from './modules/illustrations/illustrations.modul
 import { BooksModule } from './modules/books/books.module';
 import { AddressesModule } from './modules/addresses/addresses.module';
 import { OrdersModule } from './modules/orders/orders.module';
+import { AdminModule } from './modules/admin/admin.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { SubscriptionModule } from './modules/subscription/subscription.module';
 import { AppConfigModule } from './modules/app-config/app-config.module';
@@ -85,6 +86,7 @@ import { HealthModule } from './modules/health/health.module';
     BooksModule,
     AddressesModule,
     OrdersModule,
+    AdminModule,
     NotificationsModule,
     SubscriptionModule,
     AppConfigModule,
