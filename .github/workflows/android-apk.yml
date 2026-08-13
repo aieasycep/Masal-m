@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       api_url:
-        description: "API adresi (örn. http://192.168.1.20:3001 veya https://api.ornek.com). Boş bırakılırsa yerel varsayılan kullanılır."
+        description: "API adresi (örn. https://masalim-api-z6ry.onrender.com). Boş bırakılırsa canlı test API'si kullanılır."
         required: false
         default: ""
   push:
@@ -23,7 +23,7 @@ jobs:
     timeout-minutes: 60
     env:
       # EXPO_PUBLIC_* values are inlined into the JS bundle at build time.
-      EXPO_PUBLIC_API_URL: ${{ inputs.api_url != '' && inputs.api_url || 'http://192.168.1.100:3001' }}
+      EXPO_PUBLIC_API_URL: ${{ inputs.api_url != '' && inputs.api_url || 'https://masalim-api-z6ry.onrender.com' }}
       EXPO_PUBLIC_PURCHASES_PROVIDER: mock
     steps:
       - uses: actions/checkout@v4
@@ -35,7 +35,7 @@ jobs:
           node-version: 22
           cache: pnpm
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: "17"
