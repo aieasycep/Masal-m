@@ -421,3 +421,47 @@ index b2409a09939164c49c0f7a16bb6d3284e8eab8fb..bbaf73b760e42ac362d071eb779d9a4e
          callback.resolve(Arguments.fromBundle(musicService.getPlayerStateBundle(musicService.state)))
      }
  }
+diff --git a/android/src/main/java/com/doublesymmetry/trackplayer/service/MusicService.kt b/android/src/main/java/com/doublesymmetry/trackplayer/service/MusicService.kt
+index afa6b0f335714de0cc8741d5bbdd51b4e04bb3bb..2b12f1f8948f6375d916cb467bbe276da46a99d7 100644
+--- a/android/src/main/java/com/doublesymmetry/trackplayer/service/MusicService.kt
++++ b/android/src/main/java/com/doublesymmetry/trackplayer/service/MusicService.kt
+@@ -30,6 +30,8 @@ import com.doublesymmetry.trackplayer.module.MusicEvents.Companion.METADATA_PAYL
+ import com.doublesymmetry.trackplayer.utils.BundleUtils
+ import com.doublesymmetry.trackplayer.utils.BundleUtils.setRating
+ import com.facebook.react.HeadlessJsTaskService
++import com.facebook.react.ReactApplication
++import com.facebook.react.bridge.ReactContext
+ import com.facebook.react.bridge.Arguments
+ import com.facebook.react.jstasks.HeadlessJsTaskConfig
+ import com.facebook.react.modules.core.DeviceEventManagerModule
+@@ -739,9 +741,20 @@ class MusicService : HeadlessJsTaskService() {
+         return bundle
+     }
+ 
++    /**
++     * Bridgeless (New Architecture) safe ReactContext lookup. The legacy
++     * ReactNativeHost accessor throws under the New Architecture, so prefer
++     * the ReactHost when the application provides one.
++     */
++    private fun currentReactContext(): ReactContext? {
++        val reactHost = (application as ReactApplication).reactHost
++        return if (reactHost != null) reactHost.currentReactContext
++        else reactNativeHost.reactInstanceManager.currentReactContext
++    }
++
+     @MainThread
+     private fun emit(event: String, data: Bundle? = null) {
+-        reactNativeHost.reactInstanceManager.currentReactContext
++        currentReactContext()
+             ?.getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter::class.java)
+             ?.emit(event, data?.let { Arguments.fromBundle(it) })
+     }
+@@ -751,7 +764,7 @@ class MusicService : HeadlessJsTaskService() {
+         val payload = Arguments.createArray()
+         data.forEach { payload.pushMap(Arguments.fromBundle(it)) }
+ 
+-        reactNativeHost.reactInstanceManager.currentReactContext
++        currentReactContext()
+             ?.getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter::class.java)
+             ?.emit(event, payload)
+     }
