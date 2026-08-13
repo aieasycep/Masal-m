@@ -78,15 +78,19 @@ export const useWizardStore = create<WizardState>()((set) => ({
   ...initialDraft,
   setStep: (step) => set({ step }),
   initialize: ({ child, theme }) =>
-    set((state) => ({
-      initialized: true,
-      childId: child?.id ?? null,
-      heroMode: child == null ? 'custom' : 'child',
-      heroName: child?.name ?? '',
-      heroType: HeroType.CHILD,
-      ageRange: child?.ageRange ?? state.ageRange,
-      themes: theme != null ? [theme] : state.themes,
-    })),
+    set((state) => {
+      // Self-guarding: prefill applies exactly once per draft (reset() re-arms).
+      if (state.initialized) return {};
+      return {
+        initialized: true,
+        childId: child?.id ?? null,
+        heroMode: child == null ? 'custom' : ('child' as const),
+        heroName: child?.name ?? '',
+        heroType: HeroType.CHILD,
+        ageRange: child?.ageRange ?? state.ageRange,
+        themes: theme != null ? [theme] : state.themes,
+      };
+    }),
   selectChild: (child) =>
     set((state) => ({
       childId: child.id,
