@@ -1,0 +1,86 @@
+import { Inject, Module, type MiddlewareConsumer, type NestModule } from '@nestjs/common';
+import { APP_FILTER, APP_GUARD, APP_PIPE } from '@nestjs/core';
+import { JwtModule } from '@nestjs/jwt';
+import { ThrottlerGuard, ThrottlerModule, seconds } from '@nestjs/throttler';
+import { ThrottlerStorageRedisService } from '@nest-lab/throttler-storage-redis';
+import { LoggerModule } from 'nestjs-pino';
+import { ZodValidationPipe } from 'nestjs-zod';
+import Redis from 'ioredis';
+import type { Request } from 'express';
+import { ConfigModule, ENV } from './config/config.module';
+import type { Env } from './config/env';
+import { PrismaModule } from './prisma/prisma.module';
+import { RedisModule, REDIS } from './redis/redis.module';
+import { ProvidersModule } from './providers/providers.module';
+import { GlobalExceptionFilter } from './common/errors/global-exception.filter';
+import { JwtAuthGuard } from './common/auth/jwt-auth.guard';
+import { AppVersionMiddleware } from './common/middleware/app-version.middleware';
+import { AuthModule } from './modules/auth/auth.module';
+import { UsersModule } from './modules/users/users.module';
+import { ChildrenModule } from './modules/children/children.module';
+import { UploadsModule } from './modules/uploads/uploads.module';
+import { AppConfigModule } from './modules/app-config/app-config.module';
+import { HealthModule } from './modules/health/health.module';
+
+@Module({
+  imports: [
+    ConfigModule,
+    LoggerModule.forRootAsync({
+      inject: [ENV],
+      useFactory: (env: Env) => ({
+        pinoHttp: {
+          level: env.LOG_LEVEL,
+          genReqId: (req) => (req as Request & { id?: string }).id,
+          transport:
+            env.NODE_ENV === 'development'
+              ? { target: 'pino-pretty', options: { singleLine: true } }
+              : undefined,
+          redact: {
+            paths: [
+              'req.headers.authorization',
+              'req.headers.cookie',
+              'req.body.password',
+              'req.body.newPassword',
+              'req.body.refreshToken',
+              'req.body.identityToken',
+              'req.body.idToken',
+            ],
+            censor: '[REDACTED]',
+          },
+          autoLogging: { ignore: (req) => req.url === '/health' },
+        },
+      }),
+    }),
+    ThrottlerModule.forRootAsync({
+      imports: [RedisModule],
+      inject: [REDIS],
+      useFactory: (redis: Redis) => ({
+        throttlers: [{ name: 'default', ttl: seconds(60), limit: 120 }],
+        storage: new ThrottlerStorageRedisService(redis),
+      }),
+    }),
+    JwtModule.register({ global: true }),
+    PrismaModule,
+    RedisModule,
+    ProvidersModule,
+    AuthModule,
+    UsersModule,
+    ChildrenModule,
+    UploadsModule,
+    AppConfigModule,
+    HealthModule,
+  ],
+  providers: [
+    { provide: APP_PIPE, useClass: ZodValidationPipe },
+    { provide: APP_FILTER, useClass: GlobalExceptionFilter },
+    { provide: APP_GUARD, useClass: JwtAuthGuard },
+    { provide: APP_GUARD, useClass: ThrottlerGuard },
+  ],
+})
+export class AppModule implements NestModule {
+  constructor(@Inject(ENV) private readonly env: Env) {}
+
+  configure(consumer: MiddlewareConsumer): void {
+    consumer.apply(AppVersionMiddleware).exclude('app/config', 'health').forRoutes('*');
+  }
+}
