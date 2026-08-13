@@ -41,6 +41,9 @@ jobs:
       REDIS_URL: redis://localhost:6379
       JWT_SECRET: ci-jwt-secret-for-tests-only
       JWT_REFRESH_SECRET: ci-refresh-secret-for-tests-only
+      # No MinIO service in CI — workers write to the local-disk provider.
+      STORAGE_PROVIDER: local
+      STORAGE_LOCAL_DIR: /tmp/masalim-ci-storage
     steps:
       - uses: actions/checkout@v4
 
