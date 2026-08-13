@@ -230,7 +230,9 @@
     "share": "Paylaş",
     "excerptTitle": "Hikâyeden bir kesit",
     "narrationPreparing": "Seslendirme hazırlanıyor…",
-    "narrationReady": "Seslendirme hazır"
+    "narrationReady": "Seslendirme hazır",
+    "editTitleLabel": "Başlık",
+    "editPageLabel": "{{page}}. sayfa"
   },
   "player": {
     "nowPlaying": "Şimdi dinliyorsun",
@@ -282,7 +284,9 @@
       "reVoice": "Yeni Sesle Oluştur",
       "makeBook": "Kitap Yap",
       "duplicate": "Kopyasını Oluştur",
-      "delete": "Sil"
+      "delete": "Sil",
+      "favorite": "Favorilere ekle",
+      "unfavorite": "Favorilerden çıkar"
     },
     "deleteConfirmTitle": "Hikâyeyi silmek istiyor musun?",
     "deleteConfirmBody": "Bu hikâye kütüphanenden kaldırılacak.",
@@ -516,7 +520,10 @@
     "deleteAccountConfirm": "Hesabımı Sil",
     "deletionPending": "Hesabın {{date}} tarihinde silinecek.",
     "deletionCancel": "Silme İşlemini İptal Et",
-    "version": "Sürüm {{version}}"
+    "version": "Sürüm {{version}}",
+    "pushDisabled": "Bildirimler kapalı",
+    "pushPermissionDenied": "Bildirimlere izin vermek için cihaz ayarlarını açman gerekiyor.",
+    "enablePush": "Bildirimleri Aç"
   },
   "subscription": {
     "title": "Masalım Premium",

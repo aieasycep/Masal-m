@@ -4,14 +4,17 @@ import { ExpoPushProvider, MockPushProvider, PushProvider } from '@masalim/notif
 import {
   AnthropicStoryProvider,
   ElevenLabsTtsProvider,
+  ElevenLabsVoiceCloneProvider,
   LlmContentModerator,
   MockContentModerator,
   MockStoryProvider,
   MockTtsProvider,
+  MockVoiceCloneProvider,
   OpenAIStoryProvider,
   ContentModerator,
   StoryGenerationProvider,
   TextToSpeechProvider,
+  VoiceCloneProvider,
 } from '@masalim/ai';
 import { ENV } from '../config/config.module';
 import type { Env } from '../config/env';
@@ -22,6 +25,7 @@ export const PUSH = Symbol('PUSH');
 export const STORY_AI = Symbol('STORY_AI');
 export const MODERATOR = Symbol('MODERATOR');
 export const TTS = Symbol('TTS');
+export const VOICE_CLONE = Symbol('VOICE_CLONE');
 
 /**
  * Provider DI wiring — every external service is selected from env config here
@@ -86,8 +90,16 @@ export const TTS = Symbol('TTS');
           ? new ElevenLabsTtsProvider({ apiKey: env.TTS_API_KEY, modelId: env.TTS_MODEL })
           : new MockTtsProvider(),
     },
+    {
+      provide: VOICE_CLONE,
+      inject: [ENV],
+      useFactory: (env: Env): VoiceCloneProvider =>
+        env.VOICE_CLONE_PROVIDER === 'elevenlabs'
+          ? new ElevenLabsVoiceCloneProvider({ apiKey: env.VOICE_CLONE_API_KEY })
+          : new MockVoiceCloneProvider(),
+    },
     MailService,
   ],
-  exports: [STORAGE, PUSH, STORY_AI, MODERATOR, TTS, MailService],
+  exports: [STORAGE, PUSH, STORY_AI, MODERATOR, TTS, VOICE_CLONE, MailService],
 })
 export class ProvidersModule {}

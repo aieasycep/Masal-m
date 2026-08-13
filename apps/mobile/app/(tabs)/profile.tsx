@@ -7,6 +7,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { AGE_RANGE_LABELS } from '@masalim/types';
 import { colors, fontFamilies, fontSizes, radius, shadows, spacing } from '@masalim/ui';
 import { api } from '../../src/lib/api';
+import { unregisterPush } from '../../src/lib/push';
 import { useAuthStore } from '../../src/stores/auth';
 import { useAppPrefs } from '../../src/stores/app-prefs';
 import { Avatar } from '../../src/components/Avatar';
@@ -48,31 +49,32 @@ export default function Profile() {
   const children = childrenQuery.data ?? [];
 
   const menuItems: MenuItem[] = [
-    {
-      key: 'voices',
-      icon: '🎙',
-      label: t('profile.menu.voices'),
-      sub: t('profile.menu.voicesEmpty'),
-      route: '/voice',
-    },
-    {
-      key: 'orders',
-      icon: '📦',
-      label: t('profile.menu.orders'),
-      sub: t('profile.menu.ordersEmpty'),
-      route: '/orders',
-    },
-    {
-      key: 'subscription',
-      icon: '👑',
-      label: t('profile.menu.subscription'),
-      // Expiry date arrives with the subscription API wiring (commerce phase);
-      // until then premium users get the date-less variant.
-      sub: isPremium
-        ? t('profile.menu.subscriptionPremiumNoDate')
-        : t('profile.menu.subscriptionFree'),
-      route: '/subscription/paywall',
-    },
+    // restored in voice/commerce phase — targets don't exist yet, dead rows are forbidden:
+    // {
+    //   key: 'voices',
+    //   icon: '🎙',
+    //   label: t('profile.menu.voices'),
+    //   sub: t('profile.menu.voicesEmpty'),
+    //   route: '/voice',
+    // },
+    // {
+    //   key: 'orders',
+    //   icon: '📦',
+    //   label: t('profile.menu.orders'),
+    //   sub: t('profile.menu.ordersEmpty'),
+    //   route: '/orders',
+    // },
+    // {
+    //   key: 'subscription',
+    //   icon: '👑',
+    //   label: t('profile.menu.subscription'),
+    //   // Expiry date arrives with the subscription API wiring (commerce phase);
+    //   // until then premium users get the date-less variant.
+    //   sub: isPremium
+    //     ? t('profile.menu.subscriptionPremiumNoDate')
+    //     : t('profile.menu.subscriptionFree'),
+    //   route: '/subscription/paywall',
+    // },
     {
       key: 'notifications',
       icon: '🔔',
@@ -85,7 +87,9 @@ export default function Profile() {
       icon: '🔒',
       label: t('profile.menu.privacy'),
       sub: t('profile.menu.privacySub'),
-      route: '/settings/voice-data',
+      // Voice-data detail lands in the voice phase — the settings hub hosts the
+      // privacy/voice-data summary until then.
+      route: '/settings',
     },
     {
       key: 'settings',
@@ -98,6 +102,8 @@ export default function Profile() {
 
   const signOut = async () => {
     setConfirmSignOut(false);
+    // Best-effort: drop this device's push token while the session is still valid.
+    await unregisterPush();
     try {
       await api.auth.logout();
     } catch {

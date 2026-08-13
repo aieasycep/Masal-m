@@ -22,6 +22,7 @@ import { ChildrenModule } from './modules/children/children.module';
 import { UploadsModule } from './modules/uploads/uploads.module';
 import { StoriesModule } from './modules/stories/stories.module';
 import { VoicesModule } from './modules/voices/voices.module';
+import { NarrationsModule } from './modules/narrations/narrations.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { SubscriptionModule } from './modules/subscription/subscription.module';
 import { AppConfigModule } from './modules/app-config/app-config.module';
@@ -75,6 +76,7 @@ import { HealthModule } from './modules/health/health.module';
     UploadsModule,
     StoriesModule,
     VoicesModule,
+    NarrationsModule,
     NotificationsModule,
     SubscriptionModule,
     AppConfigModule,

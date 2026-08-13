@@ -1,0 +1,135 @@
+import { create } from 'zustand';
+import { AgeRange, HeroType, StoryDuration, type StoryTheme } from '@masalim/types';
+
+/** Max selectable themes — mirrors createStorySchema's `.max(4)`. */
+export const MAX_THEMES = 4;
+
+export type HeroMode = 'child' | 'custom';
+
+/** Minimal child info the wizard needs (id + copy + age default). */
+export interface WizardChild {
+  id: string;
+  name: string;
+  ageRange: AgeRange;
+}
+
+interface WizardDraft {
+  step: number;
+  /** null = "general story" (no child attached). */
+  childId: string | null;
+  heroMode: HeroMode;
+  heroName: string;
+  heroType: HeroType;
+  themes: StoryTheme[];
+  /** Free-text idea — maps to CreateStoryInput.customPrompt. */
+  customPrompt: string;
+  ageRange: AgeRange;
+  durationTarget: StoryDuration;
+  /**
+   * Narrator choice (system voice id). Stored for the narration phase only —
+   * story generation does not consume it yet.
+   */
+  voiceId: string | null;
+  /** One-time prefill (selected child from app prefs + route theme) applied. */
+  initialized: boolean;
+}
+
+interface WizardState extends WizardDraft {
+  setStep: (step: number) => void;
+  /** One-time prefill from app prefs (child) and the `?theme=` route param. */
+  initialize: (options: { child: WizardChild | null; theme: StoryTheme | null }) => void;
+  selectChild: (child: WizardChild) => void;
+  /** "General story" — no child; hero must be custom. */
+  selectGeneral: () => void;
+  setHeroMode: (heroMode: HeroMode) => void;
+  setHeroName: (heroName: string) => void;
+  setHeroType: (heroType: HeroType) => void;
+  /** Toggle a theme; taps beyond MAX_THEMES are ignored (deselect always works). */
+  toggleTheme: (theme: StoryTheme) => void;
+  setThemes: (themes: StoryTheme[]) => void;
+  /** AI suggestion tap: merge its themes (capped) and seed the free-text idea. */
+  applySuggestion: (themes: StoryTheme[], promptSeed: string) => void;
+  setCustomPrompt: (customPrompt: string) => void;
+  setAgeRange: (ageRange: AgeRange) => void;
+  setDurationTarget: (durationTarget: StoryDuration) => void;
+  setVoiceId: (voiceId: string | null) => void;
+  reset: () => void;
+}
+
+const initialDraft: WizardDraft = {
+  step: 1,
+  childId: null,
+  heroMode: 'child',
+  heroName: '',
+  heroType: HeroType.CHILD,
+  themes: [],
+  customPrompt: '',
+  ageRange: AgeRange.AGE_3_5,
+  durationTarget: StoryDuration.MEDIUM,
+  voiceId: null,
+  initialized: false,
+};
+
+/**
+ * Story-creation wizard draft. Plain (non-persisted) store: the draft survives
+ * navigation within the session but starts fresh on app relaunch.
+ */
+export const useWizardStore = create<WizardState>()((set) => ({
+  ...initialDraft,
+  setStep: (step) => set({ step }),
+  initialize: ({ child, theme }) =>
+    set((state) => ({
+      initialized: true,
+      childId: child?.id ?? null,
+      heroMode: child == null ? 'custom' : 'child',
+      heroName: child?.name ?? '',
+      heroType: HeroType.CHILD,
+      ageRange: child?.ageRange ?? state.ageRange,
+      themes: theme != null ? [theme] : state.themes,
+    })),
+  selectChild: (child) =>
+    set((state) => ({
+      childId: child.id,
+      ageRange: child.ageRange,
+      // Child-as-hero keeps hero fields in sync with the selected child.
+      ...(state.heroMode === 'child'
+        ? { heroName: child.name, heroType: HeroType.CHILD }
+        : {}),
+    })),
+  selectGeneral: () =>
+    set((state) => ({
+      childId: null,
+      heroMode: 'custom',
+      // Drop a hero name inherited from child-as-hero mode.
+      heroName: state.heroMode === 'child' ? '' : state.heroName,
+    })),
+  setHeroMode: (heroMode) => set({ heroMode }),
+  setHeroName: (heroName) => set({ heroName }),
+  setHeroType: (heroType) => set({ heroType }),
+  toggleTheme: (theme) =>
+    set((state) => {
+      if (state.themes.includes(theme)) {
+        return { themes: state.themes.filter((item) => item !== theme) };
+      }
+      if (state.themes.length >= MAX_THEMES) {
+        return {};
+      }
+      return { themes: [...state.themes, theme] };
+    }),
+  setThemes: (themes) => set({ themes: themes.slice(0, MAX_THEMES) }),
+  applySuggestion: (themes, promptSeed) =>
+    set((state) => {
+      const merged = [...state.themes];
+      for (const theme of themes) {
+        if (!merged.includes(theme) && merged.length < MAX_THEMES) {
+          merged.push(theme);
+        }
+      }
+      return { themes: merged, customPrompt: promptSeed };
+    }),
+  setCustomPrompt: (customPrompt) => set({ customPrompt }),
+  setAgeRange: (ageRange) => set({ ageRange }),
+  setDurationTarget: (durationTarget) => set({ durationTarget }),
+  setVoiceId: (voiceId) => set({ voiceId }),
+  reset: () => set(initialDraft),
+}));

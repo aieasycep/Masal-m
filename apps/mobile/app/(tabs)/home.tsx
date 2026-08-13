@@ -69,12 +69,14 @@ export default function Home() {
   });
   const recommendations = recommendationsQuery.data ?? [];
 
-  // Wired to /stories in the stories phase.
-  const stories: StorySummary[] = [];
+  const storiesQuery = useQuery({
+    queryKey: ['stories', 'recent'],
+    queryFn: () => api.stories.list({ pageSize: 10 }),
+  });
+  const stories: StorySummary[] = storiesQuery.data?.items ?? [];
 
   const continueStory = stories.find((story) => story.latestNarration != null);
-  const showEmptyState =
-    childrenQuery.isSuccess && childList.length === 0 && stories.length === 0;
+  const showEmptyState = storiesQuery.isSuccess && stories.length === 0;
   const hasError = meQuery.isError || childrenQuery.isError;
 
   const goCreate = () => router.push('/story/create' as never);
@@ -83,6 +85,7 @@ export default function Home() {
   const retry = () => {
     void meQuery.refetch();
     void childrenQuery.refetch();
+    void storiesQuery.refetch();
   };
 
   const header = (

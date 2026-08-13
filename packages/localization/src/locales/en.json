@@ -230,7 +230,9 @@
     "share": "Share",
     "excerptTitle": "A glimpse of the story",
     "narrationPreparing": "Narration is being prepared…",
-    "narrationReady": "Narration ready"
+    "narrationReady": "Narration ready",
+    "editTitleLabel": "Title",
+    "editPageLabel": "Page {{page}}"
   },
   "player": {
     "nowPlaying": "Now listening",
@@ -282,7 +284,9 @@
       "reVoice": "Narrate with a New Voice",
       "makeBook": "Make a Book",
       "duplicate": "Duplicate",
-      "delete": "Delete"
+      "delete": "Delete",
+      "favorite": "Add to favorites",
+      "unfavorite": "Remove from favorites"
     },
     "deleteConfirmTitle": "Delete this story?",
     "deleteConfirmBody": "This story will be removed from your library.",
@@ -516,7 +520,10 @@
     "deleteAccountConfirm": "Delete My Account",
     "deletionPending": "Your account will be deleted on {{date}}.",
     "deletionCancel": "Cancel Deletion",
-    "version": "Version {{version}}"
+    "version": "Version {{version}}",
+    "pushDisabled": "Notifications are off",
+    "pushPermissionDenied": "To allow notifications, open your device settings.",
+    "enablePush": "Enable Notifications"
   },
   "subscription": {
     "title": "Masalım Premium",

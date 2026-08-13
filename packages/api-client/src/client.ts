@@ -7,7 +7,9 @@ import type {
   AuthTokens,
   Child,
   CreateChildInput,
+  CreateNarrationInput,
   CreateStoryInput,
+  CreateVoiceProfileInput,
   DeleteAccountInput,
   EntitlementsResponse,
   ForgotPasswordInput,
@@ -16,10 +18,12 @@ import type {
   LoginInput,
   Me,
   MockPurchaseInput,
+  Narration,
   NotificationItem,
   PaginatedMeta,
   PlaybackPositionInput,
   Recommendation,
+  RecreateVoiceProfileInput,
   RegisterInput,
   RegisterDeviceInput,
   ResetPasswordInput,
@@ -30,6 +34,8 @@ import type {
   UpdateChildInput,
   UpdateMeInput,
   UpdateStoryInput,
+  UpdateVoiceProfileInput,
+  VoiceProfile,
 } from '@masalim/validation';
 import { HttpClient, type HttpClientConfig, type RequestOptions } from './http';
 
@@ -114,6 +120,23 @@ export class MasalimApiClient {
     system: () => this.http.get<SystemVoice[]>('/voices/system'),
     systemPreview: (id: string) =>
       this.http.post<{ previewUrl: string }>(`/voices/system/${id}/preview`),
+    list: () => this.http.get<VoiceProfile[]>('/voices'),
+    create: (input: CreateVoiceProfileInput) => this.http.post<VoiceProfile>('/voices', input),
+    rename: (id: string, input: UpdateVoiceProfileInput) =>
+      this.http.patch<VoiceProfile>(`/voices/${id}`, input),
+    remove: (id: string) => this.http.delete<void>(`/voices/${id}`),
+    preview: (id: string) => this.http.post<{ previewUrl: string }>(`/voices/${id}/preview`),
+    recreate: (id: string, input: RecreateVoiceProfileInput) =>
+      this.http.post<VoiceProfile>(`/voices/${id}/recreate`, input),
+  };
+
+  readonly narrations = {
+    list: (storyId: string) => this.http.get<Narration[]>(`/stories/${storyId}/narrations`),
+    create: (storyId: string, input: CreateNarrationInput) =>
+      this.http.post<{ narration: Narration; jobId: string | null }>(
+        `/stories/${storyId}/narrations`,
+        input,
+      ),
   };
 
   readonly subscription = {
