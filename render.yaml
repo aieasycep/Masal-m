@@ -54,6 +54,21 @@ services:
       - key: STORAGE_SECRET_KEY
         sync: false
 
+  # Admin backoffice (Next.js) — orders/users/jobs/moderation tracking.
+  - type: web
+    name: masalim-admin
+    runtime: node
+    plan: free
+    buildCommand: corepack enable && pnpm install --frozen-lockfile && pnpm turbo build --filter=@masalim/admin...
+    startCommand: pnpm --filter @masalim/admin exec next start -p $PORT
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      # Inlined into the browser bundle at build time — must be the API's
+      # public URL. Update if the API service is ever recreated.
+      - key: NEXT_PUBLIC_API_URL
+        value: https://masalim-api-z6ry.onrender.com
+
   - type: keyvalue
     name: masalim-redis
     plan: free

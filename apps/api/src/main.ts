@@ -18,7 +18,12 @@ async function bootstrap(): Promise<void> {
   app.use(requestIdMiddleware);
   app.use(helmet());
   app.enableCors({
-    origin: env.CORS_ORIGINS.split(',').map((origin) => origin.trim()),
+    // Outside production, also accept Render preview/test hosts so the admin
+    // panel works without knowing its generated subdomain up front.
+    origin: [
+      ...env.CORS_ORIGINS.split(',').map((origin) => origin.trim()),
+      ...(env.NODE_ENV !== 'production' ? [/^https:\/\/[a-z0-9-]+\.onrender\.com$/] : []),
+    ],
     credentials: true,
   });
   app.enableShutdownHooks();

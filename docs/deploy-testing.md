@@ -66,6 +66,17 @@ Kullanılacak servisler:
 - Tüm yapay zekâ/ödeme sağlayıcıları **mock** modda: anahtar gerekmez, ödeme
   gerçek para çekmez, hikâyeler deterministik örnek içeriktir.
 
+## Yönetim paneli (backoffice)
+
+Blueprint, `masalim-admin` adında ikinci bir web servisi daha kurar — kayıtlı
+kullanıcıları, basılı kitap siparişlerini (durum/kargo takip), yapay zekâ
+işlerini, içerik denetimini ve özellik anahtarlarını buradan yönetirsin.
+
+- Adres: Render panelinde `masalim-admin` servisine tıkla → üstteki
+  `https://masalim-admin-xxxx.onrender.com` bağlantısı.
+- Giriş: `admin@masalim.local` / `admin-dev-password-1` (test hesabı).
+- Normal kullanıcı hesapları panele giremez; yönetici oturumu ayrıdır.
+
 ## Bilinen ücretsiz-katman sınırları
 
 - Render ücretsiz servis 15 dk boşta kalınca uyur → ilk istek ~1 dk sürebilir.
