@@ -1,4 +1,4 @@
-import { Controller, Get, Header, Param, Sse, type MessageEvent } from '@nestjs/common';
+import { Controller, Get, Header, Param, Sse, MessageEvent } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import {
   defer,
@@ -12,7 +12,7 @@ import {
   share,
   takeUntil,
   takeWhile,
-  type Observable,
+  Observable,
 } from 'rxjs';
 import { AIJobStatus } from '@masalim/types';
 import type { AIJob as AIJobRow } from '@masalim/database';

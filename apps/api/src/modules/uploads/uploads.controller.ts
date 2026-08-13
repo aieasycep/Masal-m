@@ -1,7 +1,7 @@
 import { Body, Controller, Inject, Post } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { ApiTags } from '@nestjs/swagger';
-import { StorageKeys, type StorageProvider } from '@masalim/storage';
+import { StorageKeys, StorageProvider } from '@masalim/storage';
 import type { SignedUploadResponse } from '@masalim/validation';
 import { CurrentUser } from '../../common/auth/current-user.decorator';
 import type { AuthenticatedUser } from '../../common/auth/jwt-auth.guard';

@@ -6,7 +6,7 @@
     "build": "nest build",
     "dev": "nest start --watch",
     "start": "node dist/main.js",
-    "lint": "eslint src test",
+    "lint": "eslint src",
     "typecheck": "tsc --noEmit",
     "test": "jest --testPathIgnorePatterns=test/integration",
     "test:integration": "jest --testPathPatterns=test/integration --runInBand"

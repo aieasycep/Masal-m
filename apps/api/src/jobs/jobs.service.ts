@@ -1,13 +1,13 @@
-import { Inject, Injectable, Logger, type OnApplicationShutdown } from '@nestjs/common';
-import { Queue, type JobsOptions } from 'bullmq';
-import Redis from 'ioredis';
-import { AIJobStatus, type AIJobType, type ErrorCode } from '@masalim/types';
+import { Inject, Injectable, Logger, OnApplicationShutdown } from '@nestjs/common';
+import { Queue, JobsOptions } from 'bullmq';
+import type Redis from 'ioredis';
+import { AIJobStatus, AIJobType, ErrorCode } from '@masalim/types';
 import type { AIJob as AIJobDto, JobStreamEvent } from '@masalim/validation';
 import type { AIJob as AIJobRow, Prisma } from '@masalim/database';
 import { PrismaService } from '../prisma/prisma.service';
 import { AppException } from '../common/errors/app.exception';
 import { REDIS } from '../redis/redis.module';
-import { QUEUE_FOR_JOB_TYPE, type QueueJobData, type QueueName } from './queues';
+import { QUEUE_FOR_JOB_TYPE, QueueJobData, QueueName } from './queues';
 
 const JOB_CHANNEL_PREFIX = 'masalim:job-events:';
 

@@ -22,11 +22,10 @@ function buildService() {
     refreshToken: {
       create: jest.fn(async ({ data }: { data: Omit<RefreshRow, 'id' | 'revokedAt' | 'user'> }) => {
         const row: RefreshRow = {
+          ...data,
           id: `rt-${++idCounter}`,
           revokedAt: null,
           user: { email: 'user@test.local', deletedAt: null },
-          deviceId: null,
-          ...data,
         };
         rows.push(row);
         return row;

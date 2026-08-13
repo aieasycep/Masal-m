@@ -1,8 +1,8 @@
 import {
   HttpStatus,
   Injectable,
-  type CanActivate,
-  type ExecutionContext,
+  CanActivate,
+  ExecutionContext,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { JwtService } from '@nestjs/jwt';

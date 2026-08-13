@@ -1,4 +1,4 @@
-import { Injectable, type NestMiddleware } from '@nestjs/common';
+import { Injectable, NestMiddleware } from '@nestjs/common';
 import { Inject } from '@nestjs/common';
 import { ErrorCode } from '@masalim/types';
 import type { NextFunction, Request, Response } from 'express';

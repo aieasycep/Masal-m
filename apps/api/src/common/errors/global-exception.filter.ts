@@ -2,12 +2,12 @@ import {
   Catch,
   HttpException,
   HttpStatus,
-  type ArgumentsHost,
-  type ExceptionFilter,
+  ArgumentsHost,
+  ExceptionFilter,
 } from '@nestjs/common';
 import { ZodValidationException } from 'nestjs-zod';
 import { ThrottlerException } from '@nestjs/throttler';
-import { ErrorCode, type ApiErrorBody } from '@masalim/types';
+import { ErrorCode, ApiErrorBody } from '@masalim/types';
 import type { Request, Response } from 'express';
 import { PinoLogger } from 'nestjs-pino';
 import { AppException } from './app.exception';

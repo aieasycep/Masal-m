@@ -10,7 +10,7 @@ import {
   Res,
 } from '@nestjs/common';
 import { ApiExcludeController } from '@nestjs/swagger';
-import { LocalStorageProvider, type StorageProvider } from '@masalim/storage';
+import { LocalStorageProvider, StorageProvider } from '@masalim/storage';
 import { ErrorCode } from '@masalim/types';
 import type { Request, Response } from 'express';
 import { Public } from '../../common/auth/public.decorator';

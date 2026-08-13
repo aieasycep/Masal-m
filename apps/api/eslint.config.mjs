@@ -4,11 +4,11 @@ export default [
   ...node,
   {
     rules: {
-      // NestJS DI relies on classes referenced as types in constructors.
-      '@typescript-eslint/consistent-type-imports': [
-        'error',
-        { prefer: 'type-imports', fixStyle: 'inline-type-imports' },
-      ],
+      // Off on purpose: Nest DI + ZodValidationPipe resolve constructor and
+      // handler param classes through emitDecoratorMetadata, which erases
+      // type-only imports at runtime — auto-fixing to `import type` silently
+      // breaks injection and request validation.
+      '@typescript-eslint/consistent-type-imports': 'off',
     },
   },
 ];

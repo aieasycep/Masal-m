@@ -1,4 +1,4 @@
-import { Global, Module, type OnApplicationShutdown } from '@nestjs/common';
+import { Global, Module, OnApplicationShutdown } from '@nestjs/common';
 import { Inject } from '@nestjs/common';
 import Redis from 'ioredis';
 import { ENV } from '../config/config.module';

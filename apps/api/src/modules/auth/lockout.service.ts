@@ -1,5 +1,5 @@
 import { HttpStatus, Inject, Injectable } from '@nestjs/common';
-import Redis from 'ioredis';
+import type Redis from 'ioredis';
 import { ErrorCode } from '@masalim/types';
 import { REDIS } from '../../redis/redis.module';
 import { AppException } from '../../common/errors/app.exception';

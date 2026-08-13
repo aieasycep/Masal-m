@@ -2,12 +2,12 @@ import {
   Inject,
   Injectable,
   Logger,
-  type OnApplicationShutdown,
-  type OnModuleInit,
+  OnApplicationShutdown,
+  OnModuleInit,
 } from '@nestjs/common';
-import Redis from 'ioredis';
-import { Subject, type Observable } from 'rxjs';
-import { jobStreamEventSchema, type JobStreamEvent } from '@masalim/validation';
+import type Redis from 'ioredis';
+import { Observable, Subject } from 'rxjs';
+import { jobStreamEventSchema, JobStreamEvent } from '@masalim/validation';
 import { REDIS } from '../redis/redis.module';
 import { jobChannel } from './jobs.service';
 
