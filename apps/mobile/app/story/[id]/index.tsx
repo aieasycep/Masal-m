@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, Share, StyleSheet, Text, View } from 'react-native';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -16,7 +16,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AIJobStatus, DURATION_TARGETS, NarrationStatus, StoryStatus } from '@masalim/types';
-import { ApiError } from '@masalim/api-client';
+import { ApiError, NetworkError } from '@masalim/api-client';
 import { colors, fontFamilies, fontSizes, gradients, radius, spacing } from '@masalim/ui';
 import { api } from '../../../src/lib/api';
 import { useJobProgress } from '../../../src/lib/job-stream';
@@ -84,8 +84,8 @@ function ConfettiDot({ index }: { index: number }) {
 /**
  * Story result — cover hero + actions. With a READY narration the primary CTA
  * is "Dinlemeye Başla" (player); otherwise "Oku" stays primary and the action
- * grid gains a "Seslendir" tile. NOTE (phase deviation): the Görselleştir/
- * Kitap Yap tiles arrive with the illustration/book phases.
+ * grid gains a "Seslendir" tile. Görselleştir routes to the illustration flow;
+ * Kitap Yap reuses (or creates) the story's book and opens the builder.
  */
 export default function StoryResult() {
   const { t } = useTranslation();
@@ -93,6 +93,8 @@ export default function StoryResult() {
   const queryClient = useQueryClient();
   const { id } = useLocalSearchParams<{ id: string }>();
   const coverFloatStyle = useFloatStyle(4000);
+  const [bookLoading, setBookLoading] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   const storyQuery = useQuery({
     queryKey: ['story', id],
@@ -190,6 +192,37 @@ export default function StoryResult() {
   const openPlayer = () => router.push(`/story/${story.id}/player` as never);
   const openNarrate = () => router.push(`/story/${story.id}/narrate` as never);
   const openEdit = () => router.push(`/story/${story.id}/edit` as never);
+  const openIllustrate = () => router.push(`/story/${story.id}/illustrate` as never);
+  /** Kitap Yap: reuse the story's existing book, else create one, then open the builder. */
+  const openBookBuilder = async () => {
+    if (bookLoading) return;
+    setActionError(null);
+    setBookLoading(true);
+    try {
+      const books = await queryClient.fetchQuery({
+        queryKey: ['books'],
+        queryFn: () => api.books.list(),
+      });
+      const existing = books.find((book) => book.storyId === story.id);
+      if (existing != null) {
+        router.push(`/book/${existing.id}/builder` as never);
+        return;
+      }
+      const created = await api.books.create({ storyId: story.id });
+      void queryClient.invalidateQueries({ queryKey: ['books'] });
+      router.push(`/book/${created.id}/builder` as never);
+    } catch (err) {
+      if (err instanceof ApiError) {
+        setActionError(t(`errors.${err.code}`, { defaultValue: t('errors.GENERIC') }));
+      } else if (err instanceof NetworkError) {
+        setActionError(t('errors.OFFLINE'));
+      } else {
+        setActionError(t('errors.GENERIC'));
+      }
+    } finally {
+      setBookLoading(false);
+    }
+  };
   const share = () => {
     void Share.share({
       title: story.title,
@@ -199,10 +232,26 @@ export default function StoryResult() {
     });
   };
 
+  // 6 tiles → 3 per row × 2 rows (reference design's action grid, StoryResult.tsx).
   const actions = [
     { key: 'read', emoji: '📖', label: t('storyResult.read'), onPress: openReader },
     { key: 'narrate', emoji: '🎙', label: t('narrate.create'), onPress: openNarrate },
     { key: 'edit', emoji: '✏️', label: t('storyResult.edit'), onPress: openEdit },
+    {
+      key: 'illustrate',
+      emoji: '🎨',
+      label: t('storyResult.illustrate'),
+      onPress: openIllustrate,
+    },
+    {
+      key: 'book',
+      emoji: '📚',
+      label: t('storyResult.makeBook'),
+      onPress: () => {
+        void openBookBuilder();
+      },
+      loading: bookLoading,
+    },
     { key: 'share', emoji: '🔗', label: t('storyResult.share'), onPress: share },
   ];
 
@@ -313,15 +362,25 @@ export default function StoryResult() {
             <Pressable
               key={action.key}
               onPress={action.onPress}
+              disabled={action.loading === true}
               accessibilityRole="button"
               accessibilityLabel={action.label}
+              accessibilityState={{ busy: action.loading === true }}
               style={({ pressed }) => [styles.actionTile, { opacity: pressed ? 0.7 : 1 }]}
             >
-              <Text style={styles.actionEmoji}>{action.emoji}</Text>
+              <View style={styles.actionIconBox}>
+                {action.loading === true ? (
+                  <ActivityIndicator size="small" color={colors.primary} />
+                ) : (
+                  <Text style={styles.actionEmoji}>{action.emoji}</Text>
+                )}
+              </View>
               <Text style={styles.actionLabel}>{action.label}</Text>
             </Pressable>
           ))}
         </View>
+
+        {actionError != null ? <Text style={styles.actionError}>{actionError}</Text> : null}
 
         {excerpt.length > 0 ? (
           <View style={styles.excerptCard}>
@@ -423,9 +482,10 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: spacing.sm,
   },
-  actionGrid: { flexDirection: 'row', gap: spacing.xs, marginTop: spacing.md },
+  actionGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, marginTop: spacing.md },
   actionTile: {
-    flex: 1,
+    flexGrow: 1,
+    flexBasis: '30%',
     alignItems: 'center',
     gap: 6,
     paddingVertical: spacing.sm,
@@ -435,12 +495,20 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
   },
+  actionIconBox: { height: 26, alignItems: 'center', justifyContent: 'center' },
   actionEmoji: { fontSize: 22 },
   actionLabel: {
     fontFamily: fontFamilies.bodyBold,
     fontSize: fontSizes.md,
     color: colors.mutedForeground,
     textAlign: 'center',
+  },
+  actionError: {
+    fontFamily: fontFamilies.bodySemiBold,
+    fontSize: fontSizes.md,
+    color: colors.destructive,
+    textAlign: 'center',
+    marginTop: spacing.sm,
   },
   excerptCard: {
     marginTop: 28,

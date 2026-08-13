@@ -398,7 +398,7 @@
     "chooseAlternative": "Farklı Görsel Seç"
   },
   "book": {
-    "builderTitle": "{{name}}'nin Kitabı",
+    "builderTitle": "{{name}} için kitap",
     "builderTitleGeneric": "Kitabın",
     "editText": "Metni Düzenle",
     "coverTitle": "Kapak tasarımı",
@@ -413,7 +413,12 @@
     "autosaved": "Kaydedildi",
     "renderPreparing": "Kitabın hazırlanıyor…",
     "emptyTitle": "Bir hikâyeyi ömür boyu saklanacak bir kitaba dönüştür.",
-    "emptyCta": "Bir Hikâye Seç"
+    "emptyCta": "Bir Hikâye Seç",
+    "layoutOptions": {
+      "IMAGE_TOP": "Görsel üstte",
+      "IMAGE_FULL": "Tam sayfa görsel",
+      "TEXT_ONLY": "Yalnızca metin"
+    }
   },
   "checkout": {
     "configTitle": "Kitabını yapılandır",
@@ -446,10 +451,12 @@
     "totalLabel": "Toplam",
     "payCta": "Ödemeyi Tamamla",
     "paying": "Ödeme alınıyor…",
-    "successTitle": "{{name}}'nin masalı yola çıkmaya hazırlanıyor 💛",
+    "successTitle": "{{name}} için masal yola çıkmaya hazırlanıyor 💛",
     "successTitleGeneric": "Masalın yola çıkmaya hazırlanıyor 💛",
     "orderNumber": "Sipariş numarası",
-    "trackOrder": "Siparişimi Takip Et"
+    "trackOrder": "Siparişimi Takip Et",
+    "newAddress": "Yeni adres ekle",
+    "subtotal": "Ara toplam"
   },
   "orders": {
     "title": "Siparişlerim",

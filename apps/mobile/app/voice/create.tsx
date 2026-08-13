@@ -549,6 +549,7 @@ export default function VoiceCreate() {
         : t('voice.studioTitle');
 
   // ── Premium gate (deep-link safety): entitlement check also lives here. ──
+  // §36: the user learns this is premium BEFORE recording and can upgrade.
   if (entitled === false) {
     return (
       <View style={[styles.creamRoot, { paddingTop: Math.max(insets.top, 20) + 8 }]}>
@@ -558,7 +559,13 @@ export default function VoiceCreate() {
             <Badge label={t('subscription.premiumPlan')} variant="premium" />
             <Text style={styles.premiumGateText}>{t('voice.introPremiumNote')}</Text>
           </View>
-          <Button label={t('common.back')} onPress={exit} variant="secondary" />
+          <View style={styles.premiumGateButtons}>
+            <Button
+              label={t('subscription.subscribe')}
+              onPress={() => router.push('/subscription/paywall' as never)}
+            />
+            <Button label={t('common.back')} onPress={exit} variant="secondary" compact />
+          </View>
         </View>
       </View>
     );
@@ -1004,6 +1011,7 @@ const styles = StyleSheet.create({
     color: colors.foreground,
     lineHeight: 21,
   },
+  premiumGateButtons: { gap: 10 },
 
   centerBlock: { alignItems: 'center', paddingTop: spacing.xl },
   introEmojiCircle: {

@@ -139,8 +139,8 @@ export default function VoiceStudio() {
   });
 
   const openCreate = () => {
-    // Premium gate (§36): parent voice clone is a premium feature. The paywall
-    // screen lands with the commerce phase — until then, an inline notice.
+    // Premium gate (§36): parent voice clone is a premium feature — the user
+    // learns this BEFORE recording, via an inline notice with an upgrade CTA.
     if (canCloneVoice === false) {
       setShowPremiumNote(true);
       return;
@@ -211,6 +211,11 @@ export default function VoiceStudio() {
             <View style={styles.premiumNoteCard}>
               <Badge label={t('subscription.premiumPlan')} variant="premium" />
               <Text style={styles.premiumNoteText}>{t('voice.introPremiumNote')}</Text>
+              <Button
+                label={t('subscription.subscribe')}
+                onPress={() => router.push('/subscription/paywall' as never)}
+                compact
+              />
             </View>
           ) : null}
         </>
@@ -274,6 +279,11 @@ export default function VoiceStudio() {
             <View style={styles.premiumNoteCard}>
               <Badge label={t('subscription.premiumPlan')} variant="premium" />
               <Text style={styles.premiumNoteText}>{t('voice.introPremiumNote')}</Text>
+              <Button
+                label={t('subscription.subscribe')}
+                onPress={() => router.push('/subscription/paywall' as never)}
+                compact
+              />
             </View>
           ) : null}
         </>

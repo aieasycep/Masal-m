@@ -398,7 +398,7 @@
     "chooseAlternative": "Choose a Different Image"
   },
   "book": {
-    "builderTitle": "{{name}}'s Book",
+    "builderTitle": "A book for {{name}}",
     "builderTitleGeneric": "Your Book",
     "editText": "Edit Text",
     "coverTitle": "Cover design",
@@ -413,7 +413,12 @@
     "autosaved": "Saved",
     "renderPreparing": "Your book is being prepared…",
     "emptyTitle": "Turn a story into a book to treasure for a lifetime.",
-    "emptyCta": "Pick a Story"
+    "emptyCta": "Pick a Story",
+    "layoutOptions": {
+      "IMAGE_TOP": "Image on top",
+      "IMAGE_FULL": "Full-page image",
+      "TEXT_ONLY": "Text only"
+    }
   },
   "checkout": {
     "configTitle": "Configure your book",
@@ -446,10 +451,12 @@
     "totalLabel": "Total",
     "payCta": "Complete Payment",
     "paying": "Processing payment…",
-    "successTitle": "{{name}}'s tale is getting ready for its journey 💛",
+    "successTitle": "{{name}}'s storybook is getting ready to ship 💛",
     "successTitleGeneric": "Your tale is getting ready for its journey 💛",
     "orderNumber": "Order number",
-    "trackOrder": "Track My Order"
+    "trackOrder": "Track My Order",
+    "newAddress": "Add a new address",
+    "subtotal": "Subtotal"
   },
   "orders": {
     "title": "My Orders",

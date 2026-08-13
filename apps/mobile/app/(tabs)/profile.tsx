@@ -61,25 +61,23 @@ export default function Profile() {
           : t('profile.menu.voicesEmpty'),
       route: '/voice',
     },
-    // restored in the commerce phase — targets don't exist yet, dead rows are forbidden:
-    // {
-    //   key: 'orders',
-    //   icon: '📦',
-    //   label: t('profile.menu.orders'),
-    //   sub: t('profile.menu.ordersEmpty'),
-    //   route: '/orders',
-    // },
-    // {
-    //   key: 'subscription',
-    //   icon: '👑',
-    //   label: t('profile.menu.subscription'),
-    //   // Expiry date arrives with the subscription API wiring (commerce phase);
-    //   // until then premium users get the date-less variant.
-    //   sub: isPremium
-    //     ? t('profile.menu.subscriptionPremiumNoDate')
-    //     : t('profile.menu.subscriptionFree'),
-    //   route: '/subscription/paywall',
-    // },
+    {
+      key: 'orders',
+      icon: '📦',
+      label: t('profile.menu.orders'),
+      sub: t('profile.menu.ordersEmpty'),
+      route: '/orders',
+    },
+    {
+      key: 'subscription',
+      icon: '👑',
+      label: t('profile.menu.subscription'),
+      // The paywall shows the expiry date; the row keeps the date-less variant.
+      sub: isPremium
+        ? t('profile.menu.subscriptionPremiumNoDate')
+        : t('profile.menu.subscriptionFree'),
+      route: '/subscription/paywall',
+    },
     {
       key: 'notifications',
       icon: '🔔',

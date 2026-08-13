@@ -416,9 +416,18 @@ export default function NarrateStory() {
                     ) : null}
                   </SelectableCard>
                   {gated && premiumHintId === voice.id ? (
-                    <Animated.Text entering={FadeInUp.duration(250)} style={styles.premiumHint}>
-                      {t('errors.ENTITLEMENT_REQUIRED')}
-                    </Animated.Text>
+                    <Animated.View entering={FadeInUp.duration(250)} style={styles.premiumHintRow}>
+                      <Text style={styles.premiumHint}>{t('errors.ENTITLEMENT_REQUIRED')}</Text>
+                      <Pressable
+                        onPress={() => router.push('/subscription/paywall' as never)}
+                        accessibilityRole="button"
+                        accessibilityLabel={t('subscription.subscribe')}
+                        hitSlop={8}
+                        style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}
+                      >
+                        <Text style={styles.premiumHintLink}>{t('subscription.subscribe')}</Text>
+                      </Pressable>
+                    </Animated.View>
                   ) : null}
                 </View>
               );
@@ -581,12 +590,24 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  premiumHintRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 6,
+    marginLeft: 4,
+  },
   premiumHint: {
     fontFamily: fontFamilies.bodySemiBold,
     fontSize: fontSizes.sm,
     color: colors.primary,
-    marginTop: 6,
-    marginLeft: 4,
+  },
+  premiumHintLink: {
+    fontFamily: fontFamilies.bodyBold,
+    fontSize: fontSizes.sm,
+    color: colors.primary,
+    textDecorationLine: 'underline',
   },
   emptyVoiceCard: {
     flexDirection: 'row',
