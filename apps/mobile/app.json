@@ -1,0 +1,61 @@
+{
+  "expo": {
+    "name": "Masalım",
+    "slug": "masalim",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "scheme": "masalim",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "platforms": ["ios", "android", "web"],
+    "ios": {
+      "bundleIdentifier": "com.masalim.app",
+      "supportsTablet": false,
+      "usesAppleSignIn": true,
+      "infoPlist": {
+        "UIBackgroundModes": ["audio"],
+        "NSMicrophoneUsageDescription": "Masalım, anne veya baba sesiyle masal anlatabilmen için ses kaydı yapar."
+      }
+    },
+    "android": {
+      "package": "com.masalim.app",
+      "edgeToEdgeEnabled": true,
+      "permissions": ["RECORD_AUDIO", "FOREGROUND_SERVICE", "FOREGROUND_SERVICE_MEDIA_PLAYBACK"]
+    },
+    "splash": {
+      "backgroundColor": "#1A0F3C",
+      "resizeMode": "contain"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      "expo-apple-authentication",
+      "expo-web-browser",
+      [
+        "expo-notifications",
+        {
+          "defaultChannel": "default"
+        }
+      ],
+      [
+        "expo-audio",
+        {
+          "microphonePermission": "Masalım, anne veya baba sesiyle masal anlatabilmen için ses kaydı yapar."
+        }
+      ],
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#1A0F3C",
+          "resizeMode": "contain"
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true
+    },
+    "extra": {
+      "router": {}
+    }
+  }
+}

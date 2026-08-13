@@ -47,3 +47,4 @@ Thumbs.db
 playwright-report/
 test-results/
 .maestro/output/
+dist-export/
