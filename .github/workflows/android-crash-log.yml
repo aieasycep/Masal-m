@@ -11,10 +11,6 @@ on:
         description: "APK'nin alınacağı 'Android APK' workflow run ID"
         required: false
         default: ""
-  push:
-    branches: [claude/masalim-implementation-plan-pz1pkl]
-    paths:
-      - ".github/workflows/android-crash-log.yml"
 
 jobs:
   crash-log:
@@ -52,6 +48,11 @@ jobs:
             sleep 45
             adb logcat -d > logcat-full.txt
             if adb shell pidof com.masalim.app > /dev/null 2>&1; then echo "APP_ALIVE=yes" | tee app-alive.txt; else echo "APP_ALIVE=no (process died)" | tee app-alive.txt; fi
+            adb logcat -c || true
+            adb shell am start -W -a android.intent.action.VIEW -d "masalim://debug/player-smoke" com.masalim.app || echo "deep link start failed"
+            sleep 30
+            adb logcat -d > logcat-smoke.txt
+            if adb shell pidof com.masalim.app > /dev/null 2>&1; then echo "SMOKE_ALIVE=yes" | tee smoke-alive.txt; else echo "SMOKE_ALIVE=no (process died)" | tee smoke-alive.txt; fi
 
       - name: Upload full logcat
         if: always()
@@ -61,6 +62,8 @@ jobs:
           path: |
             logcat-full.txt
             app-alive.txt
+            logcat-smoke.txt
+            smoke-alive.txt
           retention-days: 14
 
       # Keep this step LAST so the distilled crash info sits at the end of the
@@ -70,9 +73,15 @@ jobs:
         run: |
           echo "================ APP ALIVE? ================"
           cat app-alive.txt || true
-          echo "================ FATAL EXCEPTION ================"
+          echo "================ FATAL EXCEPTION (startup) ================"
           grep -n -B 2 -A 120 "FATAL EXCEPTION" logcat-full.txt || echo "no FATAL EXCEPTION found"
-          echo "================ ReactNativeJS errors ================"
+          echo "================ ReactNativeJS errors (startup) ================"
           grep -n "ReactNativeJS" logcat-full.txt | tail -n 80 || true
-          echo "================ AndroidRuntime lines ================"
-          grep -n "AndroidRuntime" logcat-full.txt | tail -n 80 || true
+          echo "================ PLAYER SMOKE ALIVE? ================"
+          cat smoke-alive.txt || true
+          echo "================ PLAYER SMOKE markers ================"
+          grep -n "player-smoke" logcat-smoke.txt | tail -n 60 || echo "no player-smoke markers found"
+          echo "================ FATAL EXCEPTION (player smoke) ================"
+          grep -n -B 2 -A 160 "FATAL EXCEPTION" logcat-smoke.txt || echo "no FATAL EXCEPTION found"
+          echo "================ AndroidRuntime lines (player smoke) ================"
+          grep -n "AndroidRuntime" logcat-smoke.txt | tail -n 80 || true
