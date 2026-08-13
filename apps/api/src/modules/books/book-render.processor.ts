@@ -27,10 +27,19 @@ import { buildBookHtml, PRINT, type TemplatePage } from './book-template';
 
 type BookWithPages = Prisma.BookGetPayload<{ include: { pages: true } }>;
 
+const CHROMIUM_CANDIDATES = [
+  '/opt/pw-browsers/chromium', // dev containers with pre-provisioned playwright browsers
+  '/usr/bin/google-chrome', // GitHub Actions ubuntu runners ship Chrome
+  '/usr/bin/google-chrome-stable',
+  '/usr/bin/chromium-browser',
+  '/usr/bin/chromium',
+];
+
 function chromiumExecutable(configured: string): string | undefined {
   if (configured) return configured;
-  const preinstalled = '/opt/pw-browsers/chromium';
-  if (existsSync(preinstalled)) return preinstalled;
+  for (const candidate of CHROMIUM_CANDIDATES) {
+    if (existsSync(candidate)) return candidate;
+  }
   return undefined; // let playwright-core resolve its own browsers
 }
 
