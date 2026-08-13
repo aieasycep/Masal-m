@@ -152,7 +152,19 @@ Local `.env` = `.env.example` + generated JWT secrets (already present, gitignor
   uploads full logcat artifact. Verified fix: run 31736923379 → APP_ALIVE=yes, clean JS.
   Use this to verify EVERY future APK before handing to user.
 - android-apk.yml default EXPO_PUBLIC_API_URL now the live Render URL (no more manual
-  api_url input needed). Working APK for user: artifact of run 31735402753.
+  api_url input needed).
+- **Playback crash FIXED (cf5d6e3)**: tapping narrate/listen killed the app. Emulator
+  smoke (hidden route `masalim://debug/player-smoke` + crash-log workflow phase 2)
+  reproduced it: MusicService.emit used legacy reactNativeHost → "You should not use
+  ReactNativeHost directly in the New Architecture" fatal at first event emission
+  (follow-on ForegroundServiceStartNotAllowedException = system restarting the crashed
+  sticky service). Patch extended again: bridgeless-safe `currentReactContext()`
+  (prefer `ReactApplication.reactHost`, legacy fallback) in emit/emitList. Verified:
+  run 31745204779 → APP_ALIVE=yes, SMOKE_ALIVE=yes, smoke played tone to end
+  (state=ended position=2.01), zero FATAL. Google sign-in "not working" is expected
+  (no OAuth credentials in test builds) — email login for testing.
+- **Working APK for user: artifact of run 31742111666** (commit cf5d6e3; supersedes
+  31735402753 which still crashed on playback).
 - Scheduled self check-ins exist via send_later for CI/APK monitoring;
   re-arm after firing while PR is open.
 
