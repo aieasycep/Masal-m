@@ -132,6 +132,12 @@ Local `.env` = `.env.example` + generated JWT secrets (already present, gitignor
   click-by-click: Supabase storage S3 keys → Render blueprint → APK rebuild
   with api_url). User considering Vercel/Render/Supabase — advised
   Render(API+db+redis)+Supabase(storage); Vercel only fits apps/admin.
+- **Test deployment LIVE**: user's Render workspace "masalim" runs the
+  blueprint; API at https://masalim-api-z6ry.onrender.com (/health ok, db up).
+  Splash/icon assets fix (5b918a4) made the APK workflow green; final APK
+  dispatched with the user's api_url. masalim-admin web service added to
+  render.yaml (NEXT_PUBLIC_API_URL hardcoded to the api URL above); API CORS
+  accepts *.onrender.com outside production (main.ts).
 - Scheduled self check-ins exist via send_later for CI/APK monitoring;
   re-arm after firing while PR is open.
 
