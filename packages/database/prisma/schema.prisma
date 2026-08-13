@@ -1,0 +1,813 @@
+// Masalım database schema.
+// Enum values mirror @masalim/types (drift-guard test in src/__tests__/enum-drift.test.ts).
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ── Enums ────────────────────────────────────────────────────────────────────
+
+enum AdminRole {
+  ADMIN
+  SUPPORT
+  OPERATIONS
+}
+
+enum AuthProvider {
+  EMAIL
+  APPLE
+  GOOGLE
+}
+
+enum AgeRange {
+  AGE_0_2
+  AGE_3_5
+  AGE_6_8
+  AGE_9_12
+}
+
+enum StoryDuration {
+  SHORT
+  MEDIUM
+  LONG
+}
+
+enum StoryTheme {
+  ADVENTURE
+  SLEEP
+  FRIENDSHIP
+  COURAGE
+  ANIMALS
+  SPACE
+  FAIRY_TALE
+  EMOTIONS
+  EDUCATIONAL
+  FANTASY
+  SEA
+  NATURE
+  IMAGINATION
+}
+
+enum HeroType {
+  CHILD
+  ANIMAL
+  FANTASY
+  ROBOT
+  CUSTOM
+}
+
+enum StoryStatus {
+  DRAFT
+  GENERATING
+  READY
+  FAILED
+}
+
+enum ModerationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum VoiceOwnerType {
+  MOTHER
+  FATHER
+  GRANDMOTHER
+  GRANDFATHER
+  OTHER
+}
+
+enum VoiceProfileStatus {
+  RECORDING_UPLOADED
+  PROCESSING
+  READY
+  FAILED
+  DELETED
+}
+
+enum SystemVoiceCategory {
+  CALM
+  CHEERFUL
+  FAIRYTALE
+  ENERGETIC
+}
+
+enum NarrationStatus {
+  QUEUED
+  PROCESSING
+  READY
+  FAILED
+}
+
+enum IllustrationStyle {
+  WATERCOLOR
+  SOFT_3D
+  CLASSIC_STORYBOOK
+  PASTEL
+  HAND_DRAWN
+}
+
+enum IllustrationSetStatus {
+  QUEUED
+  GENERATING
+  READY
+  FAILED
+}
+
+enum BookStatus {
+  DRAFT
+  RENDERING
+  READY
+}
+
+enum BookPageLayout {
+  IMAGE_TOP
+  IMAGE_FULL
+  TEXT_ONLY
+}
+
+enum BookSize {
+  SQUARE
+  STANDARD
+}
+
+enum CoverType {
+  HARDCOVER
+  SOFTCOVER
+}
+
+enum OrderStatus {
+  PENDING
+  PAID
+  IN_PRODUCTION
+  SHIPPED
+  DELIVERED
+  CANCELLED
+  REFUNDED
+}
+
+enum PaymentStatus {
+  PENDING
+  PROCESSING
+  SUCCEEDED
+  FAILED
+  REFUNDED
+}
+
+enum SubscriptionPlan {
+  FREE
+  PREMIUM
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  TRIALING
+  EXPIRED
+  CANCELLED
+  GRACE
+}
+
+enum AIJobType {
+  STORY_GENERATION
+  VOICE_CLONE
+  NARRATION_GENERATION
+  ILLUSTRATION_GENERATION
+  BOOK_RENDER
+  PRINT_FILE_GENERATION
+  ORDER_SNAPSHOT
+  ACCOUNT_DELETION
+}
+
+enum AIJobStatus {
+  QUEUED
+  RUNNING
+  SUCCEEDED
+  FAILED
+  CANCELLED
+}
+
+enum NotificationType {
+  STORY_READY
+  VOICE_READY
+  ILLUSTRATIONS_READY
+  BOOK_READY
+  ORDER_SHIPPED
+  GENERIC
+}
+
+enum DeletionScope {
+  ACCOUNT
+  VOICE_PROFILE
+}
+
+enum DeletionStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  CANCELLED
+}
+
+enum DevicePlatform {
+  IOS
+  ANDROID
+}
+
+// ── Identity & auth ──────────────────────────────────────────────────────────
+
+model User {
+  id                  String    @id @default(cuid())
+  email               String    @unique
+  passwordHash        String?
+  name                String
+  avatarKey           String?
+  locale              String    @default("tr")
+  timezone            String?
+  onboardingCompleted Boolean   @default(false)
+  subscriptionPlan    SubscriptionPlan @default(FREE)
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+  deletedAt           DateTime?
+
+  identities        AuthIdentity[]
+  refreshTokens     RefreshToken[]
+  children          Child[]
+  voiceProfiles     VoiceProfile[]
+  stories           Story[]
+  books             Book[]
+  orders            Order[]
+  addresses         Address[]
+  subscription      Subscription?
+  favorites         Favorite[]
+  notifications     Notification[]
+  deviceTokens      DeviceToken[]
+  aiJobs            AIJob[]
+  usageLogs         AIUsageLog[]
+  entitlementUsages EntitlementUsage[]
+  deletionRequests  DeletionRequest[]
+  passwordResets    PasswordReset[]
+  playbackPositions PlaybackPosition[]
+
+  @@index([email])
+}
+
+model AuthIdentity {
+  id             String       @id @default(cuid())
+  userId         String
+  provider       AuthProvider
+  providerUserId String
+  createdAt      DateTime     @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerUserId])
+  @@index([userId])
+}
+
+model RefreshToken {
+  id        String    @id @default(cuid())
+  userId    String
+  tokenHash String    @unique
+  deviceId  String?
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model PasswordReset {
+  id        String    @id @default(cuid())
+  userId    String
+  codeHash  String
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+// ── Family ───────────────────────────────────────────────────────────────────
+
+model Child {
+  id          String    @id @default(cuid())
+  userId      String
+  name        String
+  birthDate   DateTime?
+  ageRange    AgeRange
+  avatarKey   String?
+  interests   String[]
+  preferences Json      @default("{}")
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  stories Story[]
+
+  @@index([userId])
+}
+
+// ── Voice ────────────────────────────────────────────────────────────────────
+
+model VoiceProfile {
+  id                String             @id @default(cuid())
+  userId            String
+  ownerType         VoiceOwnerType
+  displayName       String
+  provider          String
+  providerVoiceId   String?
+  recordingKey      String?
+  previewKey        String?
+  status            VoiceProfileStatus @default(RECORDING_UPLOADED)
+  consentAcceptedAt DateTime
+  processingError   String?
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  deletedAt         DateTime?
+
+  user       User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  narrations Narration[]
+
+  @@index([userId])
+}
+
+model SystemVoice {
+  id               String              @id @default(cuid())
+  displayName      String
+  description      String
+  category         SystemVoiceCategory
+  internalMetadata Json                @default("{}")
+  provider         String
+  providerVoiceId  String
+  previewKey       String?
+  enabled          Boolean             @default(true)
+  premiumOnly      Boolean             @default(false)
+  sortOrder        Int                 @default(0)
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+
+  narrations Narration[]
+}
+
+// ── Stories ──────────────────────────────────────────────────────────────────
+
+model Story {
+  id               String           @id @default(cuid())
+  userId           String
+  childId          String?
+  title            String           @default("")
+  heroName         String
+  heroType         HeroType
+  themes           StoryTheme[]
+  ageRange         AgeRange
+  durationTarget   StoryDuration
+  customPrompt     String?
+  educationalGoal  String?
+  advanced         Json             @default("{}")
+  storyText        String?
+  summary          String?
+  coverImageKey    String?
+  language         String           @default("tr")
+  status           StoryStatus      @default(DRAFT)
+  moderationStatus ModerationStatus @default(PENDING)
+  version          Int              @default(1)
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+  deletedAt        DateTime?
+
+  user             User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  child            Child?             @relation(fields: [childId], references: [id], onDelete: SetNull)
+  pages            StoryPage[]
+  revisions        StoryRevision[]
+  narrations       Narration[]
+  illustrationSets IllustrationSet[]
+  books            Book[]
+  favorites        Favorite[]
+  playbackPositions PlaybackPosition[]
+
+  @@index([userId, deletedAt, createdAt])
+  @@index([childId])
+}
+
+model StoryPage {
+  id                 String   @id @default(cuid())
+  storyId            String
+  pageNumber         Int
+  text               String
+  illustrationPrompt String?
+  illustrationKey    String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  story         Story          @relation(fields: [storyId], references: [id], onDelete: Cascade)
+  illustrations Illustration[]
+  bookPages     BookPage[]
+
+  @@unique([storyId, pageNumber])
+}
+
+model StoryRevision {
+  id        String   @id @default(cuid())
+  storyId   String
+  version   Int
+  title     String
+  storyText String?
+  pages     Json
+  createdAt DateTime @default(now())
+
+  story Story @relation(fields: [storyId], references: [id], onDelete: Cascade)
+
+  @@unique([storyId, version])
+}
+
+model Favorite {
+  userId    String
+  storyId   String
+  createdAt DateTime @default(now())
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  story Story @relation(fields: [storyId], references: [id], onDelete: Cascade)
+
+  @@id([userId, storyId])
+}
+
+model PlaybackPosition {
+  userId          String
+  storyId         String
+  narrationId     String
+  positionSeconds Float
+  updatedAt       DateTime @updatedAt
+
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  story     Story     @relation(fields: [storyId], references: [id], onDelete: Cascade)
+  narration Narration @relation(fields: [narrationId], references: [id], onDelete: Cascade)
+
+  @@id([userId, storyId])
+}
+
+// ── Narration ────────────────────────────────────────────────────────────────
+
+model Narration {
+  id             String          @id @default(cuid())
+  storyId        String
+  storyVersion   Int             @default(1)
+  voiceProfileId String?
+  systemVoiceId  String?
+  provider       String
+  audioKey       String?
+  duration       Float?
+  timings        Json?
+  status         NarrationStatus @default(QUEUED)
+  error          String?
+  createdAt      DateTime        @default(now())
+
+  story             Story              @relation(fields: [storyId], references: [id], onDelete: Cascade)
+  voiceProfile      VoiceProfile?      @relation(fields: [voiceProfileId], references: [id], onDelete: SetNull)
+  systemVoice       SystemVoice?       @relation(fields: [systemVoiceId], references: [id], onDelete: SetNull)
+  playbackPositions PlaybackPosition[]
+
+  @@index([storyId])
+}
+
+// ── Illustrations ────────────────────────────────────────────────────────────
+
+model IllustrationSet {
+  id                 String                @id @default(cuid())
+  storyId            String
+  storyVersion       Int                   @default(1)
+  style              IllustrationStyle
+  characterBible     Json                  @default("{}")
+  characterReference String?
+  status             IllustrationSetStatus @default(QUEUED)
+  createdAt          DateTime              @default(now())
+
+  story         Story          @relation(fields: [storyId], references: [id], onDelete: Cascade)
+  illustrations Illustration[]
+
+  @@index([storyId])
+}
+
+model Illustration {
+  id                String   @id @default(cuid())
+  illustrationSetId String
+  storyPageId       String?
+  imageKey          String
+  prompt            String
+  selected          Boolean  @default(false)
+  createdAt         DateTime @default(now())
+
+  illustrationSet IllustrationSet @relation(fields: [illustrationSetId], references: [id], onDelete: Cascade)
+  storyPage       StoryPage?      @relation(fields: [storyPageId], references: [id], onDelete: SetNull)
+  bookPages       BookPage[]
+
+  @@index([illustrationSetId])
+}
+
+// ── Books ────────────────────────────────────────────────────────────────────
+
+model Book {
+  id                  String     @id @default(cuid())
+  userId              String
+  storyId             String
+  storyVersion        Int        @default(1)
+  title               String
+  subtitle            String?
+  dedication          String?
+  coverIllustrationId String?
+  coverImageKey       String?
+  backCoverText       String?
+  status              BookStatus @default(DRAFT)
+  printPdfKey         String?
+  createdAt           DateTime   @default(now())
+  updatedAt           DateTime   @updatedAt
+  deletedAt           DateTime?
+
+  user   User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  story  Story      @relation(fields: [storyId], references: [id], onDelete: Cascade)
+  pages  BookPage[]
+  orders Order[]
+
+  @@index([userId])
+  @@index([storyId])
+}
+
+model BookPage {
+  id             String         @id @default(cuid())
+  bookId         String
+  pageNumber     Int
+  storyPageId    String?
+  illustrationId String?
+  imageKey       String?
+  text           String
+  layout         BookPageLayout @default(IMAGE_TOP)
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  book         Book          @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  storyPage    StoryPage?    @relation(fields: [storyPageId], references: [id], onDelete: SetNull)
+  illustration Illustration? @relation(fields: [illustrationId], references: [id], onDelete: SetNull)
+
+  @@unique([bookId, pageNumber])
+}
+
+// ── Commerce ─────────────────────────────────────────────────────────────────
+
+model Address {
+  id         String   @id @default(cuid())
+  userId     String
+  fullName   String
+  phone      String
+  addressLine String
+  city       String
+  district   String
+  postalCode String
+  isDefault  Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  orders Order[]
+
+  @@index([userId])
+}
+
+model Order {
+  id                   String        @id @default(cuid())
+  userId               String
+  bookId               String
+  orderNumber          String        @unique
+  quantity             Int
+  bookSize             BookSize
+  coverType            CoverType
+  subtotal             Decimal       @db.Decimal(10, 2)
+  shipping             Decimal       @db.Decimal(10, 2)
+  total                Decimal       @db.Decimal(10, 2)
+  currency             String        @default("TRY")
+  status               OrderStatus   @default(PENDING)
+  paymentStatus        PaymentStatus @default(PENDING)
+  shippingAddressId    String?
+  addressSnapshot      Json
+  bookSnapshot         Json
+  snapshotReady        Boolean       @default(false)
+  trackingNumber       String?
+  printProviderOrderId String?
+  idempotencyKey       String        @unique
+  statusTimeline       Json          @default("[]")
+  createdAt            DateTime      @default(now())
+  updatedAt            DateTime      @updatedAt
+
+  user            User      @relation(fields: [userId], references: [id])
+  book            Book      @relation(fields: [bookId], references: [id])
+  shippingAddress Address?  @relation(fields: [shippingAddressId], references: [id], onDelete: SetNull)
+  payments        Payment[]
+
+  @@index([userId, createdAt])
+}
+
+model Payment {
+  id                String        @id @default(cuid())
+  orderId           String
+  provider          String
+  providerPaymentId String?
+  amount            Decimal       @db.Decimal(10, 2)
+  currency          String        @default("TRY")
+  status            PaymentStatus @default(PENDING)
+  rawResponse       Json?
+  idempotencyKey    String        @unique
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+}
+
+model PricingConfig {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  /// { basePrices: {SQUARE:{HARDCOVER,SOFTCOVER}, STANDARD:{...}}, shippingFlat, quantityDiscounts, currency }
+  value     Json
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ── Subscription & entitlements ──────────────────────────────────────────────
+
+model Subscription {
+  id                 String             @id @default(cuid())
+  userId             String             @unique
+  provider           String
+  productId          String
+  plan               SubscriptionPlan   @default(PREMIUM)
+  status             SubscriptionStatus
+  providerCustomerId String?
+  startedAt          DateTime
+  expiresAt          DateTime?
+  trialEndsAt        DateTime?
+  latestEventAt      DateTime           @default(now())
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model EntitlementUsage {
+  id          String   @id @default(cuid())
+  userId      String
+  key         String
+  periodStart DateTime
+  count       Int      @default(0)
+  updatedAt   DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, key, periodStart])
+}
+
+// ── Notifications ────────────────────────────────────────────────────────────
+
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String
+  type      NotificationType
+  title     String
+  body      String
+  data      Json             @default("{}")
+  readAt    DateTime?
+  createdAt DateTime         @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+}
+
+model DeviceToken {
+  id            String         @id @default(cuid())
+  userId        String
+  expoPushToken String         @unique
+  platform      DevicePlatform
+  lastSeenAt    DateTime       @default(now())
+  createdAt     DateTime       @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+// ── Jobs, usage, ops ─────────────────────────────────────────────────────────
+
+model AIJob {
+  id           String      @id @default(cuid())
+  userId       String
+  type         AIJobType
+  entityId     String?
+  status       AIJobStatus @default(QUEUED)
+  progress     Int         @default(0)
+  attempts     Int         @default(0)
+  errorCode    String?
+  errorMessage String?
+  payload      Json        @default("{}")
+  resultRef    String?
+  queueJobId   String?     @unique
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([status, type])
+}
+
+model AIUsageLog {
+  id           String   @id @default(cuid())
+  userId       String
+  jobId        String?
+  provider     String
+  model        String?
+  type         String
+  success      Boolean
+  inputTokens  Int?
+  outputTokens Int?
+  units        Int?
+  costEstimate Decimal? @db.Decimal(10, 4)
+  createdAt    DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+}
+
+model DeletionRequest {
+  id          String         @id @default(cuid())
+  userId      String
+  scope       DeletionScope
+  status      DeletionStatus @default(PENDING)
+  effectiveAt DateTime
+  requestedAt DateTime       @default(now())
+  completedAt DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([status, effectiveAt])
+}
+
+model FeatureFlag {
+  key         String   @id
+  enabled     Boolean  @default(false)
+  description String
+  isPublic    Boolean  @default(false)
+  payload     Json     @default("{}")
+  updatedAt   DateTime @updatedAt
+}
+
+model AdminUser {
+  id           String    @id @default(cuid())
+  email        String    @unique
+  passwordHash String
+  name         String
+  role         AdminRole
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  auditLogs AuditLog[]
+}
+
+model AuditLog {
+  id          String   @id @default(cuid())
+  adminUserId String?
+  actorUserId String?
+  action      String
+  entityType  String
+  entityId    String?
+  metadata    Json     @default("{}")
+  createdAt   DateTime @default(now())
+
+  adminUser AdminUser? @relation(fields: [adminUserId], references: [id], onDelete: SetNull)
+
+  @@index([entityType, entityId])
+  @@index([createdAt])
+}
+
+model RecommendationTemplate {
+  id         String   @id @default(cuid())
+  /// Matches Child.interests entries (lowercased Turkish keyword, e.g. "uzay", "dinozorlar").
+  interest   String
+  title      String
+  themes     StoryTheme[]
+  promptSeed String
+  emoji      String
+  enabled    Boolean  @default(true)
+  createdAt  DateTime @default(now())
+
+  @@index([interest])
+}

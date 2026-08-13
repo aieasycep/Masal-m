@@ -1,0 +1,7 @@
+{
+  "extends": "@masalim/config/tsconfig/node",
+  "compilerOptions": {
+    "rootDir": "."
+  },
+  "include": ["src", "prisma/seed.ts"]
+}
