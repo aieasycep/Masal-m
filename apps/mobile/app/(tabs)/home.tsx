@@ -76,6 +76,7 @@ export default function Home() {
   const stories: StorySummary[] = storiesQuery.data?.items ?? [];
 
   const continueStory = stories.find((story) => story.latestNarration != null);
+  const continueNarration = continueStory?.latestNarration ?? null;
   const showEmptyState = storiesQuery.isSuccess && stories.length === 0;
   const hasError = meQuery.isError || childrenQuery.isError;
 
@@ -215,11 +216,18 @@ export default function Home() {
         </View>
       ) : null}
 
-      {/* Continue listening */}
-      {continueStory != null ? (
+      {/* Continue listening — opens the player on the story's latest narration. */}
+      {continueStory != null && continueNarration != null ? (
         <View style={styles.section}>
           <SectionHeader title={t('home.continueListening')} />
-          <StoryCardWide story={continueStory} onPress={() => openStory(continueStory.id)} />
+          <StoryCardWide
+            story={continueStory}
+            onPress={() =>
+              router.push(
+                `/story/${continueStory.id}/player?narrationId=${continueNarration.id}` as never,
+              )
+            }
+          />
         </View>
       ) : null}
 

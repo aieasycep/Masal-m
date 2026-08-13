@@ -104,11 +104,12 @@ interface StoryRowProps {
 function StoryRow({ story, index, onPress, onMore }: StoryRowProps) {
   const { t } = useTranslation();
   const tint = coverTints[index % coverTints.length] ?? coverTints[0];
+  const latestNarration = story.latestNarration;
   const duration = t('common.minutesShort', {
     count: DURATION_TARGETS[story.durationTarget].minutes,
   });
   const metaParts = [story.childName ?? story.heroName, duration];
-  if (story.latestNarration != null) metaParts.push(story.latestNarration.narratorName);
+  if (latestNarration != null) metaParts.push(latestNarration.narratorName);
   const themesLabel = story.themes
     .slice(0, 2)
     .map((theme) => t(`wizard.themes.${theme}`))
@@ -164,9 +165,13 @@ function StoryRow({ story, index, onPress, onMore }: StoryRowProps) {
             <GeneratingPulse />
           ) : story.status === StoryStatus.FAILED ? (
             <View style={styles.failedDot} />
-          ) : story.latestNarration != null ? (
+          ) : latestNarration != null ? (
             <Pressable
-              onPress={onPress}
+              onPress={() =>
+                router.push(
+                  `/story/${story.id}/player?narrationId=${latestNarration.id}` as never,
+                )
+              }
               accessibilityRole="button"
               accessibilityLabel={t('library.actions.listen')}
               hitSlop={6}

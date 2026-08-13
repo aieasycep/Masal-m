@@ -3,7 +3,7 @@ import { ActivityIndicator, Pressable, ScrollView, Share, StyleSheet, Text, View
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import Animated, {
   Easing,
@@ -15,14 +15,15 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { DURATION_TARGETS, StoryStatus } from '@masalim/types';
+import { AIJobStatus, DURATION_TARGETS, NarrationStatus, StoryStatus } from '@masalim/types';
 import { ApiError } from '@masalim/api-client';
 import { colors, fontFamilies, fontSizes, gradients, radius, spacing } from '@masalim/ui';
 import { api } from '../../../src/lib/api';
+import { useJobProgress } from '../../../src/lib/job-stream';
 import { Button } from '../../../src/components/Button';
 import { ScreenHeader } from '../../../src/components/ScreenHeader';
 import { Starfield } from '../../../src/components/Starfield';
-import { ChevronLeftIcon, ShareIcon } from '../../../src/components/icons';
+import { ChevronLeftIcon, PlayIcon, ShareIcon } from '../../../src/components/icons';
 import { EmptyState, ErrorState } from '../../../src/components/states';
 
 /** Fallback cover emoji per story theme (used when no cover illustration exists yet). */
@@ -81,13 +82,15 @@ function ConfettiDot({ index }: { index: number }) {
 }
 
 /**
- * Story result — cover hero + actions. NOTE (phase deviation): the "Dinlemeye
- * Başla" listen CTA and the Görselleştir/Kitap Yap tiles arrive with the
- * narration/illustration/book phases; until then the primary CTA is "Oku".
+ * Story result — cover hero + actions. With a READY narration the primary CTA
+ * is "Dinlemeye Başla" (player); otherwise "Oku" stays primary and the action
+ * grid gains a "Seslendir" tile. NOTE (phase deviation): the Görselleştir/
+ * Kitap Yap tiles arrive with the illustration/book phases.
  */
 export default function StoryResult() {
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
+  const queryClient = useQueryClient();
   const { id } = useLocalSearchParams<{ id: string }>();
   const coverFloatStyle = useFloatStyle(4000);
 
@@ -97,6 +100,36 @@ export default function StoryResult() {
     enabled: id != null && id.length > 0,
   });
   const story = storyQuery.data;
+
+  const narrationsQuery = useQuery({
+    queryKey: ['narrations', id],
+    queryFn: () => api.narrations.list(id),
+    enabled: id != null && id.length > 0,
+  });
+  const narrations = narrationsQuery.data ?? [];
+  const readyNarration =
+    narrations.find((narration) => narration.status === NarrationStatus.READY) ?? null;
+  const processingNarration =
+    narrations.find(
+      (narration) =>
+        narration.status === NarrationStatus.QUEUED ||
+        narration.status === NarrationStatus.PROCESSING,
+    ) ?? null;
+  // Real progress for an in-flight narration; no-op when there is none.
+  const narrationJob = useJobProgress(processingNarration?.jobId ?? undefined);
+
+  // When the in-flight narration finishes, refresh so the listen CTA appears.
+  useEffect(() => {
+    if (
+      narrationJob.status === AIJobStatus.SUCCEEDED ||
+      narrationJob.status === AIJobStatus.FAILED ||
+      narrationJob.status === AIJobStatus.CANCELLED
+    ) {
+      void queryClient.invalidateQueries({ queryKey: ['narrations', id] });
+      void queryClient.invalidateQueries({ queryKey: ['story', id] });
+      void queryClient.invalidateQueries({ queryKey: ['stories'] });
+    }
+  }, [narrationJob.status, queryClient, id]);
 
   if (storyQuery.isPending) {
     return (
@@ -154,6 +187,8 @@ export default function StoryResult() {
   });
 
   const openReader = () => router.push(`/story/${story.id}/reader` as never);
+  const openPlayer = () => router.push(`/story/${story.id}/player` as never);
+  const openNarrate = () => router.push(`/story/${story.id}/narrate` as never);
   const openEdit = () => router.push(`/story/${story.id}/edit` as never);
   const share = () => {
     void Share.share({
@@ -166,6 +201,7 @@ export default function StoryResult() {
 
   const actions = [
     { key: 'read', emoji: '📖', label: t('storyResult.read'), onPress: openReader },
+    { key: 'narrate', emoji: '🎙', label: t('narrate.create'), onPress: openNarrate },
     { key: 'edit', emoji: '✏️', label: t('storyResult.edit'), onPress: openEdit },
     { key: 'share', emoji: '🔗', label: t('storyResult.share'), onPress: share },
   ];
@@ -247,12 +283,30 @@ export default function StoryResult() {
           ) : null}
         </View>
 
-        {/* Primary CTA — narration lands in a later phase; reading is primary. */}
-        <Button
-          label={t('storyResult.read')}
-          leading={<Text style={styles.ctaEmoji}>📖</Text>}
-          onPress={openReader}
-        />
+        {/* Primary CTA — listen when a narration is READY, read otherwise. */}
+        {readyNarration != null ? (
+          <Button
+            label={t('storyResult.listen')}
+            leading={<PlayIcon size={18} color={colors.primaryForeground} />}
+            onPress={openPlayer}
+          />
+        ) : (
+          <Button
+            label={t('storyResult.read')}
+            leading={<Text style={styles.ctaEmoji}>📖</Text>}
+            onPress={openReader}
+          />
+        )}
+
+        {processingNarration != null ? (
+          <Text style={styles.preparingText}>
+            {narrationJob.progress > 0
+              ? `${t('storyResult.narrationPreparing')} %${Math.round(
+                  Math.min(Math.max(narrationJob.progress, 0), 100),
+                )}`
+              : t('storyResult.narrationPreparing')}
+          </Text>
+        ) : null}
 
         <View style={styles.actionGrid}>
           {actions.map((action) => (
@@ -362,6 +416,13 @@ const styles = StyleSheet.create({
     color: colors.mutedForeground,
   },
   ctaEmoji: { fontSize: 20 },
+  preparingText: {
+    fontFamily: fontFamilies.body,
+    fontSize: fontSizes.sm,
+    color: colors.mutedForeground,
+    textAlign: 'center',
+    marginTop: spacing.sm,
+  },
   actionGrid: { flexDirection: 'row', gap: spacing.xs, marginTop: spacing.md },
   actionTile: {
     flex: 1,

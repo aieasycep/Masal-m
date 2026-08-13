@@ -74,9 +74,9 @@ function ActionRow({ emoji, label, onPress, destructive, disabled, loading }: Ac
 }
 
 /**
- * Story action bottom sheet (Library kebab/long-press): read, duplicate,
- * favorite toggle and delete (with nested confirmation). Follows the
- * ConfirmSheet structure: backdrop + sheet + grabber.
+ * Story action bottom sheet (Library kebab/long-press): listen (when a
+ * narration exists), read, duplicate, favorite toggle and delete (with nested
+ * confirmation). Follows the ConfirmSheet structure: backdrop + sheet + grabber.
  */
 export function StorySheet({ story, onClose, onChanged }: StorySheetProps) {
   const { t } = useTranslation();
@@ -114,6 +114,14 @@ export function StorySheet({ story, onClose, onChanged }: StorySheetProps) {
     const storyId = active.id;
     close();
     router.push(`/story/${storyId}/reader` as never);
+  };
+
+  const latestNarration = active.latestNarration;
+  const openPlayer = () => {
+    if (latestNarration == null) return;
+    const storyId = active.id;
+    close();
+    router.push(`/story/${storyId}/player?narrationId=${latestNarration.id}` as never);
   };
 
   const duplicate = async () => {
@@ -186,6 +194,14 @@ export function StorySheet({ story, onClose, onChanged }: StorySheetProps) {
         </Text>
         {error != null ? <Text style={styles.error}>{error}</Text> : null}
         <View style={styles.actions}>
+          {latestNarration != null ? (
+            <ActionRow
+              emoji="🎧"
+              label={t('library.actions.listen')}
+              onPress={openPlayer}
+              disabled={busy != null}
+            />
+          ) : null}
           <ActionRow
             emoji="📖"
             label={t('library.actions.read')}

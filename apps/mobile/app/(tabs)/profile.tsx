@@ -43,20 +43,25 @@ export default function Profile() {
 
   const meQuery = useQuery({ queryKey: ['me'], queryFn: () => api.users.me() });
   const childrenQuery = useQuery({ queryKey: ['children'], queryFn: () => api.children.list() });
+  const voicesQuery = useQuery({ queryKey: ['voices'], queryFn: () => api.voices.list() });
 
   const me = meQuery.data;
   const isPremium = me?.subscriptionPlan === 'PREMIUM';
   const children = childrenQuery.data ?? [];
+  const voiceCount = voicesQuery.data?.length ?? 0;
 
   const menuItems: MenuItem[] = [
-    // restored in voice/commerce phase — targets don't exist yet, dead rows are forbidden:
-    // {
-    //   key: 'voices',
-    //   icon: '🎙',
-    //   label: t('profile.menu.voices'),
-    //   sub: t('profile.menu.voicesEmpty'),
-    //   route: '/voice',
-    // },
+    {
+      key: 'voices',
+      icon: '🎙',
+      label: t('profile.menu.voices'),
+      sub:
+        voiceCount > 0
+          ? t('profile.menu.voicesSub', { count: voiceCount })
+          : t('profile.menu.voicesEmpty'),
+      route: '/voice',
+    },
+    // restored in the commerce phase — targets don't exist yet, dead rows are forbidden:
     // {
     //   key: 'orders',
     //   icon: '📦',
