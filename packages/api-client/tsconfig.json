@@ -1,0 +1,9 @@
+{
+  "extends": "@masalim/config/tsconfig/base",
+  "compilerOptions": {
+    "rootDir": "src",
+    "outDir": "dist",
+    "lib": ["es2022", "dom"]
+  },
+  "include": ["src"]
+}

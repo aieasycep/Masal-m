@@ -1,4 +1,4 @@
-import { AgeRange, StoryDuration } from './enums';
+import type { AgeRange, StoryDuration } from './enums';
 
 /** Domain constants — kept central so no magic numbers/strings spread through the codebase. */
 
