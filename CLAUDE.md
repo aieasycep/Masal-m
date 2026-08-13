@@ -86,15 +86,28 @@ Local `.env` = `.env.example` + generated JWT secrets (already present, gitignor
   grace, children+recommendations v0, uploads signed URLs, app-config gate, health),
   docker-compose, CI workflow, Expo scaffold (fonts/i18n/query/auth store/basic screens),
   smoke-tested end-to-end incl. IDOR + refresh reuse rejection.
-- ⏳ **Phase 2 — Core Mobile UI** (next): component library + pixel-accurate screens
-  from `docs/design-reference/src/screens/*.tsx` (Splash starfield/moon/book SVG,
-  4-slide onboarding, auth with Apple/Google buttons, child setup with interest chips,
-  Home sections, custom tab bar with raised Oluştur button, Profile). Add child switcher.
-  Known prototype gaps to fix listed in plan §2.3 (age-group ids, validation, suffix
-  interpolation via withSuffix, onboarding persistence flag).
-- Phase 3 stories+jobs+SSE+push+entitlements core; Phase 4 voice+narration+player;
-  Phase 5 illustrations+books+PDF; Phase 6 commerce; Phase 7 admin; Phase 8 hardening.
+- ✅ **Phase 2 — Core Mobile UI**: component library (Button/SelectableCard/Chip/Avatar/
+  Badge/Input/ConfirmSheet/Screen/ScreenHeader/states/StoryCard/Starfield/TabBar/
+  ChildSwitcherSheet), splash+4-slide onboarding, welcome/email auth, child setup+edit,
+  full Home + Profile, custom tab bar. (Settings skeleton delivered with Phase 3 slice.)
+- ⏳ **Phase 3 — Stories** (in progress): BACKEND DONE + smoke-tested E2E
+  (scratchpad/smoke-phase3.sh): JobsModule (BullMQ + AIJob mirror + Redis pub/sub +
+  SSE /jobs/:id/stream), StoriesModule (two-phase create/generate, list filters,
+  versioned edit, duplicate, favorites, playback-position), StoryGenerationProcessor
+  (moderation pre/post, quota consume/refund, usage log, STORY_READY push),
+  SubscriptionModule (EntitlementService atomic quotas, RevenueCat-shaped webhook,
+  dev mock purchase/expire), NotificationsModule (+devices), system voices + lazy
+  TTS previews. Mobile screens (wizard/generating/result/edit/library/reader/push/
+  settings/home-wiring) being built by 4 parallel agents.
+  ⚠ NestJS runs via `pnpm dev` (nest start) — NEVER tsx (esbuild drops
+  emitDecoratorMetadata → DI breaks). eslint consistent-type-imports is OFF in
+  apps/api for the same reason.
+- Phase 4 voice+narration+player (RNTP setup, voice previews deferred here);
+  Phase 5 illustrations+books+PDF; Phase 6 commerce (paywall UI, subscription expiry
+  on Me, profile menu rows restore); Phase 7 admin; Phase 8 hardening.
   Done-definition: master prompt §101; final report §103.
+  Deferred deviations to restore: result-screen Dinle CTA + Görselleştir/Kitap Yap
+  tiles; wizard voice preview buttons; profile Seslerimiz/Siparişlerim/Aboneliğim rows.
 
 ## Verification checklist per phase
 
