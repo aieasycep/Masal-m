@@ -5,6 +5,7 @@
     "version": "0.1.0",
     "orientation": "portrait",
     "scheme": "masalim",
+    "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
     "platforms": ["ios", "android", "web"],
@@ -19,6 +20,10 @@
     },
     "android": {
       "package": "com.masalim.app",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#1A0F3C"
+      },
       "edgeToEdgeEnabled": true,
       "permissions": ["RECORD_AUDIO", "FOREGROUND_SERVICE", "FOREGROUND_SERVICE_MEDIA_PLAYBACK"]
     },
@@ -46,6 +51,8 @@
       [
         "expo-splash-screen",
         {
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 200,
           "backgroundColor": "#1A0F3C",
           "resizeMode": "contain"
         }
