@@ -11,6 +11,11 @@ on:
     branches: [claude/masalim-implementation-plan-pz1pkl]
     paths:
       - ".github/workflows/android-apk.yml"
+      - "apps/mobile/**"
+      - "patches/**"
+      - "packages/**"
+      - "pnpm-lock.yaml"
+      - "package.json"
 
 jobs:
   apk:

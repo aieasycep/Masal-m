@@ -109,6 +109,32 @@ Local `.env` = `.env.example` + generated JWT secrets (already present, gitignor
   mobile store tests, quality sweep (no TODO/console.log/any), docs
   (README/architecture/providers/database), final report docs/final-report.md.
 
+## Delivery state (post-completion — keep current)
+
+- **PR #1 (draft): https://github.com/aieasycep/Masal-m/pull/1** — head
+  `claude/masalim-implementation-plan-pz1pkl`, base `main` (cut from the first
+  scaffold commit; repo was empty). Push access GRANTED and working.
+  Subscribed to PR activity; drive-to-green posture applies.
+- **CI (ci.yml)**: fixed twice — (1) Chromium probe extended to system Chrome
+  paths for runners, (2) integration job now uses STORAGE_PROVIDER=local
+  (no MinIO in CI; S3 default threw CredentialsProviderError). Last fix
+  pushed as 2353d1f; VERIFY latest run is green.
+- **Android APK workflow** (.github/workflows/android-apk.yml): builds release
+  APK on runners (expo prebuild + gradle), uploads artifact `masalim-apk`,
+  workflow_dispatch input `api_url` bakes the API URL into the bundle.
+  First run failed: react-native-track-player 4.1.2 Kotlin nullability vs
+  RN 0.86 → fixed via pnpm patch (patches/react-native-track-player.patch,
+  MusicModule.kt lines ~548/588 null-safe fromBundle). Push triggers rebuild.
+- **Test deployment prep** (user is non-technical, wants phone testing):
+  render.yaml blueprint (masalim-api docker + keyvalue redis + free postgres,
+  NODE_ENV=staging so mocks allowed), apps/api/Dockerfile (node:22-slim +
+  ffmpeg + chromium, migrate+seed on boot), docs/deploy-testing.md (Turkish
+  click-by-click: Supabase storage S3 keys → Render blueprint → APK rebuild
+  with api_url). User considering Vercel/Render/Supabase — advised
+  Render(API+db+redis)+Supabase(storage); Vercel only fits apps/admin.
+- Scheduled self check-ins exist via send_later for CI/APK monitoring;
+  re-arm after firing while PR is open.
+
 ## Environment gotchas
 
 - ⚠ NestJS runs via `pnpm dev` (nest start) — NEVER tsx (esbuild drops
