@@ -90,24 +90,33 @@ Local `.env` = `.env.example` + generated JWT secrets (already present, gitignor
   Badge/Input/ConfirmSheet/Screen/ScreenHeader/states/StoryCard/Starfield/TabBar/
   ChildSwitcherSheet), splash+4-slide onboarding, welcome/email auth, child setup+edit,
   full Home + Profile, custom tab bar. (Settings skeleton delivered with Phase 3 slice.)
-- ⏳ **Phase 3 — Stories** (in progress): BACKEND DONE + smoke-tested E2E
-  (scratchpad/smoke-phase3.sh): JobsModule (BullMQ + AIJob mirror + Redis pub/sub +
-  SSE /jobs/:id/stream), StoriesModule (two-phase create/generate, list filters,
-  versioned edit, duplicate, favorites, playback-position), StoryGenerationProcessor
-  (moderation pre/post, quota consume/refund, usage log, STORY_READY push),
-  SubscriptionModule (EntitlementService atomic quotas, RevenueCat-shaped webhook,
-  dev mock purchase/expire), NotificationsModule (+devices), system voices + lazy
-  TTS previews. Mobile screens (wizard/generating/result/edit/library/reader/push/
-  settings/home-wiring) being built by 4 parallel agents.
-  ⚠ NestJS runs via `pnpm dev` (nest start) — NEVER tsx (esbuild drops
+- ✅ **Phase 3 — Stories**: jobs infra (BullMQ + AIJob mirror + Redis pub/sub + SSE),
+  two-phase create/generate, entitlements + mock IAP pipeline, notifications+devices,
+  system voices; mobile wizard/generating/result/edit/library/reader/push/settings.
+  Smoke: scratchpad/smoke-phase3.sh.
+- ✅ **Phase 4 — Voice & Audio**: voice profiles + consent + clone worker + retention,
+  narration pipeline (chunk→TTS→ffmpeg concat→timings), RNTP night player + sleep
+  timer + text sync, voice studio 9-step flow, re-voice. Smoke: smoke-phase4.sh.
+- ✅ **Phase 5 — Illustrations & Books**: character-sheet-first illustration sets +
+  alternatives, book builder/cover/preview autosave, Chromium print PDF (206mm/300DPI).
+  Smoke: smoke-phase5.sh.
+- ✅ **Phase 6 — Commerce**: addresses, kuruş-math pricing, idempotent orders,
+  payment verify + snapshot job + print progression; checkout/orders/paywall mobile.
+  Smoke: smoke-phase6.sh.
+- ✅ **Phase 7 — Admin**: separate JWT realm + RBAC + audit (API) and Next.js panel
+  (apps/admin, offline build). Smoke: smoke-phase7.sh.
+- ✅ **Phase 8 — Hardening**: analytics ingestion, integration journey tests (CI),
+  mobile store tests, quality sweep (no TODO/console.log/any), docs
+  (README/architecture/providers/database), final report docs/final-report.md.
+
+## Environment gotchas
+
+- ⚠ NestJS runs via `pnpm dev` (nest start) — NEVER tsx (esbuild drops
   emitDecoratorMetadata → DI breaks). eslint consistent-type-imports is OFF in
   apps/api for the same reason.
-- Phase 4 voice+narration+player (RNTP setup, voice previews deferred here);
-  Phase 5 illustrations+books+PDF; Phase 6 commerce (paywall UI, subscription expiry
-  on Me, profile menu rows restore); Phase 7 admin; Phase 8 hardening.
-  Done-definition: master prompt §101; final report §103.
-  Deferred deviations to restore: result-screen Dinle CTA + Görselleştir/Kitap Yap
-  tiles; wizard voice preview buttons; profile Seslerimiz/Siparişlerim/Aboneliğim rows.
+- Integration tests: `NODE_ENV=test` skips throttling (shared Redis buckets).
+- Known deferred deviation: voice preview playback buttons (wizard step 5,
+  voice studio list/review/success rows) await a shared preview-player pass.
 
 ## Verification checklist per phase
 
