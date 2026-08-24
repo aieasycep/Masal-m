@@ -1,12 +1,22 @@
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Image } from 'expo-image';
+import { LinearGradient } from 'expo-linear-gradient';
 import { router, useLocalSearchParams } from 'expo-router';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { BookSize, CoverType } from '@masalim/types';
 import { ApiError, NetworkError } from '@masalim/api-client';
-import { colors, fontFamilies, fontSizes, letterSpacing, radius, shadows, spacing } from '@masalim/ui';
+import {
+  colors,
+  fontFamilies,
+  fontSizes,
+  gradients,
+  letterSpacing,
+  radius,
+  shadows,
+  spacing,
+} from '@masalim/ui';
 import { api } from '../../../src/lib/api';
 import { useCheckoutStore } from '../../../src/stores/checkout';
 import { Button } from '../../../src/components/Button';
@@ -18,6 +28,10 @@ import { ErrorState } from '../../../src/components/states';
 const QUOTE_DEBOUNCE_MS = 300;
 const MIN_QUANTITY = 1;
 const MAX_QUANTITY = 20;
+
+/** Checkout flow: configure (this) → address → review. */
+const TOTAL_STEPS = 3;
+const STEP_INDEX = 0;
 
 const BOOK_SIZES: BookSize[] = [BookSize.SQUARE, BookSize.STANDARD];
 const COVER_TYPES: CoverType[] = [CoverType.HARDCOVER, CoverType.SOFTCOVER];
@@ -36,6 +50,23 @@ function useDebouncedValue<T>(value: T, delayMs: number): T {
     return () => clearTimeout(timer);
   }, [value, delayMs]);
   return debounced;
+}
+
+/** Thin 3-segment checkout progress bar under the header (design: PrintOrder). */
+function StepBar() {
+  return (
+    <View style={styles.progressRow}>
+      {Array.from({ length: TOTAL_STEPS }, (_, index) => (
+        <View
+          key={index}
+          style={[
+            styles.progressSegment,
+            index <= STEP_INDEX ? styles.progressFilled : styles.progressEmpty,
+          ]}
+        />
+      ))}
+    </View>
+  );
 }
 
 /** Checkout step 1 — product configuration with a live server quote (§34, §82). */
@@ -99,7 +130,8 @@ export default function CheckoutConfigure() {
   if (bookQuery.isError) {
     return (
       <Screen>
-        <ScreenHeader title={t('checkout.configTitle')} />
+        <ScreenHeader eyebrow={t('checkout.eyebrow')} title={t('checkout.configTitle')} />
+        <StepBar />
         <ErrorState
           emoji="🌧️"
           title={mapError(bookQuery.error)}
@@ -114,7 +146,8 @@ export default function CheckoutConfigure() {
 
   return (
     <Screen>
-      <ScreenHeader title={t('checkout.configTitle')} />
+      <ScreenHeader eyebrow={t('checkout.eyebrow')} title={t('checkout.configTitle')} />
+      <StepBar />
 
       {book == null ? (
         <ActivityIndicator
@@ -124,18 +157,24 @@ export default function CheckoutConfigure() {
         />
       ) : (
         <>
-          {/* Product card — cover thumb + title. */}
+          {/* Product card — book-shaped cover thumb + title. */}
           <View style={[styles.productCard, shadows.cardSubtle]}>
             <View style={styles.coverThumb}>
+              <LinearGradient
+                colors={gradients.playerCover as unknown as [string, string]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.coverFill}
+              />
               {book.coverImageUrl != null ? (
                 <Image
                   source={{ uri: book.coverImageUrl }}
-                  style={StyleSheet.absoluteFill}
+                  style={styles.coverFill}
                   contentFit="cover"
                   accessibilityIgnoresInvertColors
                 />
               ) : (
-                <Text style={styles.coverEmoji}>📖</Text>
+                <Text style={styles.coverEmoji}>⭐</Text>
               )}
             </View>
             <View style={styles.productInfo}>
@@ -165,12 +204,12 @@ export default function CheckoutConfigure() {
                 style={styles.optionTile}
               >
                 <View style={styles.optionContent}>
-                  <Text style={styles.optionEmoji}>{size === BookSize.SQUARE ? '⬛' : '📄'}</Text>
                   <Text
-                    style={[styles.optionLabel, bookSize === size && styles.optionLabelSelected]}
+                    style={[styles.sizeLabel, bookSize === size && styles.optionLabelSelected]}
                   >
                     {t(`checkout.sizes.${size}`)}
                   </Text>
+                  <Text style={styles.optionSub}>{t(`checkout.sizeDims.${size}`)}</Text>
                 </View>
               </SelectableCard>
             ))}
@@ -192,13 +231,14 @@ export default function CheckoutConfigure() {
               >
                 <View style={styles.optionContent}>
                   <Text style={styles.optionEmoji}>
-                    {cover === CoverType.HARDCOVER ? '📕' : '📙'}
+                    {cover === CoverType.HARDCOVER ? '📗' : '📔'}
                   </Text>
                   <Text
-                    style={[styles.optionLabel, coverType === cover && styles.optionLabelSelected]}
+                    style={[styles.coverLabel, coverType === cover && styles.optionLabelSelected]}
                   >
                     {t(`checkout.covers.${cover}`)}
                   </Text>
+                  <Text style={styles.optionSub}>{t(`checkout.coverSubs.${cover}`)}</Text>
                 </View>
               </SelectableCard>
             ))}
@@ -214,9 +254,13 @@ export default function CheckoutConfigure() {
               disabled={quantity <= MIN_QUANTITY}
               accessibilityRole="button"
               accessibilityLabel="−"
-              style={[styles.stepperButton, quantity <= MIN_QUANTITY && styles.stepperDisabled]}
+              style={[
+                styles.stepperButton,
+                styles.stepperMinus,
+                quantity <= MIN_QUANTITY && styles.stepperDisabled,
+              ]}
             >
-              <Text style={styles.stepperSign}>−</Text>
+              <Text style={styles.stepperMinusSign}>−</Text>
             </Pressable>
             <Text style={styles.stepperValue} accessibilityLiveRegion="polite">
               {quantity}
@@ -226,14 +270,18 @@ export default function CheckoutConfigure() {
               disabled={quantity >= MAX_QUANTITY}
               accessibilityRole="button"
               accessibilityLabel="+"
-              style={[styles.stepperButton, quantity >= MAX_QUANTITY && styles.stepperDisabled]}
+              style={[
+                styles.stepperButton,
+                styles.stepperPlus,
+                quantity >= MAX_QUANTITY && styles.stepperDisabled,
+              ]}
             >
-              <Text style={styles.stepperSign}>+</Text>
+              <Text style={styles.stepperPlusSign}>+</Text>
             </Pressable>
           </View>
 
           {/* Live server quote — prices only ever come from the API (§82). */}
-          <View style={styles.quoteCard}>
+          <View style={[styles.summaryCard, shadows.cardSubtle]}>
             {quoteQuery.isError ? (
               <View style={styles.quoteErrorBlock}>
                 <Text style={styles.quoteError}>{mapError(quoteQuery.error)}</Text>
@@ -248,22 +296,41 @@ export default function CheckoutConfigure() {
               <ActivityIndicator color={colors.primary} accessibilityLabel={t('common.loading')} />
             ) : (
               <>
-                <View style={styles.quoteRow}>
-                  <Text style={styles.quoteLabel}>{t('checkout.price')}</Text>
-                  <View style={styles.quoteValueRow}>
+                <View style={styles.summaryRow}>
+                  <Text style={styles.summaryLabel}>
+                    {t('checkout.priceLine', {
+                      qty: quantity,
+                      size: t(`checkout.sizes.${bookSize}`),
+                      cover: t(`checkout.covers.${coverType}`),
+                    })}
+                  </Text>
+                  <Text style={styles.summaryValue}>{formatPrice(quote.subtotal)}</Text>
+                </View>
+                <View style={styles.summaryRow}>
+                  <Text style={styles.summaryLabel}>{t('checkout.shippingLabel')}</Text>
+                  <Text style={styles.summaryValue}>
+                    {quote.shipping === '0.00'
+                      ? t('checkout.shippingFree')
+                      : formatPrice(quote.shipping)}
+                  </Text>
+                </View>
+                <View style={styles.summaryDivider} />
+                <View style={styles.summaryRow}>
+                  <Text style={styles.totalLabel}>{t('checkout.totalLabel')}</Text>
+                  <View style={styles.totalValueRow}>
                     {quotePending ? (
                       <ActivityIndicator size="small" color={colors.primary} />
                     ) : null}
-                    <Text style={[styles.quoteValue, quotePending && styles.quoteValueStale]}>
+                    <Text style={[styles.totalValue, quotePending && styles.totalValueStale]}>
                       {formatPrice(quote.total)}
                     </Text>
                   </View>
                 </View>
                 <Text style={styles.deliveryNote}>
-                  {t('checkout.estimatedDelivery', {
+                  {`🚚 ${t('checkout.estimatedDelivery', {
                     min: quote.estimatedDeliveryDays.min,
                     max: quote.estimatedDeliveryDays.max,
-                  })}
+                  })}`}
                 </Text>
               </>
             )}
@@ -283,125 +350,179 @@ export default function CheckoutConfigure() {
 
 const styles = StyleSheet.create({
   loader: { marginTop: spacing.xxxl },
+  progressRow: { flexDirection: 'row', gap: 4, marginTop: -8, marginBottom: spacing.lg },
+  progressSegment: { flex: 1, height: 4, borderRadius: 2 },
+  progressFilled: { backgroundColor: colors.primary },
+  progressEmpty: { backgroundColor: colors.border },
   productCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 14,
-    padding: 14,
-    borderRadius: radius.card,
+    gap: spacing.md,
+    padding: spacing.lg,
+    borderRadius: radius.lg,
     backgroundColor: colors.card,
     borderWidth: 1,
     borderColor: colors.border,
-    marginBottom: spacing.sm,
   },
   coverThumb: {
-    width: 56,
-    height: 72,
-    borderRadius: radius.sm,
-    backgroundColor: colors.lavenderLight,
+    width: 64,
+    height: 84,
+    borderTopLeftRadius: 4,
+    borderBottomLeftRadius: 4,
+    borderTopRightRadius: 10,
+    borderBottomRightRadius: 10,
+    backgroundColor: colors.purpleDeep,
     alignItems: 'center',
     justifyContent: 'center',
-    overflow: 'hidden',
+    shadowColor: colors.primary,
+    shadowOffset: { width: 4, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 3,
   },
-  coverEmoji: { fontSize: 24 },
+  coverFill: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    borderTopLeftRadius: 4,
+    borderBottomLeftRadius: 4,
+    borderTopRightRadius: 10,
+    borderBottomRightRadius: 10,
+  },
+  coverEmoji: { fontSize: 28 },
   productInfo: { flex: 1 },
   productTitle: {
     fontFamily: fontFamilies.display,
-    fontSize: fontSizes.h4,
+    fontSize: fontSizes.xl,
     color: colors.foreground,
     marginBottom: 2,
   },
   productSubtitle: {
     fontFamily: fontFamilies.body,
-    fontSize: fontSizes.md,
+    fontSize: fontSizes.sm,
     color: colors.mutedForeground,
   },
   sectionLabel: {
-    fontFamily: fontFamilies.bodySemiBold,
-    fontSize: fontSizes.md,
+    fontFamily: fontFamilies.bodyBold,
+    fontSize: fontSizes.sm,
     color: colors.mutedForeground,
     letterSpacing: letterSpacing.eyebrow,
-    marginTop: spacing.lg,
-    marginBottom: spacing.xs,
+    marginTop: spacing.xl,
+    marginBottom: 10,
   },
-  optionRow: { flexDirection: 'row', gap: spacing.xs },
+  optionRow: { flexDirection: 'row', gap: 10 },
   optionTile: {
     flex: 1,
     justifyContent: 'center',
-    paddingVertical: 14,
-    paddingHorizontal: 12,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.sm,
   },
-  optionContent: { flex: 1, alignItems: 'center', gap: 4 },
-  optionEmoji: { fontSize: 22 },
-  optionLabel: {
+  optionContent: { flex: 1, alignItems: 'center', gap: 2 },
+  optionEmoji: { fontSize: 28, marginBottom: 4 },
+  sizeLabel: {
+    fontFamily: fontFamilies.display,
+    fontSize: fontSizes.h4,
+    color: colors.foreground,
+    textAlign: 'center',
+  },
+  coverLabel: {
     fontFamily: fontFamilies.bodyBold,
-    fontSize: fontSizes.base,
+    fontSize: fontSizes.md,
     color: colors.foreground,
     textAlign: 'center',
   },
   optionLabelSelected: { color: colors.primary },
+  optionSub: {
+    fontFamily: fontFamilies.body,
+    fontSize: fontSizes.xs,
+    color: colors.mutedForeground,
+    textAlign: 'center',
+  },
   stepperRow: {
     flexDirection: 'row',
     alignItems: 'center',
     alignSelf: 'flex-start',
     gap: spacing.lg,
-    backgroundColor: colors.card,
-    borderWidth: 2,
-    borderColor: colors.border,
-    borderRadius: radius.base,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
   },
   stepperButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: colors.secondary,
+    width: 44,
+    height: 44,
+    borderRadius: radius.round,
     alignItems: 'center',
     justifyContent: 'center',
   },
+  stepperMinus: {
+    backgroundColor: colors.card,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  stepperPlus: { backgroundColor: colors.secondary },
   stepperDisabled: { opacity: 0.4 },
-  stepperSign: {
+  stepperMinusSign: {
+    fontFamily: fontFamilies.bodySemiBold,
+    fontSize: fontSizes.lg + 5,
+    color: colors.foreground,
+    lineHeight: 24,
+  },
+  stepperPlusSign: {
     fontFamily: fontFamilies.bodyExtraBold,
-    fontSize: fontSizes.h3,
+    fontSize: fontSizes.lg + 5,
     color: colors.primary,
     lineHeight: 24,
   },
   stepperValue: {
-    minWidth: 32,
+    minWidth: 40,
     textAlign: 'center',
     fontFamily: fontFamilies.display,
-    fontSize: fontSizes.h3,
+    fontSize: fontSizes.display,
     color: colors.foreground,
   },
-  quoteCard: {
+  summaryCard: {
     marginTop: spacing.xl,
-    padding: 18,
-    borderRadius: radius.card,
-    backgroundColor: colors.secondary,
-    gap: 6,
+    padding: spacing.md,
+    borderRadius: radius.base,
+    backgroundColor: colors.card,
+    borderWidth: 1,
+    borderColor: colors.border,
+    gap: spacing.xs,
   },
-  quoteRow: {
+  summaryRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    gap: spacing.sm,
   },
-  quoteLabel: {
-    fontFamily: fontFamilies.bodySemiBold,
-    fontSize: fontSizes.lg,
-    color: colors.secondaryForeground,
-  },
-  quoteValueRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  quoteValue: {
-    fontFamily: fontFamilies.display,
-    fontSize: fontSizes.h2,
-    color: colors.primary,
-  },
-  quoteValueStale: { opacity: 0.5 },
-  deliveryNote: {
+  summaryLabel: {
+    flex: 1,
     fontFamily: fontFamilies.body,
     fontSize: fontSizes.md,
     color: colors.mutedForeground,
+  },
+  summaryValue: {
+    fontFamily: fontFamilies.bodyBold,
+    fontSize: fontSizes.md,
+    color: colors.foreground,
+  },
+  summaryDivider: { height: 1, backgroundColor: colors.border, marginVertical: 2 },
+  totalLabel: {
+    fontFamily: fontFamilies.bodyBold,
+    fontSize: fontSizes.lg,
+    color: colors.foreground,
+  },
+  totalValueRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
+  totalValue: {
+    fontFamily: fontFamilies.display,
+    fontSize: fontSizes.h4,
+    color: colors.primary,
+  },
+  totalValueStale: { opacity: 0.5 },
+  deliveryNote: {
+    fontFamily: fontFamilies.body,
+    fontSize: fontSizes.sm,
+    color: colors.mutedForeground,
+    marginTop: 2,
   },
   quoteErrorBlock: { gap: spacing.sm },
   quoteError: {

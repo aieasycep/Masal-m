@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
@@ -10,7 +11,15 @@ import Animated, {
   withDelay,
   withTiming,
 } from 'react-native-reanimated';
-import { colors, fontFamilies, fontSizes, letterSpacing, spacing } from '@masalim/ui';
+import {
+  colors,
+  fontFamilies,
+  fontSizes,
+  gradients,
+  letterSpacing,
+  shadows,
+  spacing,
+} from '@masalim/ui';
 import { api } from '../../../src/lib/api';
 import { Button } from '../../../src/components/Button';
 import { Screen } from '../../../src/components/Screen';
@@ -81,45 +90,66 @@ export default function CheckoutSuccess() {
       : t('checkout.successTitleGeneric');
 
   return (
-    <Screen scroll={false}>
-      {Array.from({ length: CONFETTI_COUNT }, (_, index) => (
-        <ConfettiDot key={index} index={index} height={height} />
-      ))}
+    <LinearGradient
+      colors={[colors.background, colors.secondary] as const}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 0.4, y: 1 }}
+      style={styles.flex}
+    >
+      <Screen scroll={false} backgroundColor="transparent">
+        {Array.from({ length: CONFETTI_COUNT }, (_, index) => (
+          <ConfettiDot key={index} index={index} height={height} />
+        ))}
 
-      <View style={styles.center}>
-        <Text style={styles.emoji}>🎉</Text>
-        <Text style={styles.title} accessibilityRole="header">
-          {title}
-        </Text>
-        {orderNumber != null ? (
-          <View style={styles.orderNumberBlock}>
-            <Text style={styles.orderNumberLabel}>
-              {t('checkout.orderNumber').toLocaleUpperCase('tr')}
-            </Text>
-            <Text style={styles.orderNumber} selectable>
-              {orderNumber}
-            </Text>
-          </View>
-        ) : null}
-      </View>
+        <View style={styles.center}>
+          {/* Printed-book mockup (design: PrintOrder success). */}
+          <LinearGradient
+            colors={gradients.playerCover as unknown as [string, string]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={[styles.bookMockup, shadows.hero]}
+          >
+            <View style={styles.bookSpine} />
+            <Text style={styles.bookEmoji}>⭐</Text>
+          </LinearGradient>
 
-      <View style={styles.buttons}>
-        <Button
-          label={t('checkout.trackOrder')}
-          onPress={() => router.replace(`/orders/${orderId}` as never)}
-        />
-        <Button
-          label={t('tabs.home')}
-          variant="tertiary"
-          compact
-          onPress={() => router.replace('/(tabs)/home')}
-        />
-      </View>
-    </Screen>
+          <Text style={styles.title} accessibilityRole="header">
+            {title}
+          </Text>
+          <Text style={styles.subtitle}>{t('checkout.successSubtitle')}</Text>
+          {orderNumber != null ? (
+            <View style={styles.orderNumberBlock}>
+              <Text style={styles.orderNumberLabel}>
+                {t('checkout.orderNumber').toLocaleUpperCase('tr')}
+              </Text>
+              <Text style={styles.orderNumber} selectable>
+                {orderNumber}
+              </Text>
+            </View>
+          ) : null}
+        </View>
+
+        <View style={styles.buttons}>
+          <Button
+            label={t('checkout.trackOrder')}
+            variant="secondary"
+            leading={<Text style={styles.buttonEmoji}>📦</Text>}
+            style={styles.trackButton}
+            onPress={() => router.replace(`/orders/${orderId}` as never)}
+          />
+          <Button
+            label={t('checkout.backHome')}
+            variant="secondary"
+            onPress={() => router.replace('/(tabs)/home')}
+          />
+        </View>
+      </Screen>
+    </LinearGradient>
   );
 }
 
 const styles = StyleSheet.create({
+  flex: { flex: 1 },
   confetti: {
     position: 'absolute',
     top: 40,
@@ -127,14 +157,47 @@ const styles = StyleSheet.create({
   },
   confettiRound: { borderRadius: 999 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  emoji: { fontSize: 56, marginBottom: spacing.lg },
+  bookMockup: {
+    width: 140,
+    height: 180,
+    borderTopLeftRadius: 8,
+    borderBottomLeftRadius: 8,
+    borderTopRightRadius: 16,
+    borderBottomRightRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.2)',
+    marginBottom: spacing.xl,
+  },
+  bookSpine: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: 12,
+    borderTopLeftRadius: 8,
+    borderBottomLeftRadius: 8,
+    backgroundColor: colors.secondaryForeground,
+  },
+  bookEmoji: { fontSize: 60 },
   title: {
     fontFamily: fontFamilies.display,
-    fontSize: fontSizes.h2,
-    lineHeight: 32,
+    fontSize: fontSizes.h1,
+    lineHeight: 34,
+    letterSpacing: letterSpacing.tight,
     color: colors.foreground,
     textAlign: 'center',
-    marginBottom: spacing.xl,
+    marginBottom: spacing.xs,
+    paddingHorizontal: spacing.sm,
+  },
+  subtitle: {
+    fontFamily: fontFamilies.body,
+    fontSize: fontSizes.lg,
+    lineHeight: 24,
+    color: colors.mutedForeground,
+    textAlign: 'center',
+    marginBottom: spacing.md,
     paddingHorizontal: spacing.sm,
   },
   orderNumberBlock: { alignItems: 'center', gap: 4 },
@@ -150,5 +213,7 @@ const styles = StyleSheet.create({
     color: colors.primary,
     letterSpacing: 1,
   },
-  buttons: { gap: spacing.xs },
+  buttons: { gap: 10 },
+  trackButton: { backgroundColor: colors.secondary, borderColor: colors.secondary },
+  buttonEmoji: { fontSize: fontSizes.xl },
 });

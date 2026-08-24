@@ -35,6 +35,27 @@ const FIELD_ORDER: FieldName[] = [
   'postalCode',
 ];
 
+/** Checkout flow: configure → address (this) → review. */
+const TOTAL_STEPS = 3;
+const STEP_INDEX = 1;
+
+/** Thin 3-segment checkout progress bar under the header (design: PrintOrder). */
+function StepBar() {
+  return (
+    <View style={styles.progressRow}>
+      {Array.from({ length: TOTAL_STEPS }, (_, index) => (
+        <View
+          key={index}
+          style={[
+            styles.progressSegment,
+            index <= STEP_INDEX ? styles.progressFilled : styles.progressEmpty,
+          ]}
+        />
+      ))}
+    </View>
+  );
+}
+
 /** Checkout step 2 — pick a saved shipping address or create a new one (§34). */
 export default function CheckoutAddress() {
   const { t } = useTranslation();
@@ -133,7 +154,8 @@ export default function CheckoutAddress() {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       <Screen>
-        <ScreenHeader title={t('checkout.addressTitle')} />
+        <ScreenHeader eyebrow={t('checkout.eyebrow')} title={t('checkout.addressTitle')} />
+        <StepBar />
 
         {addressesQuery.isError ? (
           <ErrorState
@@ -280,6 +302,10 @@ export default function CheckoutAddress() {
 const styles = StyleSheet.create({
   flex: { flex: 1 },
   loader: { marginTop: spacing.xxxl },
+  progressRow: { flexDirection: 'row', gap: 4, marginTop: -8, marginBottom: spacing.lg },
+  progressSegment: { flex: 1, height: 4, borderRadius: 2 },
+  progressFilled: { backgroundColor: colors.primary },
+  progressEmpty: { backgroundColor: colors.border },
   addressList: { gap: spacing.xs, marginBottom: spacing.sm },
   addressBody: { flex: 1, gap: 2 },
   addressName: {

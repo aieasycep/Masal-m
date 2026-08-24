@@ -1,13 +1,23 @@
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import { Image } from 'expo-image';
+import { LinearGradient } from 'expo-linear-gradient';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import * as WebBrowser from 'expo-web-browser';
 import { AIJobStatus, PaymentStatus } from '@masalim/types';
 import { ApiError, NetworkError } from '@masalim/api-client';
-import { colors, fontFamilies, fontSizes, letterSpacing, radius, shadows, spacing } from '@masalim/ui';
+import {
+  colors,
+  fontFamilies,
+  fontSizes,
+  gradients,
+  letterSpacing,
+  radius,
+  shadows,
+  spacing,
+} from '@masalim/ui';
 import { api } from '../../../src/lib/api';
 import { useJobProgress } from '../../../src/lib/job-stream';
 import { useCheckoutStore } from '../../../src/stores/checkout';
@@ -20,6 +30,10 @@ const PAYMENT_POLL_MS = 3_000;
 /** ~3 minutes of polling before giving up on the hosted checkout. */
 const PAYMENT_MAX_POLLS = 60;
 
+/** Checkout flow: configure → address → review (this). */
+const TOTAL_STEPS = 3;
+const STEP_INDEX = 2;
+
 /** "649.00" → "₺649,00" (Turkish decimal comma + thousands dots). */
 function formatPrice(amount: string): string {
   const [int = '0', frac = '00'] = amount.split('.');
@@ -27,6 +41,23 @@ function formatPrice(amount: string): string {
 }
 
 type PayPhase = 'idle' | 'working' | 'polling';
+
+/** Thin 3-segment checkout progress bar under the header (design: PrintOrder). */
+function StepBar() {
+  return (
+    <View style={styles.progressRow}>
+      {Array.from({ length: TOTAL_STEPS }, (_, index) => (
+        <View
+          key={index}
+          style={[
+            styles.progressSegment,
+            index <= STEP_INDEX ? styles.progressFilled : styles.progressEmpty,
+          ]}
+        />
+      ))}
+    </View>
+  );
+}
 
 /** Checkout step 3 — order summary, print-file readiness gate and payment (§34). */
 export default function CheckoutReview() {
@@ -221,7 +252,8 @@ export default function CheckoutReview() {
   if (bookQuery.isError) {
     return (
       <Screen>
-        <ScreenHeader title={t('checkout.reviewTitle')} />
+        <ScreenHeader eyebrow={t('checkout.eyebrow')} title={t('checkout.reviewTitle')} />
+        <StepBar />
         <ErrorState
           emoji="🌧️"
           title={mapError(bookQuery.error)}
@@ -234,7 +266,8 @@ export default function CheckoutReview() {
 
   return (
     <Screen>
-      <ScreenHeader title={t('checkout.reviewTitle')} />
+      <ScreenHeader eyebrow={t('checkout.eyebrow')} title={t('checkout.reviewTitle')} />
+      <StepBar />
 
       {book == null || quote == null ? (
         quoteQuery.isError ? (
@@ -254,29 +287,37 @@ export default function CheckoutReview() {
       ) : (
         <>
           {/* Product line. */}
-          <Text style={styles.sectionLabel}>
-            {t('checkout.product').toLocaleUpperCase('tr')}
-          </Text>
-          <View style={[styles.productCard, shadows.cardSubtle]}>
-            <View style={styles.coverThumb}>
-              {book.coverImageUrl != null ? (
-                <Image
-                  source={{ uri: book.coverImageUrl }}
-                  style={StyleSheet.absoluteFill}
-                  contentFit="cover"
-                  accessibilityIgnoresInvertColors
+          <View style={[styles.card, shadows.cardSubtle]}>
+            <Text style={styles.cardLabel}>
+              {t('checkout.product').toLocaleUpperCase('tr')}
+            </Text>
+            <View style={styles.productRow}>
+              <View style={styles.coverThumb}>
+                <LinearGradient
+                  colors={gradients.playerCover as unknown as [string, string]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.coverFill}
                 />
-              ) : (
-                <Text style={styles.coverEmoji}>📖</Text>
-              )}
-            </View>
-            <View style={styles.productInfo}>
-              <Text style={styles.productTitle} numberOfLines={2}>
-                {`${book.title} × ${quantity}`}
-              </Text>
-              <Text style={styles.productMeta}>
-                {`${t(`checkout.sizes.${bookSize}`)} · ${t(`checkout.covers.${coverType}`)}`}
-              </Text>
+                {book.coverImageUrl != null ? (
+                  <Image
+                    source={{ uri: book.coverImageUrl }}
+                    style={styles.coverFill}
+                    contentFit="cover"
+                    accessibilityIgnoresInvertColors
+                  />
+                ) : (
+                  <Text style={styles.coverEmoji}>⭐</Text>
+                )}
+              </View>
+              <View style={styles.productInfo}>
+                <Text style={styles.productTitle} numberOfLines={2}>
+                  {`${book.title} × ${quantity}`}
+                </Text>
+                <Text style={styles.productMeta}>
+                  {`${t(`checkout.sizes.${bookSize}`)} · ${t(`checkout.covers.${coverType}`)}`}
+                </Text>
+              </View>
             </View>
           </View>
 
@@ -307,7 +348,10 @@ export default function CheckoutReview() {
           ) : null}
 
           {/* Price breakdown — server-quoted only (§82). */}
-          <View style={styles.summaryCard}>
+          <View style={[styles.card, shadows.cardSubtle]}>
+            <Text style={styles.cardLabel}>
+              {t('checkout.paymentSummary').toLocaleUpperCase('tr')}
+            </Text>
             <View style={styles.summaryRow}>
               <Text style={styles.summaryLabel}>{t('checkout.subtotal')}</Text>
               <Text style={styles.summaryValue}>{formatPrice(quote.subtotal)}</Text>
@@ -326,33 +370,38 @@ export default function CheckoutReview() {
               <Text style={styles.totalValue}>{formatPrice(quote.total)}</Text>
             </View>
             <Text style={styles.deliveryNote}>
-              {t('checkout.estimatedDelivery', {
+              {`🚚 ${t('checkout.estimatedDelivery', {
                 min: quote.estimatedDeliveryDays.min,
                 max: quote.estimatedDeliveryDays.max,
-              })}
+              })}`}
             </Text>
           </View>
 
           {/* Shipping address. */}
-          <Text style={styles.sectionLabel}>
-            {t('checkout.addressTitle').toLocaleUpperCase('tr')}
-          </Text>
           {address != null ? (
-            <View style={styles.addressCard}>
+            <View style={[styles.card, shadows.cardSubtle]}>
+              <Text style={styles.cardLabel}>
+                {t('checkout.addressTitle').toLocaleUpperCase('tr')}
+              </Text>
               <Text style={styles.addressName}>{address.fullName}</Text>
               <Text style={styles.addressLine}>{address.addressLine}</Text>
               <Text style={styles.addressMeta}>
-                {`${address.district} / ${address.city} · ${address.postalCode}`}
+                {`${address.district}, ${address.city} ${address.postalCode}`}
               </Text>
               <Text style={styles.addressMeta}>{address.phone}</Text>
             </View>
           ) : (
-            <Button
-              label={t('checkout.addressTitle')}
-              variant="secondary"
-              compact
-              onPress={() => router.push(`/checkout/${bookId}/address` as never)}
-            />
+            <View style={styles.card}>
+              <Text style={styles.cardLabel}>
+                {t('checkout.addressTitle').toLocaleUpperCase('tr')}
+              </Text>
+              <Button
+                label={t('checkout.addressTitle')}
+                variant="secondary"
+                compact
+                onPress={() => router.push(`/checkout/${bookId}/address` as never)}
+              />
+            </View>
           )}
 
           {payError != null ? (
@@ -362,7 +411,11 @@ export default function CheckoutReview() {
           ) : null}
 
           <Button
-            label={paying ? t('checkout.paying') : t('checkout.payCta')}
+            label={
+              paying
+                ? t('checkout.paying')
+                : `${t('checkout.payCta')} · ${formatPrice(quote.total)}`
+            }
             onPress={() => void startPayment()}
             disabled={!canPay}
             style={styles.cta}
@@ -375,48 +428,70 @@ export default function CheckoutReview() {
 
 const styles = StyleSheet.create({
   loader: { marginTop: spacing.xxxl },
-  sectionLabel: {
-    fontFamily: fontFamilies.bodySemiBold,
-    fontSize: fontSizes.md,
-    color: colors.mutedForeground,
-    letterSpacing: letterSpacing.eyebrow,
-    marginTop: spacing.lg,
-    marginBottom: spacing.xs,
-  },
-  productCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 14,
-    padding: 14,
-    borderRadius: radius.card,
+  progressRow: { flexDirection: 'row', gap: 4, marginTop: -8, marginBottom: spacing.lg },
+  progressSegment: { flex: 1, height: 4, borderRadius: 2 },
+  progressFilled: { backgroundColor: colors.primary },
+  progressEmpty: { backgroundColor: colors.border },
+  card: {
+    marginTop: spacing.md,
+    paddingVertical: spacing.md,
+    paddingHorizontal: 18,
+    borderRadius: radius.base,
     backgroundColor: colors.card,
     borderWidth: 1,
     borderColor: colors.border,
+    gap: 4,
   },
+  cardLabel: {
+    fontFamily: fontFamilies.bodyBold,
+    fontSize: fontSizes.xs,
+    color: colors.mutedForeground,
+    letterSpacing: letterSpacing.eyebrow,
+    marginBottom: 4,
+  },
+  productRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
   coverThumb: {
     width: 56,
     height: 72,
-    borderRadius: radius.sm,
-    backgroundColor: colors.lavenderLight,
+    borderTopLeftRadius: 4,
+    borderBottomLeftRadius: 4,
+    borderTopRightRadius: 10,
+    borderBottomRightRadius: 10,
+    backgroundColor: colors.purpleDeep,
     alignItems: 'center',
     justifyContent: 'center',
-    overflow: 'hidden',
+    shadowColor: colors.primary,
+    shadowOffset: { width: 4, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 3,
+  },
+  coverFill: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    borderTopLeftRadius: 4,
+    borderBottomLeftRadius: 4,
+    borderTopRightRadius: 10,
+    borderBottomRightRadius: 10,
   },
   coverEmoji: { fontSize: 24 },
   productInfo: { flex: 1 },
   productTitle: {
     fontFamily: fontFamilies.display,
-    fontSize: fontSizes.h4,
+    fontSize: fontSizes.xl,
     color: colors.foreground,
     marginBottom: 2,
   },
   productMeta: {
     fontFamily: fontFamilies.body,
-    fontSize: fontSizes.md,
+    fontSize: fontSizes.base,
     color: colors.mutedForeground,
   },
   renderCard: {
-    marginTop: spacing.sm,
+    marginTop: spacing.md,
     padding: 14,
     borderRadius: radius.base,
     backgroundColor: colors.secondary,
@@ -434,15 +509,6 @@ const styles = StyleSheet.create({
     fontSize: fontSizes.md,
     color: colors.destructive,
   },
-  summaryCard: {
-    marginTop: spacing.lg,
-    padding: 18,
-    borderRadius: radius.card,
-    backgroundColor: colors.card,
-    borderWidth: 1,
-    borderColor: colors.border,
-    gap: 10,
-  },
   summaryRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -450,53 +516,46 @@ const styles = StyleSheet.create({
   },
   summaryLabel: {
     fontFamily: fontFamilies.body,
-    fontSize: fontSizes.lg,
+    fontSize: fontSizes.base,
     color: colors.mutedForeground,
   },
   summaryValue: {
-    fontFamily: fontFamilies.bodySemiBold,
-    fontSize: fontSizes.lg,
+    fontFamily: fontFamilies.bodyBold,
+    fontSize: fontSizes.base,
     color: colors.foreground,
   },
-  summaryDivider: { height: 1, backgroundColor: colors.border },
+  summaryDivider: { height: 1, backgroundColor: colors.border, marginVertical: 4 },
   totalLabel: {
     fontFamily: fontFamilies.bodyBold,
-    fontSize: fontSizes.xl,
+    fontSize: fontSizes.lg,
     color: colors.foreground,
   },
   totalValue: {
     fontFamily: fontFamilies.display,
-    fontSize: fontSizes.h3,
+    fontSize: fontSizes.h4,
     color: colors.primary,
   },
   deliveryNote: {
     fontFamily: fontFamilies.body,
-    fontSize: fontSizes.md,
+    fontSize: fontSizes.sm,
     color: colors.mutedForeground,
-  },
-  addressCard: {
-    padding: 18,
-    borderRadius: radius.card,
-    backgroundColor: colors.card,
-    borderWidth: 1,
-    borderColor: colors.border,
-    gap: 4,
+    marginTop: 2,
   },
   addressName: {
     fontFamily: fontFamilies.bodyBold,
-    fontSize: fontSizes.lg,
+    fontSize: fontSizes.base,
     color: colors.foreground,
   },
   addressLine: {
     fontFamily: fontFamilies.body,
     fontSize: fontSizes.base,
-    color: colors.mutedForeground,
+    color: colors.foreground,
     lineHeight: 19,
   },
   addressMeta: {
-    fontFamily: fontFamilies.bodySemiBold,
-    fontSize: fontSizes.sm,
-    color: colors.mutedForeground,
+    fontFamily: fontFamilies.body,
+    fontSize: fontSizes.base,
+    color: colors.foreground,
   },
   payError: {
     fontFamily: fontFamilies.bodySemiBold,
