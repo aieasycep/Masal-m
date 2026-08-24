@@ -5,13 +5,30 @@ import argon2 from 'argon2';
 const prisma = new PrismaClient();
 
 async function seedSystemVoices() {
+  // System voices must carry provider voice ids the active TTS provider understands:
+  // the narration pipeline forwards providerVoiceId verbatim to generateSpeech().
+  // ElevenLabs premade voices are account-global and speak Turkish under
+  // eleven_multilingual_v2 (TTS_MODEL default).
+  const useElevenLabs = process.env.TTS_PROVIDER === 'elevenlabs';
+  const provider = useElevenLabs ? 'elevenlabs' : 'mock';
+  const elevenLabsIds: Record<string, string> = {
+    Duru: '21m00Tcm4TlvDq8ikWAM', // Rachel — calm female
+    Atlas: 'pNInz6obpgDQGcFmaJgB', // Adam — deep male
+    Luna: 'EXAVITQu4vr4xnSDxMaL', // Sarah — soft female
+    Çınar: 'ErXwobaYiN019PkySvjV', // Antoni — warm male
+    Masal: 'AZnzlk1XvdvUeBnXmlld', // Domi — upbeat female
+    Yıldız: 'TxGEqnHWrfWFTfGW9XjX', // Josh — energetic male
+  };
+  const voiceId = (name: string, mockId: string) =>
+    useElevenLabs ? (elevenLabsIds[name] ?? mockId) : mockId;
+
   const voices = [
     {
       displayName: 'Duru',
       description: 'Yumuşak masal anlatıcısı',
       category: 'CALM' as const,
-      provider: 'mock',
-      providerVoiceId: 'mock-voice-duru',
+      provider,
+      providerVoiceId: voiceId('Duru', 'mock-voice-duru'),
       premiumOnly: false,
       sortOrder: 1,
     },
@@ -19,8 +36,8 @@ async function seedSystemVoices() {
       displayName: 'Atlas',
       description: 'Sıcak erkek sesi',
       category: 'CALM' as const,
-      provider: 'mock',
-      providerVoiceId: 'mock-voice-atlas',
+      provider,
+      providerVoiceId: voiceId('Atlas', 'mock-voice-atlas'),
       premiumOnly: false,
       sortOrder: 2,
     },
@@ -28,8 +45,8 @@ async function seedSystemVoices() {
       displayName: 'Luna',
       description: 'Masalsı ve huzurlu',
       category: 'FAIRYTALE' as const,
-      provider: 'mock',
-      providerVoiceId: 'mock-voice-luna',
+      provider,
+      providerVoiceId: voiceId('Luna', 'mock-voice-luna'),
       premiumOnly: false,
       sortOrder: 3,
     },
@@ -37,8 +54,8 @@ async function seedSystemVoices() {
       displayName: 'Çınar',
       description: 'Güven veren anlatıcı',
       category: 'CALM' as const,
-      provider: 'mock',
-      providerVoiceId: 'mock-voice-cinar',
+      provider,
+      providerVoiceId: voiceId('Çınar', 'mock-voice-cinar'),
       premiumOnly: true,
       sortOrder: 4,
     },
@@ -46,8 +63,8 @@ async function seedSystemVoices() {
       displayName: 'Masal',
       description: 'Neşeli ve oyuncu',
       category: 'CHEERFUL' as const,
-      provider: 'mock',
-      providerVoiceId: 'mock-voice-masal',
+      provider,
+      providerVoiceId: voiceId('Masal', 'mock-voice-masal'),
       premiumOnly: true,
       sortOrder: 5,
     },
@@ -55,24 +72,30 @@ async function seedSystemVoices() {
       displayName: 'Yıldız',
       description: 'Enerjik macera sesi',
       category: 'ENERGETIC' as const,
-      provider: 'mock',
-      providerVoiceId: 'mock-voice-yildiz',
+      provider,
+      providerVoiceId: voiceId('Yıldız', 'mock-voice-yildiz'),
       premiumOnly: true,
       sortOrder: 6,
     },
   ];
 
   for (const voice of voices) {
+    // Keyed by displayName so a provider switch updates rows in place instead of
+    // duplicating the roster; a changed voice id invalidates the cached preview.
     const existing = await prisma.systemVoice.findFirst({
-      where: { providerVoiceId: voice.providerVoiceId },
+      where: { displayName: voice.displayName },
     });
     if (existing) {
-      await prisma.systemVoice.update({ where: { id: existing.id }, data: voice });
+      const idChanged = existing.providerVoiceId !== voice.providerVoiceId;
+      await prisma.systemVoice.update({
+        where: { id: existing.id },
+        data: idChanged ? { ...voice, previewKey: null } : voice,
+      });
     } else {
       await prisma.systemVoice.create({ data: voice });
     }
   }
-  console.log(`Seeded ${voices.length} system voices`);
+  console.log(`Seeded ${voices.length} system voices (provider: ${provider})`);
 }
 
 async function seedFeatureFlags() {
