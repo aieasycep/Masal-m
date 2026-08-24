@@ -232,7 +232,11 @@
     "narrationPreparing": "Seslendirme hazırlanıyor…",
     "narrationReady": "Seslendirme hazır",
     "editTitleLabel": "Başlık",
-    "editPageLabel": "{{page}}. sayfa"
+    "editPageLabel": "{{page}}. sayfa",
+    "editEyebrow": "Hikâyeyi Düzenle",
+    "editPageTextLabel": "Sayfa {{page}} metni",
+    "editCharCount": "{{count}} karakter",
+    "editIllustrationCta": "Yeniden Oluştur"
   },
   "player": {
     "nowPlaying": "Şimdi dinliyorsun",
@@ -249,7 +253,10 @@
   "reader": {
     "pageOf": "{{current}} / {{total}}",
     "readAloud": "Sesli Oku",
-    "theEnd": "Son 🌙"
+    "theEnd": "Son 🌙",
+    "pageLabel": "Sayfa {{current}} / {{total}}",
+    "previous": "Önceki",
+    "next": "Sonraki"
   },
   "library": {
     "title": "Hikâyelerim",
@@ -391,11 +398,23 @@
     "generate": "Görselleri Oluştur",
     "progressCover": "Kapak",
     "progressPage": "Sayfa {{number}}",
-    "generatingTitle": "Görseller hazırlanıyor…",
+    "generatingTitle": "Görseller oluşturuluyor…",
     "generatingBody": "Kahramanın her sayfada aynı görünmesi için özen gösteriyoruz.",
     "done": "Görsellerin hazır 🎨",
     "regenerate": "Görseli Yeniden Oluştur",
-    "chooseAlternative": "Farklı Görsel Seç"
+    "chooseAlternative": "Farklı Görsel Seç",
+    "eyebrow": "Masalını Resimlendir",
+    "pickerTitle": "İllüstrasyon stili seç",
+    "pickerHint": "✨ Her sayfa için yapay zekâ yeni bir görsel oluşturacak. Kahramanın görünümü kitap boyunca tutarlı kalacak.",
+    "styleDescriptions": {
+      "WATERCOLOR": "Yumuşak, akıcı renkler",
+      "SOFT_3D": "Sıcak, hacimli figürler",
+      "CLASSIC_STORYBOOK": "Geleneksel illüstrasyon",
+      "PASTEL": "Hafif ve huzur verici",
+      "HAND_DRAWN": "Sıcak, kişisel dokunuş"
+    },
+    "generateCaption": "{{count}} görsel oluşturulacak · 1–2 dakika sürebilir",
+    "generatingStep": "{{label}} hazırlanıyor"
   },
   "book": {
     "builderTitle": "{{name}} için kitap",
@@ -418,10 +437,15 @@
       "IMAGE_TOP": "Görsel üstte",
       "IMAGE_FULL": "Tam sayfa görsel",
       "TEXT_ONLY": "Yalnızca metin"
-    }
+    },
+    "builderEyebrow": "Kitap Editörü",
+    "builderTitlePossessive": "{{nameGen}} Kitabı",
+    "previewCta": "Önizle",
+    "pageShort": "S{{number}}",
+    "layoutLabel": "Sayfa Düzeni"
   },
   "checkout": {
-    "configTitle": "Kitabını yapılandır",
+    "configTitle": "Kitap Seçenekleri",
     "bookSize": "Kitap boyutu",
     "sizes": {
       "SQUARE": "Kare",
@@ -436,7 +460,7 @@
     "price": "Fiyat",
     "estimatedDelivery": "Tahmini teslimat: {{min}}–{{max}} iş günü",
     "continue": "Devam Et",
-    "addressTitle": "Teslimat adresi",
+    "addressTitle": "Teslimat Adresi",
     "fullName": "Ad Soyad",
     "phone": "Telefon",
     "addressLine": "Adres",
@@ -444,7 +468,7 @@
     "district": "İlçe",
     "postalCode": "Posta kodu",
     "saveAddress": "Adresi kaydet",
-    "reviewTitle": "Sipariş özeti",
+    "reviewTitle": "Sipariş Özeti",
     "product": "Ürün",
     "shippingLabel": "Kargo",
     "shippingFree": "Ücretsiz",
@@ -456,7 +480,20 @@
     "orderNumber": "Sipariş numarası",
     "trackOrder": "Siparişimi Takip Et",
     "newAddress": "Yeni adres ekle",
-    "subtotal": "Ara toplam"
+    "subtotal": "Ara toplam",
+    "eyebrow": "Fiziksel Kitap",
+    "sizeDims": {
+      "SQUARE": "21 × 21 cm",
+      "STANDARD": "21 × 29.7 cm"
+    },
+    "coverSubs": {
+      "HARDCOVER": "Daha dayanıklı",
+      "SOFTCOVER": "Hafif ve esnek"
+    },
+    "priceLine": "{{qty}} × Kitap ({{size}} · {{cover}})",
+    "paymentSummary": "Ödeme Özeti",
+    "successSubtitle": "Siparişin alındı. 5–7 iş günü içinde kapında.",
+    "backHome": "Ana Sayfaya Dön"
   },
   "orders": {
     "title": "Siparişlerim",

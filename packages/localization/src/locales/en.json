@@ -232,7 +232,11 @@
     "narrationPreparing": "Narration is being prepared…",
     "narrationReady": "Narration ready",
     "editTitleLabel": "Title",
-    "editPageLabel": "Page {{page}}"
+    "editPageLabel": "Page {{page}}",
+    "editEyebrow": "Edit Story",
+    "editPageTextLabel": "Page {{page}} text",
+    "editCharCount": "{{count}} characters",
+    "editIllustrationCta": "Regenerate"
   },
   "player": {
     "nowPlaying": "Now listening",
@@ -249,7 +253,10 @@
   "reader": {
     "pageOf": "{{current}} / {{total}}",
     "readAloud": "Read Aloud",
-    "theEnd": "The End 🌙"
+    "theEnd": "The End 🌙",
+    "pageLabel": "Page {{current}} / {{total}}",
+    "previous": "Previous",
+    "next": "Next"
   },
   "library": {
     "title": "My Stories",
@@ -391,11 +398,23 @@
     "generate": "Create the Images",
     "progressCover": "Cover",
     "progressPage": "Page {{number}}",
-    "generatingTitle": "Creating the images…",
+    "generatingTitle": "Creating your images…",
     "generatingBody": "We're making sure the hero looks the same on every page.",
     "done": "Your images are ready 🎨",
     "regenerate": "Regenerate Image",
-    "chooseAlternative": "Choose a Different Image"
+    "chooseAlternative": "Choose a Different Image",
+    "eyebrow": "Illustrate Your Tale",
+    "pickerTitle": "Choose an illustration style",
+    "pickerHint": "✨ AI will create a new image for every page. Your hero will look consistent throughout the book.",
+    "styleDescriptions": {
+      "WATERCOLOR": "Soft, flowing colors",
+      "SOFT_3D": "Warm, rounded figures",
+      "CLASSIC_STORYBOOK": "Traditional illustration",
+      "PASTEL": "Light and calming",
+      "HAND_DRAWN": "A warm, personal touch"
+    },
+    "generateCaption": "{{count}} images will be created · may take 1–2 minutes",
+    "generatingStep": "Preparing {{label}}"
   },
   "book": {
     "builderTitle": "A book for {{name}}",
@@ -418,10 +437,15 @@
       "IMAGE_TOP": "Image on top",
       "IMAGE_FULL": "Full-page image",
       "TEXT_ONLY": "Text only"
-    }
+    },
+    "builderEyebrow": "Book Editor",
+    "builderTitlePossessive": "{{name}}'s Book",
+    "previewCta": "Preview",
+    "pageShort": "P{{number}}",
+    "layoutLabel": "Page Layout"
   },
   "checkout": {
-    "configTitle": "Configure your book",
+    "configTitle": "Book Options",
     "bookSize": "Book size",
     "sizes": {
       "SQUARE": "Square",
@@ -436,7 +460,7 @@
     "price": "Price",
     "estimatedDelivery": "Estimated delivery: {{min}}–{{max}} business days",
     "continue": "Continue",
-    "addressTitle": "Delivery address",
+    "addressTitle": "Delivery Address",
     "fullName": "Full Name",
     "phone": "Phone",
     "addressLine": "Address",
@@ -444,7 +468,7 @@
     "district": "District",
     "postalCode": "Postal code",
     "saveAddress": "Save address",
-    "reviewTitle": "Order summary",
+    "reviewTitle": "Order Summary",
     "product": "Product",
     "shippingLabel": "Shipping",
     "shippingFree": "Free",
@@ -456,7 +480,20 @@
     "orderNumber": "Order number",
     "trackOrder": "Track My Order",
     "newAddress": "Add a new address",
-    "subtotal": "Subtotal"
+    "subtotal": "Subtotal",
+    "eyebrow": "Printed Book",
+    "sizeDims": {
+      "SQUARE": "21 × 21 cm",
+      "STANDARD": "21 × 29.7 cm"
+    },
+    "coverSubs": {
+      "HARDCOVER": "More durable",
+      "SOFTCOVER": "Light and flexible"
+    },
+    "priceLine": "{{qty}} × Book ({{size}} · {{cover}})",
+    "paymentSummary": "Payment Summary",
+    "successSubtitle": "Your order has been received. It will be at your door within 5–7 business days.",
+    "backHome": "Back to Home"
   },
   "orders": {
     "title": "My Orders",
