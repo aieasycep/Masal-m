@@ -11,13 +11,16 @@ async function seedSystemVoices() {
   // eleven_multilingual_v2 (TTS_MODEL default).
   const useElevenLabs = process.env.TTS_PROVIDER === 'elevenlabs';
   const provider = useElevenLabs ? 'elevenlabs' : 'mock';
+  // Current default-roster voices only: legacy premades (Rachel, Adam, ...) count
+  // as library voices on newer accounts and the API rejects them on the free plan
+  // with 402 paid_plan_required. The default roster works on every plan.
   const elevenLabsIds: Record<string, string> = {
-    Duru: '21m00Tcm4TlvDq8ikWAM', // Rachel — calm female
-    Atlas: 'pNInz6obpgDQGcFmaJgB', // Adam — deep male
+    Duru: 'XrExE9yKIg1WjnnlVkGX', // Matilda — warm female storyteller
+    Atlas: 'JBFqnCBsd6RMkjVDRZzb', // George — warm male narrator
     Luna: 'EXAVITQu4vr4xnSDxMaL', // Sarah — soft female
-    Çınar: 'ErXwobaYiN019PkySvjV', // Antoni — warm male
-    Masal: 'AZnzlk1XvdvUeBnXmlld', // Domi — upbeat female
-    Yıldız: 'TxGEqnHWrfWFTfGW9XjX', // Josh — energetic male
+    Çınar: 'nPczCjzI2devNBz1zQrb', // Brian — deep, reassuring male
+    Masal: 'cgSgspJ2msm6clMCkdW9', // Jessica — playful female
+    Yıldız: 'IKne3meq5aSn9XLyUdCD', // Charlie — energetic male
   };
   const voiceId = (name: string, mockId: string) =>
     useElevenLabs ? (elevenLabsIds[name] ?? mockId) : mockId;
