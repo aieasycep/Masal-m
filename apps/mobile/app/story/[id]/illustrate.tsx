@@ -6,7 +6,14 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Animated, { FadeInUp } from 'react-native-reanimated';
+import Animated, {
+  Easing,
+  FadeInUp,
+  useAnimatedStyle,
+  useSharedValue,
+  withRepeat,
+  withTiming,
+} from 'react-native-reanimated';
 import {
   AIJobStatus,
   ErrorCode,
@@ -35,7 +42,7 @@ import { SelectableCard } from '../../../src/components/SelectableCard';
 import { CheckIcon } from '../../../src/components/icons';
 import { ErrorState } from '../../../src/components/states';
 
-/** Picker order mirrors the enum's design order. */
+/** Picker order mirrors the design's card order. */
 const STYLE_ORDER: IllustrationStyle[] = [
   IllustrationStyle.WATERCOLOR,
   IllustrationStyle.SOFT_3D,
@@ -44,20 +51,24 @@ const STYLE_ORDER: IllustrationStyle[] = [
   IllustrationStyle.HAND_DRAWN,
 ];
 
-/** Style-evocative swatch gradients built from token colors only (§51: no raw hex). */
-const STYLE_SWATCHES: Record<IllustrationStyle, [string, string]> = {
-  WATERCOLOR: [coverTints[1], coverTints[4]],
-  SOFT_3D: [colors.lavenderLight, coverTints[0]],
-  CLASSIC_STORYBOOK: [colors.gold, coverTints[3]],
-  PASTEL: [coverTints[3], coverTints[0]],
-  HAND_DRAWN: [coverTints[2], colors.sage],
+/**
+ * Three vertical color stripes per style card (design: IllustrationStyle).
+ * Tokens where they exist; the classic/pastel palettes are design literals
+ * absent from the token set.
+ */
+const STYLE_STRIPES: Record<IllustrationStyle, readonly [string, string, string]> = {
+  WATERCOLOR: [coverTints[1], colors.lavenderLight, colors.peach],
+  SOFT_3D: [colors.peach, colors.gold, coverTints[2]],
+  CLASSIC_STORYBOOK: ['#D4A574', '#8B6914', '#5C3D1E'],
+  PASTEL: ['#F0C9D4', '#C9E0F0', '#D4F0C9'],
+  HAND_DRAWN: [colors.foreground, colors.mutedForeground, colors.background],
 };
 
 const STYLE_EMOJIS: Record<IllustrationStyle, string> = {
   WATERCOLOR: '🎨',
   SOFT_3D: '🧸',
-  CLASSIC_STORYBOOK: '📜',
-  PASTEL: '🖍️',
+  CLASSIC_STORYBOOK: '📖',
+  PASTEL: '🌸',
   HAND_DRAWN: '✏️',
 };
 
@@ -109,6 +120,120 @@ function AltTile({ illustration, size, busy, disabled, onSelect, accessibilityLa
         </View>
       ) : null}
     </Pressable>
+  );
+}
+
+interface GeneratingNightProps {
+  title: string;
+  stepLabel: string;
+  /** Cover + page labels, in generation order. */
+  labels: string[];
+  /** Index of the item currently being generated. */
+  currentIndex: number;
+  /** Job finished — every row shows as done. */
+  done: boolean;
+  /** REAL backend percent (SSE / set milestones). */
+  percent: number;
+}
+
+/**
+ * Night-mode generation panel per the design: spinning palette medallion,
+ * per-page checklist (done ✓ / pulsing current / dimmed pending) and a
+ * purple→gold progress bar driven only by the real job percent.
+ */
+function GeneratingNight({
+  title,
+  stepLabel,
+  labels,
+  currentIndex,
+  done,
+  percent,
+}: GeneratingNightProps) {
+  // Design: spin-slow 4s linear on the palette, pulse-soft 1s on the current dot.
+  const spin = useSharedValue(0);
+  const pulse = useSharedValue(1);
+  useEffect(() => {
+    spin.value = withRepeat(withTiming(360, { duration: 4000, easing: Easing.linear }), -1, false);
+    pulse.value = withRepeat(
+      withTiming(0.35, { duration: 500, easing: Easing.inOut(Easing.ease) }),
+      -1,
+      true,
+    );
+  }, [spin, pulse]);
+  const spinStyle = useAnimatedStyle(() => ({ transform: [{ rotate: `${spin.value}deg` }] }));
+  const pulseStyle = useAnimatedStyle(() => ({ opacity: pulse.value }));
+
+  // Bar width animates to the real backend value only.
+  const progressValue = useSharedValue(0);
+  useEffect(() => {
+    progressValue.value = withTiming(percent, { duration: 500, easing: Easing.out(Easing.cubic) });
+  }, [percent, progressValue]);
+  const fillStyle = useAnimatedStyle(() => ({ width: `${progressValue.value}%` }));
+
+  return (
+    <View style={styles.nightPanel}>
+      <Animated.View style={[styles.palette, spinStyle]}>
+        <Text style={styles.paletteEmoji}>🎨</Text>
+      </Animated.View>
+
+      <View style={styles.nightTextBlock}>
+        <Text style={styles.nightTitle}>{title}</Text>
+        <Text style={styles.nightStep}>{stepLabel}</Text>
+      </View>
+
+      <View style={styles.checklist}>
+        {labels.map((label, index) => {
+          const isDone = done || index < currentIndex;
+          const isCurrent = !done && index === currentIndex;
+          return (
+            <View
+              key={label}
+              style={[styles.checkRow, !isDone && !isCurrent ? styles.checkRowPending : null]}
+            >
+              <View
+                style={[
+                  styles.checkCircle,
+                  isDone
+                    ? styles.checkCircleDone
+                    : isCurrent
+                      ? styles.checkCircleCurrent
+                      : styles.checkCirclePending,
+                ]}
+              >
+                {isDone ? (
+                  <CheckIcon />
+                ) : isCurrent ? (
+                  <Animated.View style={[styles.currentDot, pulseStyle]} />
+                ) : null}
+              </View>
+              <Text
+                style={[
+                  styles.checkLabel,
+                  isDone
+                    ? styles.checkLabelDone
+                    : isCurrent
+                      ? styles.checkLabelCurrent
+                      : styles.checkLabelPending,
+                ]}
+              >
+                {label}
+              </Text>
+            </View>
+          );
+        })}
+      </View>
+
+      <View style={styles.nightTrack}>
+        <Animated.View style={[styles.nightFill, fillStyle]}>
+          <LinearGradient
+            colors={gradients.generatingProgress as unknown as [string, string]}
+            start={{ x: 0, y: 0.5 }}
+            end={{ x: 1, y: 0.5 }}
+            style={StyleSheet.absoluteFill}
+          />
+        </Animated.View>
+      </View>
+    </View>
   );
 }
 
@@ -341,7 +466,7 @@ export default function IllustrateStory() {
   if (setsQuery.isError) {
     return (
       <View style={[styles.stateFill, { paddingTop: Math.max(insets.top, 20) + 8 }]}>
-        <ScreenHeader title={t('illustrate.title')} />
+        <ScreenHeader eyebrow={t('illustrate.eyebrow')} title={t('illustrate.title')} />
         <ErrorState
           emoji="🌧️"
           title={t('errors.GENERIC')}
@@ -357,7 +482,6 @@ export default function IllustrateStory() {
   // ── Derived view data ──────────────────────────────────────────────────────
 
   const sortedPages = [...story.pages].sort((a, b) => a.pageNumber - b.pageNumber);
-  const pageNumberById = new Map(sortedPages.map((page) => [page.id, page.pageNumber]));
 
   const quotaBanner = quotaHit ? (
     <Animated.View entering={FadeInUp.duration(250)} style={styles.quotaBanner}>
@@ -389,97 +513,101 @@ export default function IllustrateStory() {
       </View>
     ) : null;
 
-  const renderPicker = () => (
-    <View style={styles.styleGrid}>
-      {STYLE_ORDER.map((style) => {
-        const selected = selectedStyle === style;
-        return (
-          <SelectableCard
-            key={style}
-            selected={selected}
-            showCheck={false}
-            onPress={() => setSelectedStyle(style)}
-            style={styles.styleTile}
-            accessibilityLabel={t(`illustrate.styles.${style}`)}
-          >
-            <LinearGradient
-              colors={STYLE_SWATCHES[style]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.swatch}
-            >
-              <Text style={styles.swatchEmoji}>{STYLE_EMOJIS[style]}</Text>
-            </LinearGradient>
-            <Text style={[styles.styleName, selected && styles.styleNameSelected]}>
-              {t(`illustrate.styles.${style}`)}
-            </Text>
-          </SelectableCard>
-        );
-      })}
-    </View>
-  );
+  // ── Generating: full-bleed night takeover (design: IllustrationStyle) ─────
 
-  const renderGenerating = (set: IllustrationSet) => {
-    const total = Math.max(set.progress.total, 1);
-    const completed = Math.min(Math.max(set.progress.completed, 0), total);
+  if (isGenerating && activeSet != null) {
+    const total = Math.max(activeSet.progress.total, 1);
+    const completed = Math.min(Math.max(activeSet.progress.completed, 0), total);
     // Bar is the job's real percent; before the first event, fall back to the
     // set's completed/total ratio (also real backend milestones).
     const percent =
       genJob.status != null
         ? Math.round(Math.min(Math.max(genJob.progress, 0), 100))
         : Math.round((completed / total) * 100);
-    const stepLabel =
-      genJob.status === AIJobStatus.SUCCEEDED
-        ? t('illustrate.done')
-        : completed === 0
-          ? t('illustrate.progressCover')
-          : t('illustrate.progressPage', { number: Math.min(completed, Math.max(total - 1, 1)) });
-
-    const loaded = [...set.illustrations].sort((a, b) => {
-      if (a.isCover !== b.isCover) return a.isCover ? -1 : 1;
-      const pageA = a.storyPageId != null ? (pageNumberById.get(a.storyPageId) ?? 0) : 0;
-      const pageB = b.storyPageId != null ? (pageNumberById.get(b.storyPageId) ?? 0) : 0;
-      return pageA - pageB || a.createdAt.localeCompare(b.createdAt);
-    });
-    const skeletonCount = Math.max(0, total - loaded.length);
+    const done = genJob.status === AIJobStatus.SUCCEEDED;
+    const currentIndex = Math.min(completed, total - 1);
+    const labels = Array.from({ length: total }, (_, index) =>
+      index === 0 ? t('illustrate.progressCover') : t('illustrate.progressPage', { number: index }),
+    );
+    const stepLabel = done
+      ? t('illustrate.done')
+      : t('illustrate.generatingStep', { label: labels[currentIndex] ?? '' });
 
     return (
-      <Animated.View entering={FadeInUp.duration(300)}>
-        <View style={styles.generatingCard}>
-          <Text style={styles.generatingTitle}>{t('illustrate.generatingTitle')}</Text>
-          <Text style={styles.generatingBody}>{t('illustrate.generatingBody')}</Text>
-          <View style={styles.progressTrack}>
-            <LinearGradient
-              colors={gradients.progress as unknown as [string, string]}
-              start={{ x: 0, y: 0.5 }}
-              end={{ x: 1, y: 0.5 }}
-              style={[styles.progressFill, { width: `${percent}%` }]}
-            />
-          </View>
-          <View style={styles.progressMetaRow}>
-            <Text style={styles.progressStep}>{stepLabel}</Text>
-            <Text style={styles.progressPercent}>%{percent}</Text>
-          </View>
+      <View style={styles.nightRoot}>
+        <LinearGradient
+          colors={gradients.nightSky as unknown as [string, string, ...string[]]}
+          locations={[0, 0.5, 1]}
+          start={{ x: 0.2, y: 0 }}
+          end={{ x: 0.8, y: 1 }}
+          style={StyleSheet.absoluteFill}
+        />
+        <View style={[styles.header, { paddingTop: Math.max(insets.top, 20) + 8 }]}>
+          <ScreenHeader eyebrow={t('illustrate.eyebrow')} dark />
         </View>
-
-        {/* Thumbnails land one by one; skeletons hold the remaining slots. */}
-        <View style={styles.thumbGrid}>
-          {loaded.map((illustration) => (
-            <Image
-              key={illustration.id}
-              source={{ uri: illustration.imageUrl }}
-              style={styles.thumb}
-              contentFit="cover"
-              accessibilityIgnoresInvertColors
+        <ScrollView
+          style={styles.scroll}
+          contentContainerStyle={[
+            styles.nightScrollContent,
+            { paddingBottom: Math.max(insets.bottom, 16) + spacing.xxl },
+          ]}
+          showsVerticalScrollIndicator={false}
+        >
+          {styleSwitcher}
+          {quotaBanner}
+          <Animated.View entering={FadeInUp.duration(300)} style={styles.nightCenter}>
+            <GeneratingNight
+              title={t('illustrate.generatingTitle')}
+              stepLabel={stepLabel}
+              labels={labels}
+              currentIndex={currentIndex}
+              done={done}
+              percent={percent}
             />
-          ))}
-          {Array.from({ length: skeletonCount }, (_, index) => (
-            <View key={`skeleton-${index}`} style={[styles.thumb, styles.thumbSkeleton]} />
-          ))}
-        </View>
-      </Animated.View>
+          </Animated.View>
+        </ScrollView>
+      </View>
     );
-  };
+  }
+
+  // ── Picker / ready / failed (cream) ────────────────────────────────────────
+
+  const renderPicker = () => (
+    <View style={styles.styleList}>
+      {STYLE_ORDER.map((style) => {
+        const selected = selectedStyle === style;
+        return (
+          <SelectableCard
+            key={style}
+            selected={selected}
+            glow
+            showCheck={false}
+            onPress={() => setSelectedStyle(style)}
+            style={styles.styleCard}
+            accessibilityLabel={t(`illustrate.styles.${style}`)}
+          >
+            <View style={styles.stripes}>
+              {STYLE_STRIPES[style].map((stripeColor, index) => (
+                <View key={index} style={[styles.stripeBar, { backgroundColor: stripeColor }]} />
+              ))}
+            </View>
+            <View style={styles.styleInfo}>
+              <Text style={styles.styleEmoji}>{STYLE_EMOJIS[style]}</Text>
+              <View style={styles.styleTextBlock}>
+                <Text style={styles.styleName}>{t(`illustrate.styles.${style}`)}</Text>
+                <Text style={styles.styleDesc}>{t(`illustrate.styleDescriptions.${style}`)}</Text>
+              </View>
+              {selected ? (
+                <View style={styles.styleCheck}>
+                  <CheckIcon />
+                </View>
+              ) : null}
+            </View>
+          </SelectableCard>
+        );
+      })}
+    </View>
+  );
 
   const renderFailed = (set: IllustrationSet) => (
     <View>
@@ -627,15 +755,22 @@ export default function IllustrateStory() {
   return (
     <View style={styles.root}>
       <View style={[styles.header, { paddingTop: Math.max(insets.top, 20) + 8 }]}>
-        <ScreenHeader title={t('illustrate.title')} />
-        {showPicker ? <Text style={styles.subtitle}>{t('illustrate.subtitle')}</Text> : null}
+        <ScreenHeader
+          eyebrow={t('illustrate.eyebrow')}
+          title={showPicker ? t('illustrate.pickerTitle') : t('illustrate.title')}
+        />
+        {showPicker ? (
+          <View style={styles.hintCard}>
+            <Text style={styles.hintText}>{t('illustrate.pickerHint')}</Text>
+          </View>
+        ) : null}
       </View>
 
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={[
           styles.scrollContent,
-          { paddingBottom: showPicker ? 200 : Math.max(insets.bottom, 16) + spacing.xxl },
+          { paddingBottom: showPicker ? 220 : Math.max(insets.bottom, 16) + spacing.xxl },
         ]}
         showsVerticalScrollIndicator={false}
       >
@@ -647,9 +782,7 @@ export default function IllustrateStory() {
             ? null
             : activeSet.status === IllustrationSetStatus.FAILED
               ? renderFailed(activeSet)
-              : isGenerating
-                ? renderGenerating(activeSet)
-                : renderReady(activeSet)}
+              : renderReady(activeSet)}
       </ScrollView>
 
       {/* Fixed bottom CTA over a cream scrim (wizard pattern) — picker only. */}
@@ -657,7 +790,7 @@ export default function IllustrateStory() {
         <View style={styles.footer} pointerEvents="box-none">
           <LinearGradient
             colors={['rgba(250,248,244,0)', colors.background]}
-            locations={[0, 0.45]}
+            locations={[0, 0.3]}
             style={StyleSheet.absoluteFill}
             pointerEvents="none"
           />
@@ -669,12 +802,16 @@ export default function IllustrateStory() {
             {createError != null ? <Text style={styles.submitError}>{createError}</Text> : null}
             <Button
               label={t('illustrate.generate')}
+              leading={<Text style={styles.ctaEmoji}>🎨</Text>}
               onPress={() => {
                 if (selectedStyle != null) void create(selectedStyle);
               }}
               disabled={selectedStyle == null}
               loading={submitting}
             />
+            <Text style={styles.ctaCaption}>
+              {t('illustrate.generateCaption', { count: sortedPages.length + 1 })}
+            </Text>
           </View>
         </View>
       ) : null}
@@ -696,12 +833,20 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.pageX,
   },
   header: { paddingHorizontal: spacing.pageX },
-  subtitle: {
+  hintCard: {
+    paddingVertical: 14,
+    paddingHorizontal: spacing.md,
+    borderRadius: radius.md,
+    backgroundColor: 'rgba(124,92,191,0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(124,92,191,0.15)',
+    marginBottom: spacing.xl,
+  },
+  hintText: {
     fontFamily: fontFamilies.body,
-    fontSize: fontSizes.lg,
-    color: colors.mutedForeground,
-    marginTop: -8,
-    marginBottom: spacing.sm,
+    fontSize: fontSizes.md,
+    color: colors.foreground,
+    lineHeight: 20,
   },
   scroll: { flex: 1 },
   scrollContent: { paddingHorizontal: spacing.pageX },
@@ -712,79 +857,118 @@ const styles = StyleSheet.create({
     marginBottom: spacing.lg,
   },
 
-  // Style picker
-  styleGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
-  styleTile: {
-    width: '48%',
-    flexDirection: 'column',
-    alignItems: 'flex-start',
-    paddingVertical: 14,
-    paddingHorizontal: 14,
-    gap: 10,
+  // Style picker (design: full-width stripe cards)
+  styleList: { gap: spacing.sm },
+  styleCard: {
+    paddingVertical: 0,
+    paddingHorizontal: 0,
+    gap: 0,
+    alignItems: 'stretch',
+    borderRadius: radius.lg,
+    overflow: 'hidden',
   },
-  swatch: {
-    width: 44,
-    height: 44,
-    borderRadius: radius.chip,
+  stripes: { width: 96, flexDirection: 'row', alignSelf: 'stretch' },
+  stripeBar: { flex: 1 },
+  styleInfo: {
+    flex: 1,
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    gap: 14,
+    paddingVertical: spacing.md,
+    paddingHorizontal: 18,
   },
-  swatchEmoji: { fontSize: 20 },
+  styleEmoji: { fontSize: 32 },
+  styleTextBlock: { flex: 1 },
   styleName: {
-    fontFamily: fontFamilies.bodyBold,
-    fontSize: fontSizes.base,
-    color: colors.foreground,
-  },
-  styleNameSelected: { color: colors.primary },
-
-  // Generating panel
-  generatingCard: {
-    padding: spacing.lg,
-    borderRadius: radius.card,
-    backgroundColor: colors.card,
-    borderWidth: 1,
-    borderColor: colors.border,
-    gap: spacing.xs,
-    marginBottom: spacing.lg,
-  },
-  generatingTitle: {
     fontFamily: fontFamilies.display,
-    fontSize: fontSizes.h4,
+    fontSize: fontSizes.xxl,
     color: colors.foreground,
+    marginBottom: 2,
   },
-  generatingBody: {
+  styleDesc: {
     fontFamily: fontFamilies.body,
     fontSize: fontSizes.md,
     color: colors.mutedForeground,
-    lineHeight: 19,
   },
-  progressTrack: {
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: colors.muted,
+  styleCheck: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  // Generating (night takeover)
+  nightRoot: { flex: 1, backgroundColor: colors.purpleDarkest },
+  nightScrollContent: {
+    flexGrow: 1,
+    paddingHorizontal: spacing.pageXWide,
+    paddingTop: spacing.xs,
+  },
+  nightCenter: { flexGrow: 1, justifyContent: 'center' },
+  nightPanel: { alignItems: 'center', gap: 28, paddingVertical: spacing.xxxl },
+  palette: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: 'rgba(176,156,224,0.15)',
+    borderWidth: 2,
+    borderColor: 'rgba(176,156,224,0.3)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  paletteEmoji: { fontSize: 44 },
+  nightTextBlock: { alignItems: 'center' },
+  nightTitle: {
+    fontFamily: fontFamilies.display,
+    fontSize: fontSizes.h2,
+    color: colors.primaryForeground,
+    textAlign: 'center',
+    marginBottom: spacing.xs,
+  },
+  nightStep: {
+    fontFamily: fontFamilies.body,
+    fontSize: fontSizes.base,
+    color: 'rgba(176,156,224,0.8)',
+    textAlign: 'center',
+  },
+  checklist: { alignSelf: 'stretch', gap: spacing.xs },
+  checkRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  checkRowPending: { opacity: 0.35 },
+  checkCircle: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  checkCircleDone: {
+    backgroundColor: 'rgba(141,184,154,0.3)',
+    borderColor: 'rgba(141,184,154,0.6)',
+  },
+  checkCircleCurrent: {
+    backgroundColor: 'rgba(176,156,224,0.3)',
+    borderColor: 'rgba(176,156,224,0.6)',
+  },
+  checkCirclePending: {
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderColor: 'rgba(255,255,255,0.15)',
+  },
+  currentDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: colors.lavender },
+  checkLabel: { fontFamily: fontFamilies.bodySemiBold, fontSize: fontSizes.base },
+  checkLabelDone: { color: colors.sage },
+  checkLabelCurrent: { color: colors.lavender },
+  checkLabelPending: { color: 'rgba(255,255,255,0.4)' },
+  nightTrack: {
+    alignSelf: 'stretch',
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: 'rgba(255,255,255,0.1)',
     overflow: 'hidden',
-    marginTop: spacing.xxs,
   },
-  progressFill: { height: '100%', borderRadius: 3 },
-  progressMetaRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  progressStep: {
-    fontFamily: fontFamilies.bodySemiBold,
-    fontSize: fontSizes.sm,
-    color: colors.primary,
-  },
-  progressPercent: {
-    fontFamily: fontFamilies.bodyBold,
-    fontSize: fontSizes.sm,
-    color: colors.mutedForeground,
-  },
-  thumbGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
-  thumb: {
-    width: '31%',
-    aspectRatio: 1,
-    borderRadius: radius.md,
-    backgroundColor: colors.muted,
-  },
-  thumbSkeleton: { borderWidth: 1, borderColor: colors.border },
+  nightFill: { height: '100%', borderRadius: 2, overflow: 'hidden' },
 
   // Ready set
   readyHeaderRow: {
@@ -882,6 +1066,13 @@ const styles = StyleSheet.create({
     fontFamily: fontFamilies.bodySemiBold,
     fontSize: fontSizes.md,
     color: colors.destructive,
+    textAlign: 'center',
+  },
+  ctaEmoji: { fontSize: fontSizes.xl },
+  ctaCaption: {
+    fontFamily: fontFamilies.body,
+    fontSize: fontSizes.sm,
+    color: colors.mutedForeground,
     textAlign: 'center',
   },
   footer: { position: 'absolute', left: 0, right: 0, bottom: 0 },
