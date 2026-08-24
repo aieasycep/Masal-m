@@ -712,17 +712,17 @@ export default function StoryPlayer() {
           </Pressable>
         </View>
 
-        {/* Show text toggle */}
+        {/* Show text → full reader (design wiring: onShowText → StoryReader).
+            The inline sing-along panel below stays reachable via the kebab menu. */}
         <View style={styles.showTextRow}>
           <Pressable
-            onPress={() => setShowText((value) => !value)}
+            onPress={() => router.push(`/story/${story.id}/reader` as never)}
             accessibilityRole="button"
+            accessibilityLabel={t('player.showText')}
             style={({ pressed }) => [styles.showTextButton, pressed && styles.pressedDim]}
           >
-            <FileTextIcon size={16} color={showText ? night.purple : night.muted} />
-            <Text style={[styles.showTextLabel, showText && styles.showTextLabelActive]}>
-              {showText ? t('player.hideText') : t('player.showText')}
-            </Text>
+            <FileTextIcon size={16} color={night.muted} />
+            <Text style={styles.showTextLabel}>{t('player.showText')}</Text>
           </Pressable>
         </View>
 
@@ -980,7 +980,6 @@ const styles = StyleSheet.create({
     fontSize: fontSizes.base,
     color: night.muted,
   },
-  showTextLabelActive: { color: night.purple },
   textPanel: {
     marginTop: spacing.md,
     marginHorizontal: spacing.pageX,
