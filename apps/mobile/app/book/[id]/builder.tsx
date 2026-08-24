@@ -10,20 +10,32 @@ import {
   View,
 } from 'react-native';
 import { Image } from 'expo-image';
+import { LinearGradient } from 'expo-linear-gradient';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ApiError } from '@masalim/api-client';
+import { withSuffix } from '@masalim/localization';
 import { BookPageLayout } from '@masalim/types';
 import type { BookPage, Illustration, UpdateBookInput } from '@masalim/validation';
-import { colors, fontFamilies, fontSizes, radius, spacing } from '@masalim/ui';
+import {
+  colors,
+  fontFamilies,
+  fontSizes,
+  gradients,
+  letterSpacing,
+  radius,
+  shadows,
+  spacing,
+} from '@masalim/ui';
 import { api } from '../../../src/lib/api';
 import { Button } from '../../../src/components/Button';
 import { Input } from '../../../src/components/Input';
 import { ScreenHeader } from '../../../src/components/ScreenHeader';
-import { CheckIcon } from '../../../src/components/icons';
+import { Starfield } from '../../../src/components/Starfield';
+import { CheckIcon, ChevronLeftIcon } from '../../../src/components/icons';
 import { EmptyState, ErrorState } from '../../../src/components/states';
 
 const AUTOSAVE_DEBOUNCE_MS = 800;
@@ -34,6 +46,9 @@ const LAYOUT_OPTIONS = [
   BookPageLayout.IMAGE_FULL,
   BookPageLayout.TEXT_ONLY,
 ] as const;
+
+/** Which editing panel is expanded above the toolbar. */
+type EditorPanel = 'layout' | 'alternatives' | 'text';
 
 type PagePatch = NonNullable<UpdateBookInput['pages']>[number];
 
@@ -173,9 +188,10 @@ function LayoutGlyph({ layout, active }: { layout: BookPageLayout; active: boole
 }
 
 /**
- * Book Builder canvas (§30): page strip (cover + numbered pages), per-page
- * image with alternative-illustration picker, editable text and layout
- * switcher — every change autosaves through one debounced patch queue.
+ * Book Builder canvas (§30): editor header with preview shortcut, page strip
+ * (cover + numbered pages), a 3:4 storybook page canvas, and a bottom edit
+ * toolbar (layout / alternative illustration / text panels) above the print
+ * CTA — every change autosaves through one debounced patch queue.
  */
 export default function BookBuilder() {
   const { t } = useTranslation();
@@ -220,7 +236,7 @@ export default function BookBuilder() {
   const [pages, setPages] = useState<BookPage[]>([]);
   const [prefilledFor, setPrefilledFor] = useState<string | null>(null);
   const [pageIndex, setPageIndex] = useState(0);
-  const [showAlternatives, setShowAlternatives] = useState(false);
+  const [activePanel, setActivePanel] = useState<EditorPanel | null>(null);
   const autosave = useBookAutosave(id);
 
   useEffect(() => {
@@ -232,7 +248,9 @@ export default function BookBuilder() {
 
   const paddingTop = Math.max(insets.top, 20) + 8;
   const headerTitle =
-    heroName != null ? t('book.builderTitle', { name: heroName }) : t('book.builderTitleGeneric');
+    heroName != null
+      ? t('book.builderTitlePossessive', { name: heroName, nameGen: withSuffix(heroName, 'gen') })
+      : t('book.builderTitleGeneric');
 
   if (bookQuery.isPending) {
     return (
@@ -309,19 +327,58 @@ export default function BookBuilder() {
   const openCover = () => router.push(`/book/${book.id}/cover` as never);
   const openPreview = () => router.push(`/book/${book.id}/preview` as never);
 
+  const toolActions: { key: EditorPanel; emoji: string; label: string; disabled: boolean }[] = [
+    { key: 'layout', emoji: '📐', label: t('book.layoutLabel'), disabled: currentPage == null },
+    {
+      key: 'alternatives',
+      emoji: '🔄',
+      label: t('illustrate.chooseAlternative'),
+      disabled:
+        currentPage == null ||
+        currentPage.layout === BookPageLayout.TEXT_ONLY ||
+        alternatives.length === 0,
+    },
+    { key: 'text', emoji: '✏️', label: t('book.editText'), disabled: currentPage == null },
+  ];
+
   return (
     <KeyboardAvoidingView
       style={styles.flex}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       <View style={[styles.root, { paddingTop }]}>
-        <View style={styles.headerWrap}>
-          <ScreenHeader title={headerTitle} />
-          <AutosaveTick visible={autosave.saved} error={autosave.error} />
-        </View>
+        {/* Editor header: back + eyebrow/title + preview shortcut, page strip below. */}
+        <View style={styles.headerBlock}>
+          <View style={styles.headerRow}>
+            <Pressable
+              onPress={() => router.back()}
+              accessibilityRole="button"
+              accessibilityLabel={t('common.back')}
+              style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}
+            >
+              <ChevronLeftIcon color={colors.foreground} />
+            </Pressable>
+            <View style={styles.headerText}>
+              <Text style={styles.headerEyebrow} numberOfLines={1}>
+                {t('book.builderEyebrow').toLocaleUpperCase('tr')}
+              </Text>
+              <Text style={styles.headerTitle} numberOfLines={1}>
+                {headerTitle}
+              </Text>
+            </View>
+            <Pressable
+              onPress={openPreview}
+              accessibilityRole="button"
+              accessibilityLabel={t('book.previewCta')}
+              style={({ pressed }) => [styles.previewChip, pressed && styles.pressed]}
+            >
+              <Text style={styles.previewChipText}>{t('book.previewCta')}</Text>
+            </Pressable>
+          </View>
 
-        {/* Page strip: cover routes to the cover editor; pages switch the canvas. */}
-        <View>
+          <AutosaveTick visible={autosave.saved} error={autosave.error} />
+
+          {/* Page strip: cover routes to the cover editor; pages switch the canvas. */}
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
@@ -342,7 +399,14 @@ export default function BookBuilder() {
                     accessibilityIgnoresInvertColors
                   />
                 ) : (
-                  <Text style={styles.thumbEmoji}>📕</Text>
+                  <LinearGradient
+                    colors={gradients.playerCover as unknown as [string, string]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={[StyleSheet.absoluteFill, styles.thumbFallback]}
+                  >
+                    <Text style={styles.thumbEmoji}>⭐</Text>
+                  </LinearGradient>
                 )}
               </View>
               <Text style={styles.thumbLabel} numberOfLines={1}>
@@ -355,7 +419,7 @@ export default function BookBuilder() {
                 key={page.id}
                 onPress={() => {
                   setPageIndex(index);
-                  setShowAlternatives(false);
+                  setActivePanel(null);
                 }}
                 accessibilityRole="button"
                 accessibilityState={{ selected: index === pageIndex }}
@@ -375,25 +439,34 @@ export default function BookBuilder() {
                       contentFit="cover"
                       accessibilityIgnoresInvertColors
                     />
-                  ) : (
+                  ) : page.layout === BookPageLayout.TEXT_ONLY ? (
                     <View style={styles.thumbTextOnly}>
                       <View style={styles.thumbTextLine} />
                       <View style={[styles.thumbTextLine, styles.thumbTextLineShort]} />
                     </View>
+                  ) : (
+                    <LinearGradient
+                      colors={gradients.playerCover as unknown as [string, string]}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 1 }}
+                      style={[StyleSheet.absoluteFill, styles.thumbFallback]}
+                    >
+                      <Text style={styles.thumbEmoji}>🎨</Text>
+                    </LinearGradient>
                   )}
                 </View>
                 <Text
                   style={[styles.thumbLabel, index === pageIndex && styles.thumbLabelActive]}
                   numberOfLines={1}
                 >
-                  {page.pageNumber}
+                  {t('book.pageShort', { number: page.pageNumber })}
                 </Text>
               </Pressable>
             ))}
           </ScrollView>
         </View>
 
-        {/* Canvas: current page image + text + layout controls. */}
+        {/* Canvas: current page as a 3:4 storybook card. */}
         {currentPage != null ? (
           <ScrollView
             style={styles.flex}
@@ -401,74 +474,65 @@ export default function BookBuilder() {
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
           >
-            {currentPage.layout !== BookPageLayout.TEXT_ONLY ? (
-              <View
-                style={[
-                  styles.canvasImage,
-                  currentPage.layout === BookPageLayout.IMAGE_FULL && styles.canvasImageFull,
-                ]}
-              >
-                {currentPage.imageUrl != null ? (
-                  <Image
-                    source={{ uri: currentPage.imageUrl }}
-                    style={StyleSheet.absoluteFill}
-                    contentFit="cover"
-                    accessibilityIgnoresInvertColors
-                  />
-                ) : (
-                  <Text style={styles.canvasImageEmoji}>🎨</Text>
-                )}
-              </View>
-            ) : null}
-
-            {currentPage.layout !== BookPageLayout.TEXT_ONLY && alternatives.length > 0 ? (
-              <View style={styles.altBlock}>
-                <Pressable
-                  onPress={() => setShowAlternatives((value) => !value)}
-                  accessibilityRole="button"
-                  accessibilityState={{ expanded: showAlternatives }}
-                  style={({ pressed }) => [styles.altToggle, { opacity: pressed ? 0.7 : 1 }]}
-                >
-                  <Text style={styles.altToggleEmoji}>🎨</Text>
-                  <Text style={styles.altToggleText}>{t('illustrate.chooseAlternative')}</Text>
-                </Pressable>
-                {showAlternatives ? (
-                  <ScrollView
-                    horizontal
-                    showsHorizontalScrollIndicator={false}
-                    contentContainerStyle={styles.altRow}
+            <View style={[styles.pageCard, shadows.hero]}>
+              {currentPage.layout === BookPageLayout.TEXT_ONLY ? (
+                <View style={styles.cardTextOnly}>
+                  <Text style={styles.cardStar}>✦</Text>
+                  <Text style={styles.cardTextCenter} numberOfLines={12}>
+                    {currentPage.text}
+                  </Text>
+                </View>
+              ) : (
+                <>
+                  <View
+                    style={
+                      currentPage.layout === BookPageLayout.IMAGE_FULL
+                        ? StyleSheet.absoluteFill
+                        : styles.cardImageTop
+                    }
                   >
-                    {alternatives.map((illustration) => {
-                      const isCurrent = illustration.imageUrl === currentPage.imageUrl;
-                      return (
-                        <Pressable
-                          key={illustration.id}
-                          onPress={() => selectAlternative(currentPage.id, illustration)}
-                          accessibilityRole="radio"
-                          accessibilityState={{ selected: isCurrent }}
-                          style={[styles.altTile, isCurrent && styles.altTileSelected]}
-                        >
-                          <Image
-                            source={{ uri: illustration.imageUrl }}
-                            style={StyleSheet.absoluteFill}
-                            contentFit="cover"
-                            accessibilityIgnoresInvertColors
-                          />
-                          {isCurrent ? (
-                            <View style={styles.altCheck}>
-                              <CheckIcon />
-                            </View>
-                          ) : null}
-                        </Pressable>
-                      );
-                    })}
-                  </ScrollView>
-                ) : null}
-              </View>
-            ) : null}
+                    {currentPage.imageUrl != null ? (
+                      <Image
+                        source={{ uri: currentPage.imageUrl }}
+                        style={StyleSheet.absoluteFill}
+                        contentFit="cover"
+                        accessibilityIgnoresInvertColors
+                      />
+                    ) : (
+                      <LinearGradient
+                        colors={gradients.playerCover as unknown as [string, string]}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 1 }}
+                        style={[StyleSheet.absoluteFill, styles.cardImageFallback]}
+                      >
+                        <Starfield count={10} />
+                        <Text style={styles.cardFallbackEmoji}>🎨</Text>
+                      </LinearGradient>
+                    )}
+                  </View>
+                  {currentPage.layout === BookPageLayout.IMAGE_FULL ? (
+                    <View style={styles.cardOverlayPanel}>
+                      <Text style={styles.cardOverlayText} numberOfLines={5}>
+                        {currentPage.text}
+                      </Text>
+                    </View>
+                  ) : (
+                    <View style={styles.cardTextArea}>
+                      <Text style={styles.cardText} numberOfLines={8}>
+                        {currentPage.text}
+                      </Text>
+                    </View>
+                  )}
+                </>
+              )}
+            </View>
+          </ScrollView>
+        ) : null}
 
-            {/* Layout switcher: IMAGE_TOP / IMAGE_FULL / TEXT_ONLY. */}
-            <View style={styles.layoutRow}>
+        {/* Edit toolbar + expanding panels + print CTA. */}
+        <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 16) }]}>
+          {currentPage != null && activePanel === 'layout' ? (
+            <Animated.View entering={FadeIn.duration(150)} style={styles.layoutRow}>
               {LAYOUT_OPTIONS.map((option) => {
                 const active = currentPage.layout === option;
                 return (
@@ -484,33 +548,95 @@ export default function BookBuilder() {
                   </Pressable>
                 );
               })}
-            </View>
+            </Animated.View>
+          ) : null}
 
-            <Input
-              label={t('book.editText')}
-              value={currentPage.text}
-              onChangeText={(text) => setPageText(currentPage.id, text)}
-              multiline
-              maxLength={2000}
-              style={styles.textInput}
-              accessibilityLabel={t('book.editText')}
-            />
-          </ScrollView>
-        ) : null}
+          {currentPage != null && activePanel === 'alternatives' && alternatives.length > 0 ? (
+            <Animated.View entering={FadeIn.duration(150)}>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.altRow}
+              >
+                {alternatives.map((illustration) => {
+                  const isCurrent = illustration.imageUrl === currentPage.imageUrl;
+                  return (
+                    <Pressable
+                      key={illustration.id}
+                      onPress={() => selectAlternative(currentPage.id, illustration)}
+                      accessibilityRole="radio"
+                      accessibilityState={{ selected: isCurrent }}
+                      style={[styles.altTile, isCurrent && styles.altTileSelected]}
+                    >
+                      <Image
+                        source={{ uri: illustration.imageUrl }}
+                        style={StyleSheet.absoluteFill}
+                        contentFit="cover"
+                        accessibilityIgnoresInvertColors
+                      />
+                      {isCurrent ? (
+                        <View style={styles.altCheck}>
+                          <CheckIcon />
+                        </View>
+                      ) : null}
+                    </Pressable>
+                  );
+                })}
+              </ScrollView>
+            </Animated.View>
+          ) : null}
 
-        <View style={[styles.bottomBar, { paddingBottom: Math.max(insets.bottom, 16) }]}>
+          {currentPage != null && activePanel === 'text' ? (
+            <Animated.View entering={FadeIn.duration(150)}>
+              <Input
+                label={t('book.editText')}
+                value={currentPage.text}
+                onChangeText={(text) => setPageText(currentPage.id, text)}
+                multiline
+                autoFocus
+                maxLength={2000}
+                style={styles.textInput}
+                accessibilityLabel={t('book.editText')}
+              />
+            </Animated.View>
+          ) : null}
+
+          <View style={styles.toolbar}>
+            {toolActions.map((action) => {
+              const active = activePanel === action.key;
+              return (
+                <Pressable
+                  key={action.key}
+                  onPress={() =>
+                    setActivePanel((current) => (current === action.key ? null : action.key))
+                  }
+                  disabled={action.disabled}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: active, disabled: action.disabled }}
+                  accessibilityLabel={action.label}
+                  style={({ pressed }) => [
+                    styles.toolButton,
+                    active && styles.toolButtonActive,
+                    action.disabled && styles.toolButtonDisabled,
+                    pressed && styles.pressed,
+                  ]}
+                >
+                  <Text style={styles.toolEmoji}>{action.emoji}</Text>
+                  <Text
+                    style={[styles.toolLabel, active && styles.toolLabelActive]}
+                    numberOfLines={2}
+                  >
+                    {action.label}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+
           <Button
-            label={t('book.coverTitle')}
-            variant="secondary"
-            compact
-            onPress={openCover}
-            style={styles.bottomButton}
-          />
-          <Button
-            label={t('book.previewTitle')}
-            compact
+            label={t('book.printCta')}
+            leading={<Text style={styles.ctaEmoji}>📦</Text>}
             onPress={openPreview}
-            style={styles.bottomButton}
           />
         </View>
       </View>
@@ -523,9 +649,49 @@ const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.background },
   center: { alignItems: 'center', justifyContent: 'center' },
   padded: { paddingHorizontal: spacing.pageX },
-  headerWrap: { paddingHorizontal: spacing.pageX },
+  pressed: { opacity: 0.8 },
 
-  tickSlot: { height: 18, marginTop: -12, marginBottom: spacing.xxs, justifyContent: 'center' },
+  headerBlock: {
+    paddingHorizontal: spacing.lg,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  headerRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  backButton: {
+    width: 40,
+    height: 40,
+    borderRadius: radius.round,
+    backgroundColor: colors.card,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerText: { flex: 1 },
+  headerEyebrow: {
+    fontFamily: fontFamilies.bodyBold,
+    fontSize: fontSizes.xs,
+    color: colors.mutedForeground,
+    letterSpacing: letterSpacing.eyebrow,
+  },
+  headerTitle: {
+    fontFamily: fontFamilies.display,
+    fontSize: fontSizes.h4,
+    color: colors.foreground,
+  },
+  previewChip: {
+    paddingVertical: spacing.xs,
+    paddingHorizontal: 14,
+    borderRadius: radius.chip,
+    backgroundColor: colors.secondary,
+  },
+  previewChipText: {
+    fontFamily: fontFamilies.bodyBold,
+    fontSize: fontSizes.md,
+    color: colors.primary,
+  },
+
+  tickSlot: { height: 16, justifyContent: 'center' },
   tickRow: { flexDirection: 'row', alignItems: 'center', gap: 5, alignSelf: 'flex-end' },
   tickText: { fontFamily: fontFamilies.bodySemiBold, fontSize: fontSizes.sm, color: colors.sage },
   tickError: {
@@ -535,16 +701,11 @@ const styles = StyleSheet.create({
     textAlign: 'right',
   },
 
-  strip: {
-    paddingHorizontal: spacing.pageX,
-    paddingBottom: spacing.sm,
-    gap: spacing.xs,
-    alignItems: 'flex-start',
-  },
-  thumbColumn: { alignItems: 'center', gap: 4, width: 56 },
+  strip: { gap: spacing.xs, paddingBottom: spacing.sm, alignItems: 'flex-start' },
+  thumbColumn: { alignItems: 'center', gap: 4, width: 52 },
   thumb: {
-    width: 56,
-    height: 72,
+    width: 52,
+    height: 68,
     borderRadius: radius.sm,
     borderWidth: 2,
     overflow: 'hidden',
@@ -554,37 +715,123 @@ const styles = StyleSheet.create({
   },
   thumbActive: { borderColor: colors.primary },
   thumbInactive: { borderColor: colors.border },
-  thumbEmoji: { fontSize: 20 },
+  thumbFallback: { alignItems: 'center', justifyContent: 'center' },
+  thumbEmoji: { fontSize: fontSizes.h4 },
   thumbTextOnly: { gap: 4, alignSelf: 'stretch', paddingHorizontal: 10 },
   thumbTextLine: { height: 3, borderRadius: 2, backgroundColor: colors.border },
   thumbTextLineShort: { width: '60%' },
   thumbLabel: {
     fontFamily: fontFamilies.bodyBold,
-    fontSize: fontSizes.xs,
+    fontSize: fontSizes.xxs,
     color: colors.mutedForeground,
   },
   thumbLabelActive: { color: colors.primary },
 
-  canvas: { paddingHorizontal: spacing.pageX, paddingBottom: spacing.xl, gap: spacing.md },
-  canvasImage: {
-    height: 190,
-    borderRadius: radius.base,
-    overflow: 'hidden',
-    backgroundColor: colors.muted,
+  canvas: {
+    flexGrow: 1,
+    padding: spacing.lg,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  canvasImageFull: { height: 280 },
-  canvasImageEmoji: { fontSize: 40 },
-
-  altBlock: { gap: spacing.sm },
-  altToggle: { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start' },
-  altToggleEmoji: { fontSize: fontSizes.base },
-  altToggleText: {
-    fontFamily: fontFamilies.bodyBold,
-    fontSize: fontSizes.md,
-    color: colors.primary,
+  pageCard: {
+    width: '100%',
+    maxWidth: 320,
+    aspectRatio: 3 / 4,
+    borderRadius: radius.base,
+    overflow: 'hidden',
+    backgroundColor: colors.card,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
+  cardImageTop: { height: '55%', backgroundColor: colors.muted },
+  cardImageFallback: { alignItems: 'center', justifyContent: 'center' },
+  cardFallbackEmoji: { fontSize: 48 },
+  cardTextArea: { flex: 1, padding: spacing.md },
+  cardText: {
+    fontFamily: fontFamilies.displayItalic,
+    fontSize: fontSizes.md,
+    lineHeight: 20,
+    color: colors.foreground,
+  },
+  cardOverlayPanel: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    padding: spacing.md,
+  },
+  cardOverlayText: {
+    fontFamily: fontFamilies.displayItalic,
+    fontSize: fontSizes.md,
+    lineHeight: 20,
+    color: colors.primaryForeground,
+  },
+  cardTextOnly: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: spacing.lg,
+    gap: spacing.sm,
+  },
+  cardStar: { fontSize: fontSizes.h4, color: colors.lavender },
+  cardTextCenter: {
+    fontFamily: fontFamilies.displayItalic,
+    fontSize: fontSizes.base,
+    lineHeight: 22,
+    color: colors.foreground,
+    textAlign: 'center',
+  },
+
+  footer: {
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.sm,
+    gap: spacing.sm,
+    backgroundColor: colors.background,
+  },
+  toolbar: { flexDirection: 'row', gap: spacing.xs },
+  toolButton: {
+    flex: 1,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: 6,
+    borderRadius: radius.md,
+    backgroundColor: colors.card,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: 'center',
+    gap: 4,
+  },
+  toolButtonActive: { borderColor: colors.primary, backgroundColor: colors.secondary },
+  toolButtonDisabled: { opacity: 0.4 },
+  toolEmoji: { fontSize: fontSizes.h4 },
+  toolLabel: {
+    fontFamily: fontFamilies.bodyBold,
+    fontSize: fontSizes.xxs,
+    lineHeight: 12,
+    color: colors.mutedForeground,
+    textAlign: 'center',
+  },
+  toolLabelActive: { color: colors.primary },
+  ctaEmoji: { fontSize: 20 },
+
+  layoutRow: { flexDirection: 'row', gap: spacing.xs, justifyContent: 'center' },
+  layoutToggle: {
+    width: 52,
+    height: 52,
+    borderRadius: radius.chip,
+    borderWidth: 2,
+    borderColor: colors.border,
+    backgroundColor: colors.card,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  layoutToggleActive: { borderColor: colors.primary, backgroundColor: colors.secondary },
+  glyphFrame: { width: 26, height: 34, gap: 3, justifyContent: 'center' },
+  glyphImage: { height: 14, borderRadius: 3 },
+  glyphImageFull: { flex: 1 },
+  glyphLine: { height: 3, borderRadius: 2 },
+  glyphLineShort: { width: '65%' },
+
   altRow: { gap: spacing.xs },
   altTile: {
     width: 72,
@@ -608,40 +855,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
 
-  layoutRow: { flexDirection: 'row', gap: spacing.xs },
-  layoutToggle: {
-    width: 52,
-    height: 52,
-    borderRadius: radius.chip,
-    borderWidth: 2,
-    borderColor: colors.border,
-    backgroundColor: colors.card,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  layoutToggleActive: { borderColor: colors.primary, backgroundColor: colors.secondary },
-  glyphFrame: { width: 26, height: 34, gap: 3, justifyContent: 'center' },
-  glyphImage: { height: 14, borderRadius: 3 },
-  glyphImageFull: { flex: 1 },
-  glyphLine: { height: 3, borderRadius: 2 },
-  glyphLineShort: { width: '65%' },
-
   textInput: {
-    minHeight: 140,
+    minHeight: 120,
+    maxHeight: 180,
     textAlignVertical: 'top',
     fontFamily: fontFamilies.body,
     fontSize: fontSizes.lg,
     lineHeight: 24,
   },
-
-  bottomBar: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-    paddingHorizontal: spacing.pageX,
-    paddingTop: spacing.sm,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
-    backgroundColor: colors.background,
-  },
-  bottomButton: { flex: 1 },
 });
