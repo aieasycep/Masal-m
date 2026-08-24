@@ -1,17 +1,21 @@
 interface Props {
   onListen: () => void
+  onRead: () => void
+  onEdit: () => void
+  onIllustrate: () => void
+  onMakeBook: () => void
   onBack: () => void
 }
 
 const actions = [
-  { label: "Oku", emoji: "📖" },
-  { label: "Düzenle", emoji: "✏️" },
-  { label: "Görselleştir", emoji: "🎨" },
-  { label: "Kitap Yap", emoji: "📚" },
-  { label: "Paylaş", emoji: "🔗" },
+  { label: "Oku", emoji: "📖", key: "read" },
+  { label: "Düzenle", emoji: "✏️", key: "edit" },
+  { label: "Görselleştir", emoji: "🎨", key: "illustrate" },
+  { label: "Kitap Yap", emoji: "📚", key: "book" },
+  { label: "Paylaş", emoji: "🔗", key: "share" },
 ]
 
-export default function StoryResult({ onListen, onBack }: Props) {
+export default function StoryResult({ onListen, onRead, onEdit, onIllustrate, onMakeBook, onBack }: Props) {
   return (
     <div
       style={{
@@ -223,6 +227,12 @@ export default function StoryResult({ onListen, onBack }: Props) {
           {actions.map((action) => (
             <div
               key={action.label}
+              onClick={() => {
+                if (action.key === "read") onRead()
+                else if (action.key === "edit") onEdit()
+                else if (action.key === "illustrate") onIllustrate()
+                else if (action.key === "book") onMakeBook()
+              }}
               style={{
                 display: "flex",
                 flexDirection: "column",
@@ -233,6 +243,7 @@ export default function StoryResult({ onListen, onBack }: Props) {
                 background: "white",
                 border: "1px solid var(--border)",
                 cursor: "pointer",
+                transition: "background 0.15s ease",
               }}
             >
               <span style={{ fontSize: 20 }}>{action.emoji}</span>

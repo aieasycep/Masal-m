@@ -7,6 +7,11 @@ import StoryCreation from "./screens/StoryCreation"
 import StoryGenerating from "./screens/StoryGenerating"
 import StoryResult from "./screens/StoryResult"
 import AudioPlayer from "./screens/AudioPlayer"
+import StoryReader from "./screens/StoryReader"
+import StoryEdit from "./screens/StoryEdit"
+import IllustrationStyle from "./screens/IllustrationStyle"
+import BookBuilder from "./screens/BookBuilder"
+import PrintOrder from "./screens/PrintOrder"
 import Library from "./screens/Library"
 import VoiceStudio from "./screens/VoiceStudio"
 import Profile from "./screens/Profile"
@@ -19,6 +24,11 @@ type Screen =
   | "generating"
   | "result"
   | "player"
+  | "reader"
+  | "edit"
+  | "illustration"
+  | "bookbuilder"
+  | "print"
   | "library"
   | "voice"
   | "profile"
@@ -70,7 +80,7 @@ export default function App() {
         }}
       >
         {/* Status bar */}
-        {screen !== "splash" && screen !== "onboarding" && screen !== "player" && screen !== "generating" && (
+        {screen !== "splash" && screen !== "onboarding" && screen !== "player" && screen !== "generating" && screen !== "reader" && (
           <div
             style={{
               position: "absolute",
@@ -144,12 +154,48 @@ export default function App() {
         {screen === "result" && (
           <StoryResult
             onListen={() => setScreen("player")}
+            onRead={() => setScreen("reader")}
+            onEdit={() => setScreen("edit")}
+            onIllustrate={() => setScreen("illustration")}
+            onMakeBook={() => setScreen("bookbuilder")}
             onBack={() => setScreen(activeTab === "create" ? "home" : "library")}
           />
         )}
 
         {screen === "player" && (
-          <AudioPlayer onBack={() => setScreen("result")} />
+          <AudioPlayer
+            onBack={() => setScreen("result")}
+            onShowText={() => setScreen("reader")}
+          />
+        )}
+
+        {screen === "reader" && (
+          <StoryReader onBack={() => setScreen("result")} />
+        )}
+
+        {screen === "edit" && (
+          <StoryEdit onBack={() => setScreen("result")} />
+        )}
+
+        {screen === "illustration" && (
+          <IllustrationStyle
+            onBack={() => setScreen("result")}
+            onGenerate={() => setScreen("bookbuilder")}
+          />
+        )}
+
+        {screen === "bookbuilder" && (
+          <BookBuilder
+            onBack={() => setScreen("result")}
+            onPrint={() => setScreen("print")}
+          />
+        )}
+
+        {screen === "print" && (
+          <PrintOrder
+            onBack={() => setScreen("bookbuilder")}
+            onSuccess={() => { setActiveTab("home"); setScreen("home") }}
+          />
         )}
 
         {screen === "voice" && (
@@ -165,7 +211,7 @@ export default function App() {
         )}
       </div>
 
-      {/* Screen label for desktop context */}
+      {/* Screen navigator */}
       <div
         style={{
           position: "fixed",
@@ -173,10 +219,10 @@ export default function App() {
           left: "50%",
           transform: "translateX(-50%)",
           display: "flex",
-          gap: 8,
+          gap: 6,
           flexWrap: "wrap",
           justifyContent: "center",
-          maxWidth: 600,
+          maxWidth: 680,
         }}
       >
         {(
@@ -188,6 +234,11 @@ export default function App() {
             { s: "generating", label: "Oluşturuluyor" },
             { s: "result", label: "Hikâye Hazır" },
             { s: "player", label: "Oynatıcı" },
+            { s: "reader", label: "Okuma Modu" },
+            { s: "edit", label: "Düzenle" },
+            { s: "illustration", label: "İllüstrasyon" },
+            { s: "bookbuilder", label: "Kitap Editörü" },
+            { s: "print", label: "Sipariş" },
             { s: "library", label: "Kütüphane" },
             { s: "voice", label: "Ses Stüdyosu" },
             { s: "profile", label: "Profil" },
@@ -202,13 +253,13 @@ export default function App() {
               }
             }}
             style={{
-              padding: "6px 12px",
+              padding: "5px 10px",
               borderRadius: 8,
               background: screen === s ? "rgba(176,156,224,0.9)" : "rgba(255,255,255,0.08)",
               border: "none",
               color: screen === s ? "#2C2825" : "rgba(255,255,255,0.5)",
               fontFamily: "Nunito, sans-serif",
-              fontSize: 11,
+              fontSize: 10,
               fontWeight: screen === s ? 800 : 500,
               cursor: "pointer",
               transition: "all 0.2s ease",
