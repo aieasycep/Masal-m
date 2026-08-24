@@ -167,6 +167,26 @@ Local `.env` = `.env.example` + generated JWT secrets (already present, gitignor
   31735402753 which still crashed on playback).
 - Scheduled self check-ins exist via send_later for CI/APK monitoring;
   re-arm after firing while PR is open.
+- **Figma second export applied** (Aug 24): 5 previously missing screens restyled
+  to spec — reader (night storybook), story edit, illustration style picker +
+  generating takeover, book builder, checkout flow visual language — plus result
+  action row + player "Metni göster" wiring; +31 i18n keys; design-reference
+  synced. APK workflow got Gradle heap 6g fix (dex-merge OOM at template 2g).
+  Latest emulator-verified APK: artifact of run 32709246373.
+- ⚠ Workflow-tool subagents are BROKEN in this container (permission handler
+  strips every tool call's input); plain Agent-tool subagents work — use those.
+- **Real providers LIVE on Render (staging)**: TTS+voice-clone elevenlabs,
+  AI anthropic, moderation llm, image openai (user added keys: AI_API_KEY,
+  IMAGE_API_KEY, TTS_API_KEY, VOICE_CLONE_API_KEY — note names, not
+  ELEVENLABS/OPENAI_*). Lessons: ElevenLabs free plan 402-rejects library AND
+  legacy-premade voices via API → seed maps personas to current default roster
+  (Matilda/George/Sarah/Brian/Jessica/Charlie), is TTS_PROVIDER-aware, upserts
+  by displayName, clears previewKey on id change. Voice cloning needs a paid
+  ElevenLabs plan (expected to fail on free). gpt-image-1 may need OpenAI org
+  verification — fallback: IMAGE_MODEL=dall-e-3.
+- Narrations list/create now prune stale FAILED rows (keep newest per voice,
+  none once a newer non-failed exists). Mock-story Turkish fixed via
+  packages/ai shared/turkish.ts (evidential, nounGenitive, dative suffix).
 
 ## Environment gotchas
 
