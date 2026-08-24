@@ -43,12 +43,44 @@ export class NarrationsService {
 
   async list(userId: string, storyId: string): Promise<NarrationDto[]> {
     await this.stories.findOwned(userId, storyId);
+    await this.pruneFailed(storyId);
     const rows = await this.prisma.narration.findMany({
       where: { storyId },
       orderBy: { createdAt: 'desc' },
       include: NARRATION_INCLUDE,
     });
     return Promise.all(rows.map((row) => this.toDto(row)));
+  }
+
+  /**
+   * Failed narrations are transient diagnostics, not history: keep at most the
+   * newest failed attempt per voice (so retry stays offered), and drop even
+   * that once the voice has a newer non-failed narration.
+   */
+  private async pruneFailed(storyId: string): Promise<void> {
+    const rows = await this.prisma.narration.findMany({
+      where: { storyId },
+      orderBy: { createdAt: 'desc' },
+      select: { id: true, status: true, voiceProfileId: true, systemVoiceId: true },
+    });
+    const newestFailedKept = new Set<string>();
+    const hasNewerNonFailed = new Set<string>();
+    const stale: string[] = [];
+    for (const row of rows) {
+      const key = row.voiceProfileId != null ? `vp:${row.voiceProfileId}` : `sv:${row.systemVoiceId}`;
+      if (row.status !== NarrationStatus.FAILED) {
+        hasNewerNonFailed.add(key);
+        continue;
+      }
+      if (hasNewerNonFailed.has(key) || newestFailedKept.has(key)) {
+        stale.push(row.id);
+      } else {
+        newestFailedKept.add(key);
+      }
+    }
+    if (stale.length > 0) {
+      await this.prisma.narration.deleteMany({ where: { id: { in: stale } } });
+    }
   }
 
   /**
@@ -135,6 +167,7 @@ export class NarrationsService {
       entityId: narration.id,
       queueJobId: `narration:${storyId}:v${story.version}:${voiceKey}`,
     });
+    await this.pruneFailed(storyId);
     return { narration: await this.toDto(narration), jobId: job.id };
   }
 

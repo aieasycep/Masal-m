@@ -1,5 +1,5 @@
 import { DURATION_TARGETS } from '@masalim/types';
-import { withSuffixLite } from '../shared/turkish';
+import { evidential, nounGenitive, withSuffixLite } from '../shared/turkish';
 import type {
   StoryGenerationInput,
   StoryGenerationProvider,
@@ -46,7 +46,7 @@ export class MockStoryProvider implements StoryGenerationProvider {
     const openings = [
       `Bir varmış bir yokmuş, ${motif.setting} yaşayan ${hero} adında meraklı bir kahraman varmış. ${hero} her akşam pencereden dışarı bakar, yeni bir macera hayal edermiş.`,
       `Bir gece ${hero}, uzaktan gelen yumuşacık bir ışık fark etmiş. "Bu da ne olabilir?" diye fısıldamış ve merakla ışığa doğru yaklaşmış.`,
-      `Işığın kaynağı ${motif.object}'ymış! ${capitalize(motif.object)} biraz üzgün görünüyormuş, çünkü evine dönmenin yolunu bulamıyormuş. ${hero} hiç düşünmeden yardım etmeye karar vermiş.`,
+      `Işığın kaynağı ${evidential(motif.object)}! ${capitalize(motif.object)} biraz üzgün görünüyormuş, çünkü evine dönmenin yolunu bulamıyormuş. ${hero} hiç düşünmeden yardım etmeye karar vermiş.`,
     ];
     const middles = [
       `${hero} ve ${motif.object} birlikte yola koyulmuşlar. Yol boyunca birbirlerine en sevdikleri şarkıları mırıldanmışlar, küçük engelleri el ele aşmışlar.`,
@@ -54,8 +54,8 @@ export class MockStoryProvider implements StoryGenerationProvider {
       `Salın üzerinde süzülürken ${motif.object}, ${heroGen} cesaretine hayran kalmış. "Sen olmasaydın asla bu kadar ilerleyemezdim," demiş minnetle.`,
       `Derken karşılarına bilge bir baykuş çıkmış. Baykuş onlara doğru yolu göstermiş ve kulaklarına küçük bir sır fısıldamış: "En güzel yol, birlikte yürünen yoldur."`,
       `${hero} baykuşa teşekkür etmiş. İçinde sıcacık bir duygu büyüyormuş; yardım etmenin mutluluğu buymuş demek!`,
-      `Sonunda ${motif.object}'nin evine varmışlar. Herkes onları sevinçle karşılamış, gökyüzü ışıl ışıl parlamış.`,
-      `${capitalize(motif.object)} evine kavuşunca ${hero}'ya sımsıkı sarılmış. "Seni hiç unutmayacağım," demiş. ${hero} gülümsemiş; kalbi kocaman olmuş.`,
+      `Sonunda ${nounGenitive(motif.object)} evine varmışlar. Herkes onları sevinçle karşılamış, gökyüzü ışıl ışıl parlamış.`,
+      `${capitalize(motif.object)} evine kavuşunca ${withSuffixLite(hero, 'dat')} sımsıkı sarılmış. "Seni hiç unutmayacağım," demiş. ${hero} gülümsemiş; kalbi kocaman olmuş.`,
       `Dönüş yolunda ${hero}, gördüğü her güzelliği tek tek aklına yazmış: parlayan yıldızları, şarkı söyleyen rüzgârı ve yeni dostunun gülüşünü.`,
       `Eve vardığında ${hero} yatağına uzanmış. Bugün öğrendiği en önemli şeyi düşünmüş: iyilik, paylaştıkça çoğalıyormuş.`,
       `${heroGen} gözkapakları yavaş yavaş ağırlaşmış. Pencereden süzülen ay ışığı, odayı gümüş bir örtü gibi kaplamış.`,
