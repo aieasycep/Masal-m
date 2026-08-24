@@ -50,6 +50,12 @@ jobs:
         working-directory: apps/mobile
         run: npx expo prebuild --platform android --no-install
 
+      - name: Raise Gradle JVM memory (dex merge OOMs at the template's 2g heap)
+        working-directory: apps/mobile/android
+        run: |
+          sed -i 's/^org.gradle.jvmargs=.*/org.gradle.jvmargs=-Xmx6g -XX:MaxMetaspaceSize=1g/' gradle.properties
+          grep '^org.gradle.jvmargs=' gradle.properties
+
       - name: Build release APK
         working-directory: apps/mobile/android
         # Expo's template signs the release build type with the auto-generated
