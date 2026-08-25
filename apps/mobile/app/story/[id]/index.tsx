@@ -19,6 +19,7 @@ import { AIJobStatus, DURATION_TARGETS, NarrationStatus, StoryStatus } from '@ma
 import { ApiError, NetworkError } from '@masalim/api-client';
 import { colors, fontFamilies, fontSizes, gradients, radius, spacing } from '@masalim/ui';
 import { api } from '../../../src/lib/api';
+import { openBookBuilderForStory } from '../../../src/lib/book-nav';
 import { useJobProgress } from '../../../src/lib/job-stream';
 import { Button } from '../../../src/components/Button';
 import { ScreenHeader } from '../../../src/components/ScreenHeader';
@@ -201,18 +202,7 @@ export default function StoryResult() {
     setActionError(null);
     setBookLoading(true);
     try {
-      const books = await queryClient.fetchQuery({
-        queryKey: ['books'],
-        queryFn: () => api.books.list(),
-      });
-      const existing = books.find((book) => book.storyId === story.id);
-      if (existing != null) {
-        router.push(`/book/${existing.id}/builder` as never);
-        return;
-      }
-      const created = await api.books.create({ storyId: story.id });
-      void queryClient.invalidateQueries({ queryKey: ['books'] });
-      router.push(`/book/${created.id}/builder` as never);
+      await openBookBuilderForStory(queryClient, story.id);
     } catch (err) {
       if (err instanceof ApiError) {
         setActionError(t(`errors.${err.code}`, { defaultValue: t('errors.GENERIC') }));

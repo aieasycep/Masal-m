@@ -447,7 +447,16 @@
       "HAND_DRAWN": "Sıcak, kişisel dokunuş"
     },
     "generateCaption": "{{count}} görsel oluşturulacak · 1–2 dakika sürebilir",
-    "generatingStep": "{{label}} hazırlanıyor"
+    "generatingStep": "{{label}} hazırlanıyor",
+    "readyTitle": "Görseller Hazır ✨",
+    "regenerateAction": "Yeniden Oluştur",
+    "alternatives": "Alternatifler",
+    "alternativesTitle": "Alternatif Görseller",
+    "alternativesLead": "«{{unit}}» için {{count}} seçenek",
+    "alternativeOption": "Seçenek {{number}}",
+    "selectImage": "Bu Görseli Seç",
+    "regeneratingLabel": "Yeni görsel oluşturuluyor",
+    "makeBook": "Kitabı Oluştur 📚"
   },
   "book": {
     "builderTitle": "{{name}} için kitap",

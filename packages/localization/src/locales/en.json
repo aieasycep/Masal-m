@@ -447,7 +447,16 @@
       "HAND_DRAWN": "A warm, personal touch"
     },
     "generateCaption": "{{count}} images will be created · may take 1–2 minutes",
-    "generatingStep": "Preparing {{label}}"
+    "generatingStep": "Preparing {{label}}",
+    "readyTitle": "Images Ready ✨",
+    "regenerateAction": "Regenerate",
+    "alternatives": "Alternatives",
+    "alternativesTitle": "Alternative Images",
+    "alternativesLead": "{{count}} options for “{{unit}}”",
+    "alternativeOption": "Option {{number}}",
+    "selectImage": "Choose This Image",
+    "regeneratingLabel": "Creating a new image",
+    "makeBook": "Create the Book 📚"
   },
   "book": {
     "builderTitle": "A book for {{name}}",

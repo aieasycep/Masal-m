@@ -30,15 +30,17 @@ import {
   fontSizes,
   gradients,
   radius,
+  shadows,
   spacing,
 } from '@masalim/ui';
 import { api } from '../../../src/lib/api';
+import { openBookBuilderForStory } from '../../../src/lib/book-nav';
 import { useJobProgress } from '../../../src/lib/job-stream';
-import { Badge } from '../../../src/components/Badge';
 import { Button } from '../../../src/components/Button';
 import { Chip } from '../../../src/components/Chip';
 import { ScreenHeader } from '../../../src/components/ScreenHeader';
 import { SelectableCard } from '../../../src/components/SelectableCard';
+import { storyThemeEmoji } from '../../../src/components/StorySheet';
 import { CheckIcon } from '../../../src/components/icons';
 import { ErrorState } from '../../../src/components/states';
 
@@ -74,53 +76,85 @@ const STYLE_EMOJIS: Record<IllustrationStyle, string> = {
 
 const byCreatedAt = (a: Illustration, b: Illustration) => a.createdAt.localeCompare(b.createdAt);
 
+/**
+ * One READY-view unit: the cover or a story page that has illustrations.
+ * `key` doubles as the regenerate rowKey ('cover' | story page id).
+ */
+interface ReadyUnit {
+  key: string;
+  /** "Kapak" / "Sayfa N" — strip caption + alternatives lead. */
+  label: string;
+  /** Line under the main preview: page excerpt (pages) / story title (cover). */
+  caption: string | null;
+  alternatives: Illustration[];
+  /** Selected alternative (falls back to the oldest one). */
+  selected: Illustration;
+}
+
+/** Last failed ready-view action, so the inline ErrorState can retry it. */
+type ReadyRetry =
+  | { kind: 'select'; illustration: Illustration }
+  | { kind: 'regenerate'; rowKey: string; illustration: Illustration };
+
 interface AltTileProps {
   illustration: Illustration;
-  /** Fixed square size; omit for a full-width square tile (single cover). */
-  size?: number;
+  /** "Seçenek N" caption in the tile's white label bar. */
+  label: string;
+  /** Locally highlighted (pending pick, or the current selection). */
+  highlighted: boolean;
   busy: boolean;
-  disabled: boolean;
-  onSelect: () => void;
-  accessibilityLabel: string;
+  onPress: () => void;
 }
 
 /**
- * One illustration alternative — SelectableCard pattern on an image: 2px border
- * (primary when selected) + check circle; spinner overlay while the selection
- * PATCH is in flight.
+ * One alternative in the 2-column grid (design Illustration/04): r20 tile with
+ * a 3px primary border when highlighted, thumbnail on top, white caption bar.
+ * The server-selected one keeps a check badge; spinner overlay while the
+ * selection PATCH is in flight.
  */
-function AltTile({ illustration, size, busy, disabled, onSelect, accessibilityLabel }: AltTileProps) {
+function AltTile({ illustration, label, highlighted, busy, onPress }: AltTileProps) {
   return (
     <Pressable
-      onPress={onSelect}
-      disabled={disabled || busy || illustration.selected}
+      onPress={onPress}
+      disabled={busy}
       accessibilityRole="radio"
-      accessibilityState={{ selected: illustration.selected }}
-      accessibilityLabel={accessibilityLabel}
-      style={[
-        styles.altTile,
-        size != null ? { width: size, height: size } : styles.altTileFull,
-        illustration.selected ? styles.altTileSelected : styles.altTileUnselected,
-      ]}
+      accessibilityState={{ selected: highlighted }}
+      accessibilityLabel={label}
+      style={[styles.altTile, highlighted ? styles.altTileSelected : styles.altTileUnselected]}
     >
-      <Image
-        source={{ uri: illustration.imageUrl }}
-        style={StyleSheet.absoluteFill}
-        contentFit="cover"
-        accessibilityIgnoresInvertColors
-      />
-      {illustration.selected ? (
-        <View style={styles.altCheck}>
-          <CheckIcon />
-        </View>
-      ) : null}
-      {busy ? (
-        <View style={styles.altBusyOverlay}>
-          <ActivityIndicator color={colors.primaryForeground} />
-        </View>
-      ) : null}
+      <View style={styles.altImageBox}>
+        <Image
+          source={{ uri: illustration.imageUrl }}
+          style={StyleSheet.absoluteFill}
+          contentFit="cover"
+          accessibilityIgnoresInvertColors
+        />
+        {illustration.selected ? (
+          <View style={styles.altCheck}>
+            <CheckIcon />
+          </View>
+        ) : null}
+        {busy ? (
+          <View style={styles.altBusyOverlay}>
+            <ActivityIndicator color={colors.primaryForeground} />
+          </View>
+        ) : null}
+      </View>
+      <View style={styles.altLabelBar}>
+        <Text style={[styles.altLabel, highlighted ? styles.altLabelActive : null]}>{label}</Text>
+      </View>
     </Pressable>
   );
+}
+
+/** Rotating ring for the regenerating overlay (design Illustration/05). */
+function RingSpinner() {
+  const spin = useSharedValue(0);
+  useEffect(() => {
+    spin.value = withRepeat(withTiming(360, { duration: 1000, easing: Easing.linear }), -1, false);
+  }, [spin]);
+  const spinStyle = useAnimatedStyle(() => ({ transform: [{ rotate: `${spin.value}deg` }] }));
+  return <Animated.View style={[styles.ring, spinStyle]} />;
 }
 
 interface GeneratingNightProps {
@@ -257,7 +291,19 @@ export default function IllustrateStory() {
   const [createError, setCreateError] = useState<string | null>(null);
   const [selectingId, setSelectingId] = useState<string | null>(null);
   const [rowError, setRowError] = useState<string | null>(null);
-  const [regen, setRegen] = useState<{ jobId: string; rowKey: string } | null>(null);
+  const [regen, setRegen] = useState<{
+    jobId: string;
+    rowKey: string;
+    target: Illustration;
+  } | null>(null);
+  /** Focused unit in the READY view ('cover' | story page id). */
+  const [focusedKey, setFocusedKey] = useState('cover');
+  const [altsOpen, setAltsOpen] = useState(false);
+  /** Pending pick in the alternatives view (null = keep server selection highlighted). */
+  const [altPick, setAltPick] = useState<string | null>(null);
+  const [lastFailed, setLastFailed] = useState<ReadyRetry | null>(null);
+  const [bookLoading, setBookLoading] = useState(false);
+  const [bookError, setBookError] = useState<string | null>(null);
 
   const storyQuery = useQuery({
     queryKey: ['story', id],
@@ -332,10 +378,18 @@ export default function IllustrateStory() {
           ? t(`errors.${regenJob.errorCode}`, { defaultValue: t('errors.GENERIC') })
           : t('errors.GENERIC'),
       );
+      setLastFailed({ kind: 'regenerate', rowKey: regen.rowKey, illustration: regen.target });
       setRegen(null);
       void queryClient.invalidateQueries({ queryKey: ['illustrations', id] });
     }
   }, [regen, regenJob.status, regenJob.errorCode, id, queryClient, t]);
+
+  // Switching the displayed set closes the alternatives view (units changed).
+  const activeSetKey = activeSet?.id ?? null;
+  useEffect(() => {
+    setAltsOpen(false);
+    setAltPick(null);
+  }, [activeSetKey]);
 
   const applyRequestError = (err: unknown) => {
     if (err instanceof ApiError) {
@@ -386,6 +440,7 @@ export default function IllustrateStory() {
       void queryClient.invalidateQueries({ queryKey: ['story', id] });
       void queryClient.invalidateQueries({ queryKey: ['stories'] });
     } catch (err) {
+      setLastFailed({ kind: 'select', illustration });
       if (err instanceof ApiError) {
         setRowError(t(`errors.${err.code}`, { defaultValue: t('errors.GENERIC') }));
       } else if (err instanceof NetworkError) {
@@ -404,11 +459,14 @@ export default function IllustrateStory() {
     setRowError(null);
     try {
       const { jobId } = await api.illustrations.regenerate(illustration.id);
-      setRegen({ jobId, rowKey });
+      setRegen({ jobId, rowKey, target: illustration });
     } catch (err) {
       if (err instanceof ApiError && err.code === ErrorCode.QUOTA_EXCEEDED) {
         setQuotaHit(true);
-      } else if (err instanceof ApiError) {
+        return;
+      }
+      setLastFailed({ kind: 'regenerate', rowKey, illustration });
+      if (err instanceof ApiError) {
         setRowError(t(`errors.${err.code}`, { defaultValue: t('errors.GENERIC') }));
       } else if (err instanceof NetworkError) {
         setRowError(t('errors.OFFLINE'));
@@ -416,6 +474,24 @@ export default function IllustrateStory() {
         setRowError(t('errors.GENERIC'));
       }
     }
+  };
+
+  /** Inline ErrorState retry — re-runs whichever ready-view action failed. */
+  const retryFailed = () => {
+    if (lastFailed == null) {
+      setRowError(null);
+      return;
+    }
+    if (lastFailed.kind === 'select') {
+      void onSelectAlternative(lastFailed.illustration);
+    } else {
+      void onRegenerate(lastFailed.rowKey, lastFailed.illustration);
+    }
+  };
+
+  const closeAlts = () => {
+    setAltsOpen(false);
+    setAltPick(null);
   };
 
   // ── Guards ─────────────────────────────────────────────────────────────────
@@ -482,6 +558,74 @@ export default function IllustrateStory() {
   // ── Derived view data ──────────────────────────────────────────────────────
 
   const sortedPages = [...story.pages].sort((a, b) => a.pageNumber - b.pageNumber);
+
+  // READY-view units: cover + each page that has illustrations, from real data.
+  const readySet =
+    activeSet != null && activeSet.status === IllustrationSetStatus.READY ? activeSet : null;
+  const readyUnits: ReadyUnit[] = [];
+  if (readySet != null) {
+    const pushUnit = (
+      key: string,
+      label: string,
+      caption: string | null,
+      alternatives: Illustration[],
+    ) => {
+      const selected = alternatives.find((item) => item.selected) ?? alternatives[0];
+      if (selected == null) return;
+      readyUnits.push({ key, label, caption, alternatives, selected });
+    };
+    pushUnit(
+      'cover',
+      t('illustrate.progressCover'),
+      story.title,
+      readySet.illustrations.filter((item) => item.isCover).sort(byCreatedAt),
+    );
+    for (const page of sortedPages) {
+      pushUnit(
+        page.id,
+        t('illustrate.progressPage', { number: page.pageNumber }),
+        page.text,
+        readySet.illustrations
+          .filter((item) => !item.isCover && item.storyPageId === page.id)
+          .sort(byCreatedAt),
+      );
+    }
+  }
+  const focusedUnit = readyUnits.find((unit) => unit.key === focusedKey) ?? readyUnits[0] ?? null;
+  const showAlts = altsOpen && focusedUnit != null;
+  const themeEmoji = storyThemeEmoji(story.themes);
+
+  /** Bottom CTA: reuse-or-create the story's book, then open the builder. */
+  const openBook = async () => {
+    if (bookLoading) return;
+    setBookError(null);
+    setBookLoading(true);
+    try {
+      await openBookBuilderForStory(queryClient, story.id);
+    } catch (err) {
+      if (err instanceof ApiError) {
+        setBookError(t(`errors.${err.code}`, { defaultValue: t('errors.GENERIC') }));
+      } else if (err instanceof NetworkError) {
+        setBookError(t('errors.OFFLINE'));
+      } else {
+        setBookError(t('errors.GENERIC'));
+      }
+    } finally {
+      setBookLoading(false);
+    }
+  };
+
+  /** "Bu Görseli Seç": commit the highlighted alternative, then return to ready. */
+  const confirmAlternative = async () => {
+    if (focusedUnit == null || selectingId != null) return;
+    const highlightedId = altPick ?? focusedUnit.selected.id;
+    const target = focusedUnit.alternatives.find((item) => item.id === highlightedId);
+    if (target != null && !target.selected) {
+      // On failure rowError is set and the ready view shows the inline ErrorState.
+      await onSelectAlternative(target);
+    }
+    closeAlts();
+  };
 
   const quotaBanner = quotaHit ? (
     <Animated.View entering={FadeInUp.duration(250)} style={styles.quotaBanner}>
@@ -624,140 +768,198 @@ export default function IllustrateStory() {
     </View>
   );
 
-  const renderRegenControl = (rowKey: string, target: Illustration) => {
-    if (regen?.rowKey === rowKey) {
-      return <ActivityIndicator size="small" color={colors.primary} />;
+  /**
+   * READY view (design Illustration/03): thumbnail strip of units, large
+   * preview of the focused unit's selected illustration, regenerate/
+   * alternatives action row. A failed action swaps the whole block for the
+   * shared illustration ErrorState with a retry.
+   */
+  const renderReady = () => {
+    if (focusedUnit == null) return null;
+    if (rowError != null) {
+      return <ErrorState kind="illustration" body={rowError} onRetry={retryFailed} />;
     }
-    return (
-      <Pressable
-        onPress={() => {
-          void onRegenerate(rowKey, target);
-        }}
-        disabled={regen != null}
-        accessibilityRole="button"
-        accessibilityLabel={t('illustrate.regenerate')}
-        style={({ pressed }) => [
-          styles.regenButton,
-          { opacity: regen != null ? 0.5 : pressed ? 0.7 : 1 },
-        ]}
-      >
-        <Text style={styles.regenLabel}>{t('illustrate.regenerate')}</Text>
-      </Pressable>
-    );
-  };
-
-  const renderReady = (set: IllustrationSet) => {
-    const covers = set.illustrations.filter((item) => item.isCover).sort(byCreatedAt);
-    const coverTarget = covers.find((item) => item.selected) ?? covers[0];
-    const pageRows = sortedPages
-      .map((page) => ({
-        page,
-        alternatives: set.illustrations
-          .filter((item) => !item.isCover && item.storyPageId === page.id)
-          .sort(byCreatedAt),
-      }))
-      .filter((row) => row.alternatives.length > 0);
+    const regenActive = regen != null && regen.rowKey === focusedUnit.key;
+    const regenPercent = Math.round(Math.min(Math.max(regenJob.progress, 0), 100));
+    const regenWidth = `${regenPercent}%` as const;
 
     return (
       <Animated.View entering={FadeInUp.duration(300)}>
-        <View style={styles.readyHeaderRow}>
-          <Badge label={t(`illustrate.styles.${set.style}`)} />
-        </View>
-        {rowError != null ? <Text style={styles.inlineError}>{rowError}</Text> : null}
-
-        {/* Cover */}
-        {covers.length > 0 && coverTarget != null ? (
-          <View style={styles.pageSection}>
-            <View style={styles.rowHeader}>
-              <Text style={styles.rowTitle}>{t('illustrate.progressCover')}</Text>
-              {renderRegenControl('cover', coverTarget)}
-            </View>
-            {covers.length > 1 ? (
-              <>
-                <Text style={styles.altHelper}>{t('illustrate.chooseAlternative')}</Text>
-                <ScrollView
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={styles.altRowContent}
-                >
-                  {covers.map((illustration) => (
-                    <AltTile
-                      key={illustration.id}
-                      illustration={illustration}
-                      size={168}
-                      busy={selectingId === illustration.id}
-                      disabled={selectingId != null}
-                      onSelect={() => {
-                        void onSelectAlternative(illustration);
-                      }}
-                      accessibilityLabel={t('illustrate.progressCover')}
+        {/* Thumbnail strip — one 64×80 tile per unit */}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={styles.strip}
+          contentContainerStyle={styles.stripContent}
+        >
+          {readyUnits.map((unit) => {
+            const active = unit.key === focusedUnit.key;
+            return (
+              <Pressable
+                key={unit.key}
+                onPress={() => setFocusedKey(unit.key)}
+                accessibilityRole="tab"
+                accessibilityState={{ selected: active }}
+                accessibilityLabel={unit.label}
+                style={styles.stripItem}
+              >
+                <View style={[styles.stripTile, active ? styles.stripTileActive : null]}>
+                  {unit.selected.imageUrl.length > 0 ? (
+                    <Image
+                      source={{ uri: unit.selected.imageUrl }}
+                      style={StyleSheet.absoluteFill}
+                      contentFit="cover"
+                      accessibilityIgnoresInvertColors
                     />
-                  ))}
-                </ScrollView>
-              </>
-            ) : (
-              <AltTile
-                illustration={coverTarget}
-                busy={selectingId === coverTarget.id}
-                disabled={selectingId != null}
-                onSelect={() => {
-                  void onSelectAlternative(coverTarget);
-                }}
-                accessibilityLabel={t('illustrate.progressCover')}
-              />
-            )}
+                  ) : (
+                    <LinearGradient
+                      colors={gradients.playerCover as unknown as [string, string]}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 1 }}
+                      style={[StyleSheet.absoluteFill, styles.tileFallback]}
+                    >
+                      <Text style={styles.stripEmoji}>{themeEmoji}</Text>
+                    </LinearGradient>
+                  )}
+                </View>
+                <Text style={[styles.stripLabel, active ? styles.stripLabelActive : null]}>
+                  {unit.label}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </ScrollView>
+
+        {/* Main preview — regenerating keeps the old image under a dark overlay */}
+        <View style={[styles.preview, shadows.cardMedium]}>
+          {focusedUnit.selected.imageUrl.length > 0 ? (
+            <Image
+              source={{ uri: focusedUnit.selected.imageUrl }}
+              style={StyleSheet.absoluteFill}
+              contentFit="cover"
+              accessibilityIgnoresInvertColors
+            />
+          ) : (
+            <LinearGradient
+              colors={gradients.playerCover as unknown as [string, string]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={[StyleSheet.absoluteFill, styles.tileFallback]}
+            >
+              <Text style={styles.previewEmoji}>{themeEmoji}</Text>
+            </LinearGradient>
+          )}
+          {regenActive ? (
+            <View style={styles.regenOverlay}>
+              <RingSpinner />
+              <Text style={styles.regenOverlayText}>{t('illustrate.regeneratingLabel')}</Text>
+            </View>
+          ) : null}
+        </View>
+
+        {regenActive ? (
+          <View style={styles.regenBarBlock}>
+            <View style={styles.regenTrack}>
+              <View style={[styles.regenFill, { width: regenWidth }]}>
+                <LinearGradient
+                  colors={gradients.progress as unknown as [string, string]}
+                  start={{ x: 0, y: 0.5 }}
+                  end={{ x: 1, y: 0.5 }}
+                  style={StyleSheet.absoluteFill}
+                />
+              </View>
+            </View>
+            <Text style={styles.regenPercentText}>%{regenPercent}</Text>
           </View>
+        ) : focusedUnit.caption != null && focusedUnit.caption.length > 0 ? (
+          <Text style={styles.previewCaption} numberOfLines={2}>
+            {focusedUnit.caption}
+          </Text>
         ) : null}
 
-        {/* Pages */}
-        {pageRows.map(({ page, alternatives }) => {
-          const target = alternatives.find((item) => item.selected) ?? alternatives[0];
-          if (target == null) return null;
-          return (
-            <View key={page.id} style={styles.pageSection}>
-              <View style={styles.rowHeader}>
-                <Text style={styles.rowTitle}>
-                  {t('illustrate.progressPage', { number: page.pageNumber })}
-                </Text>
-                {renderRegenControl(page.id, target)}
-              </View>
-              {alternatives.length > 1 ? (
-                <Text style={styles.altHelper}>{t('illustrate.chooseAlternative')}</Text>
-              ) : null}
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.altRowContent}
-              >
-                {alternatives.map((illustration) => (
-                  <AltTile
-                    key={illustration.id}
-                    illustration={illustration}
-                    size={112}
-                    busy={selectingId === illustration.id}
-                    disabled={selectingId != null}
-                    onSelect={() => {
-                      void onSelectAlternative(illustration);
-                    }}
-                    accessibilityLabel={t('illustrate.progressPage', {
-                      number: page.pageNumber,
-                    })}
-                  />
-                ))}
-              </ScrollView>
-            </View>
-          );
-        })}
+        {/* Action row */}
+        <View style={styles.actionRow}>
+          <Pressable
+            onPress={() => {
+              void onRegenerate(focusedUnit.key, focusedUnit.selected);
+            }}
+            disabled={regen != null}
+            accessibilityRole="button"
+            accessibilityLabel={t('illustrate.regenerate')}
+            style={({ pressed }) => [
+              styles.actionButton,
+              { opacity: regen != null ? 0.5 : pressed ? 0.7 : 1 },
+            ]}
+          >
+            <Text style={styles.actionEmoji}>🔄</Text>
+            <Text style={styles.actionLabel}>{t('illustrate.regenerateAction')}</Text>
+          </Pressable>
+          <Pressable
+            onPress={() => {
+              setAltPick(null);
+              setAltsOpen(true);
+            }}
+            accessibilityRole="button"
+            accessibilityLabel={t('illustrate.chooseAlternative')}
+            style={({ pressed }) => [styles.actionButton, { opacity: pressed ? 0.7 : 1 }]}
+          >
+            <Text style={styles.actionEmoji}>🖼</Text>
+            <Text style={styles.actionLabel}>{t('illustrate.alternatives')}</Text>
+          </Pressable>
+        </View>
       </Animated.View>
     );
   };
+
+  /**
+   * Alternatives view (design Illustration/04): lead line + 2-column grid of
+   * the focused unit's real alternatives; the bottom CTA commits the pick via
+   * the existing select mutation.
+   */
+  const renderAlternatives = () => {
+    if (focusedUnit == null) return null;
+    const highlightedId = altPick ?? focusedUnit.selected.id;
+    return (
+      <Animated.View entering={FadeInUp.duration(300)}>
+        <Text style={styles.altLead}>
+          {t('illustrate.alternativesLead', {
+            unit: focusedUnit.label,
+            count: focusedUnit.alternatives.length,
+          })}
+        </Text>
+        <View style={styles.altGrid}>
+          {focusedUnit.alternatives.map((illustration, index) => (
+            <AltTile
+              key={illustration.id}
+              illustration={illustration}
+              label={t('illustrate.alternativeOption', { number: index + 1 })}
+              highlighted={illustration.id === highlightedId}
+              busy={selectingId === illustration.id}
+              onPress={() => setAltPick(illustration.id)}
+            />
+          ))}
+        </View>
+      </Animated.View>
+    );
+  };
+
+  const readyFooter = !showPicker && readySet != null && focusedUnit != null && rowError == null;
 
   return (
     <View style={styles.root}>
       <View style={[styles.header, { paddingTop: Math.max(insets.top, 20) + 8 }]}>
         <ScreenHeader
           eyebrow={t('illustrate.eyebrow')}
-          title={showPicker ? t('illustrate.pickerTitle') : t('illustrate.title')}
+          title={
+            showPicker
+              ? t('illustrate.pickerTitle')
+              : showAlts
+                ? t('illustrate.alternativesTitle')
+                : readySet != null
+                  ? t('illustrate.readyTitle')
+                  : t('illustrate.title')
+          }
+          onBack={showAlts ? closeAlts : undefined}
         />
         {showPicker ? (
           <View style={styles.hintCard}>
@@ -770,7 +972,13 @@ export default function IllustrateStory() {
         style={styles.scroll}
         contentContainerStyle={[
           styles.scrollContent,
-          { paddingBottom: showPicker ? 220 : Math.max(insets.bottom, 16) + spacing.xxl },
+          {
+            paddingBottom: showPicker
+              ? 220
+              : readyFooter
+                ? 180
+                : Math.max(insets.bottom, 16) + spacing.xxl,
+          },
         ]}
         showsVerticalScrollIndicator={false}
       >
@@ -782,7 +990,9 @@ export default function IllustrateStory() {
             ? null
             : activeSet.status === IllustrationSetStatus.FAILED
               ? renderFailed(activeSet)
-              : renderReady(activeSet)}
+              : showAlts
+                ? renderAlternatives()
+                : renderReady()}
       </ScrollView>
 
       {/* Fixed bottom CTA over a cream scrim (wizard pattern) — picker only. */}
@@ -812,6 +1022,41 @@ export default function IllustrateStory() {
             <Text style={styles.ctaCaption}>
               {t('illustrate.generateCaption', { count: sortedPages.length + 1 })}
             </Text>
+          </View>
+        </View>
+      ) : readyFooter ? (
+        // Ready: "Kitabı Oluştur" (or the alternatives' "Bu Görseli Seç") CTA.
+        <View style={styles.footer} pointerEvents="box-none">
+          <LinearGradient
+            colors={['rgba(250,248,244,0)', colors.background]}
+            locations={[0, 0.3]}
+            style={StyleSheet.absoluteFill}
+            pointerEvents="none"
+          />
+          <View
+            style={[styles.footerContent, { paddingBottom: Math.max(insets.bottom, 24) + 8 }]}
+            pointerEvents="box-none"
+          >
+            {showAlts ? (
+              <Button
+                label={t('illustrate.selectImage')}
+                onPress={() => {
+                  void confirmAlternative();
+                }}
+                loading={selectingId != null}
+              />
+            ) : (
+              <>
+                {bookError != null ? <Text style={styles.submitError}>{bookError}</Text> : null}
+                <Button
+                  label={t('illustrate.makeBook')}
+                  onPress={() => {
+                    void openBook();
+                  }}
+                  loading={bookLoading}
+                />
+              </>
+            )}
           </View>
         </View>
       ) : null}
@@ -970,42 +1215,137 @@ const styles = StyleSheet.create({
   },
   nightFill: { height: '100%', borderRadius: 2, overflow: 'hidden' },
 
-  // Ready set
-  readyHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-    marginBottom: spacing.md,
-  },
-  pageSection: { marginBottom: spacing.xl },
-  rowHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: spacing.xs,
-    marginBottom: spacing.xs,
-  },
-  rowTitle: {
-    fontFamily: fontFamilies.bodyBold,
-    fontSize: fontSizes.lg,
-    color: colors.foreground,
-  },
-  altHelper: {
-    fontFamily: fontFamilies.body,
-    fontSize: fontSizes.sm,
-    color: colors.mutedForeground,
-    marginBottom: spacing.xs,
-  },
-  altRowContent: { gap: spacing.xs },
-  altTile: {
-    borderRadius: radius.md,
-    borderWidth: 2,
+  // Ready set (design Illustration/03)
+  strip: { marginBottom: spacing.md, marginHorizontal: -spacing.pageX },
+  stripContent: { gap: 10, paddingHorizontal: spacing.pageX },
+  stripItem: { width: 64 },
+  stripTile: {
+    width: 64,
+    height: 80,
+    borderRadius: radius.chip,
+    borderWidth: 3,
+    borderColor: 'transparent',
     overflow: 'hidden',
     backgroundColor: colors.muted,
   },
-  altTileFull: { width: '100%', aspectRatio: 1 },
+  stripTileActive: { borderColor: colors.primary },
+  stripEmoji: { fontSize: 26 },
+  stripLabel: {
+    fontFamily: fontFamilies.bodyBold,
+    fontSize: fontSizes.xxs,
+    color: colors.mutedForeground,
+    textAlign: 'center',
+    marginTop: 5,
+  },
+  stripLabelActive: { color: colors.primary },
+  tileFallback: { alignItems: 'center', justifyContent: 'center' },
+  preview: {
+    height: 300,
+    borderRadius: radius.xl,
+    overflow: 'hidden',
+    backgroundColor: colors.muted,
+  },
+  previewEmoji: { fontSize: 80 },
+  previewCaption: {
+    fontFamily: fontFamilies.body,
+    fontSize: fontSizes.md,
+    color: colors.mutedForeground,
+    textAlign: 'center',
+    lineHeight: 19,
+    marginTop: spacing.sm,
+    paddingHorizontal: spacing.xs,
+  },
+  actionRow: { flexDirection: 'row', gap: 10, marginTop: spacing.md },
+  actionButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 14,
+    borderRadius: radius.base,
+    backgroundColor: colors.card,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  actionEmoji: { fontSize: fontSizes.base },
+  actionLabel: {
+    fontFamily: fontFamilies.bodyBold,
+    fontSize: fontSizes.base,
+    color: colors.foreground,
+  },
+
+  // Regenerating overlay (design Illustration/05)
+  regenOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(13,27,46,0.7)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.md,
+  },
+  regenOverlayText: {
+    fontFamily: fontFamilies.bodySemiBold,
+    fontSize: fontSizes.base,
+    color: 'rgba(255,255,255,0.8)',
+  },
+  ring: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    borderWidth: 4,
+    borderColor: 'rgba(155,127,212,0.3)',
+    borderTopColor: colors.purpleSoft,
+  },
+  regenBarBlock: { marginTop: spacing.sm },
+  regenTrack: {
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: colors.muted,
+    overflow: 'hidden',
+  },
+  regenFill: { height: '100%', borderRadius: 3, overflow: 'hidden' },
+  regenPercentText: {
+    fontFamily: fontFamilies.body,
+    fontSize: fontSizes.sm,
+    color: colors.mutedForeground,
+    textAlign: 'center',
+    marginTop: spacing.xs,
+  },
+
+  // Alternatives (design Illustration/04)
+  altLead: {
+    fontFamily: fontFamilies.body,
+    fontSize: fontSizes.base,
+    color: colors.mutedForeground,
+    marginBottom: 18,
+  },
+  altGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 14 },
+  altTile: {
+    flexBasis: '46%',
+    flexGrow: 1,
+    borderRadius: radius.lg,
+    borderWidth: 3,
+    overflow: 'hidden',
+    backgroundColor: colors.card,
+  },
   altTileSelected: { borderColor: colors.primary },
-  altTileUnselected: { borderColor: colors.border },
+  altTileUnselected: { borderColor: 'transparent' },
+  altImageBox: { height: 140, backgroundColor: colors.muted },
+  altLabelBar: {
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    backgroundColor: colors.card,
+  },
+  altLabel: {
+    fontFamily: fontFamilies.bodyBold,
+    fontSize: fontSizes.md,
+    color: colors.foreground,
+  },
+  altLabelActive: { color: colors.primary },
   altCheck: {
     position: 'absolute',
     top: 8,
@@ -1026,19 +1366,6 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(44,40,37,0.35)',
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  regenButton: {
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    borderRadius: radius.chip,
-    backgroundColor: colors.card,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  regenLabel: {
-    fontFamily: fontFamilies.bodyBold,
-    fontSize: fontSizes.sm,
-    color: colors.primary,
   },
 
   // Shared feedback
