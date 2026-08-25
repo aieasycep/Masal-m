@@ -68,7 +68,15 @@
     "newPassword": "Yeni şifre",
     "resetPassword": "Şifreyi Yenile",
     "passwordResetSuccess": "Şifren yenilendi. Şimdi giriş yapabilirsin.",
-    "termsNotice": "Devam ederek Kullanım Koşulları ve Gizlilik Politikası'nı kabul etmiş olursun."
+    "termsNotice": "Devam ederek Kullanım Koşulları ve Gizlilik Politikası'nı kabul etmiş olursun.",
+    "welcomeHeadline": "Masallarına kaldığın yerden devam et.",
+    "welcomeBody": "Hikâyelerini, seslerini ve çocuk profillerini güvenle saklamak için hesabını oluştur.",
+    "signingIn": "Giriş yapılıyor…",
+    "signingUp": "Hesap oluşturuluyor…",
+    "sending": "Gönderiliyor…",
+    "checkEmailTitle": "E-postanı kontrol et.",
+    "checkEmailBody": "{{email}} adresine 6 haneli bir sıfırlama kodu gönderdik. Birkaç dakika içinde gelmezse spam klasörüne bakabilirsin.",
+    "resendCode": "Tekrar Gönder"
   },
   "childSetup": {
     "title": "Masalları kimin için hazırlıyoruz?",

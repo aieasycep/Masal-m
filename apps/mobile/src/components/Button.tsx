@@ -10,6 +10,8 @@ interface ButtonProps {
   onPress: () => void;
   variant?: ButtonVariant;
   loading?: boolean;
+  /** Optional label rendered next to the spinner while loading (e.g. "Gönderiliyor…"). */
+  loadingLabel?: string;
   disabled?: boolean;
   /** Optional leading element (e.g. play icon). */
   leading?: ReactNode;
@@ -23,6 +25,7 @@ export function Button({
   onPress,
   variant = 'primary',
   loading = false,
+  loadingLabel,
   disabled = false,
   leading,
   style,
@@ -34,7 +37,14 @@ export function Button({
   const content = (
     <View style={styles.contentRow}>
       {loading ? (
-        <ActivityIndicator color={variant === 'primary' ? colors.primaryForeground : colors.primary} />
+        <>
+          <ActivityIndicator
+            color={variant === 'primary' ? colors.primaryForeground : colors.primary}
+          />
+          {loadingLabel != null ? (
+            <Text style={[styles.label, labelStyles[variant]]}>{loadingLabel}</Text>
+          ) : null}
+        </>
       ) : (
         <>
           {leading}

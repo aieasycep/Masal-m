@@ -68,7 +68,15 @@
     "newPassword": "New password",
     "resetPassword": "Reset Password",
     "passwordResetSuccess": "Your password has been reset. You can sign in now.",
-    "termsNotice": "By continuing you accept the Terms of Use and Privacy Policy."
+    "termsNotice": "By continuing you accept the Terms of Use and Privacy Policy.",
+    "welcomeHeadline": "Pick up your fairy tales where you left off.",
+    "welcomeBody": "Create your account to safely keep your stories, voices and child profiles.",
+    "signingIn": "Signing in…",
+    "signingUp": "Creating your account…",
+    "sending": "Sending…",
+    "checkEmailTitle": "Check your e-mail.",
+    "checkEmailBody": "We sent a 6-digit reset code to {{email}}. If it doesn't arrive within a few minutes, check your spam folder.",
+    "resendCode": "Resend Code"
   },
   "childSetup": {
     "title": "Who are we making stories for?",
