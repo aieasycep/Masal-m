@@ -107,7 +107,16 @@
       "müzik": "Müzik"
     },
     "deleteConfirmTitle": "Profili silmek istiyor musun?",
-    "deleteConfirmBody": "{{name}} için kaydedilen profil silinir. Oluşturulan hikâyeler kitaplığında kalır."
+    "deleteConfirmBody": "{{name}} için kaydedilen profil silinir. Oluşturulan hikâyeler kitaplığında kalır.",
+    "ageLabel": "Yaşı",
+    "ageDecrease": "Yaşı azalt",
+    "ageIncrease": "Yaşı artır",
+    "updateChild": "Profili Güncelle",
+    "deleteChild": "Profili Sil",
+    "deleteConfirmBodyPermanent": "Bu çocuk profili ve tüm hikâyeleri silinecek. Bu işlem geri alınamaz.",
+    "editTitle": "{{nameGen}} Profili",
+    "listEmptyTitle": "Henüz bir çocuk profili yok.",
+    "listEmptyBody": "Masalları kişiselleştirmek için bir profil oluştur."
   },
   "home": {
     "greetingMorning": "Günaydın 👋",

@@ -6,19 +6,33 @@ interface ChipProps {
   selected: boolean;
   onPress: () => void;
   emoji?: string;
+  /** Dashed "add your own" affordance (Child/01 "+ Kendim ekle"). */
+  dashed?: boolean;
 }
 
 /** Selectable chip (hero types, interests): 2px border flips to primary + text tint. */
-export function Chip({ label, selected, onPress, emoji }: ChipProps) {
+export function Chip({ label, selected, onPress, emoji, dashed = false }: ChipProps) {
   return (
     <Pressable
       onPress={onPress}
       accessibilityRole="checkbox"
       accessibilityState={{ checked: selected }}
-      style={[styles.chip, selected ? styles.chipSelected : styles.chipUnselected]}
+      style={[
+        styles.chip,
+        selected ? styles.chipSelected : styles.chipUnselected,
+        dashed && !selected && styles.chipDashed,
+      ]}
     >
       {emoji ? <Text style={styles.emoji}>{emoji}</Text> : null}
-      <Text style={[styles.label, selected && styles.labelSelected]}>{label}</Text>
+      <Text
+        style={[
+          styles.label,
+          selected && styles.labelSelected,
+          dashed && !selected && styles.labelDashed,
+        ]}
+      >
+        {label}
+      </Text>
     </Pressable>
   );
 }
@@ -35,6 +49,7 @@ const styles = StyleSheet.create({
   },
   chipSelected: { borderColor: colors.primary, backgroundColor: colors.secondary },
   chipUnselected: { borderColor: colors.border, backgroundColor: colors.card },
+  chipDashed: { borderStyle: 'dashed', backgroundColor: 'transparent' },
   emoji: { fontSize: 16 },
   label: {
     fontFamily: fontFamilies.bodySemiBold,
@@ -42,4 +57,5 @@ const styles = StyleSheet.create({
     color: colors.foreground,
   },
   labelSelected: { color: colors.primary, fontFamily: fontFamilies.bodyBold },
+  labelDashed: { color: colors.mutedForeground },
 });

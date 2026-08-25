@@ -1,56 +1,50 @@
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import {
+  ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { AGE_RANGE_LABELS, AgeRange } from '@masalim/types';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { updateChildSchema, type UpdateChildInput } from '@masalim/validation';
 import { ApiError } from '@masalim/api-client';
-import { colors, fontFamilies, fontSizes, spacing } from '@masalim/ui';
+import { withSuffix } from '@masalim/localization';
+import { colors, fontFamilies, fontSizes, letterSpacing, radius, spacing } from '@masalim/ui';
 import { api } from '../../src/lib/api';
+import { ageRangeFromYears, DEFAULT_AGE_YEARS, yearsFromAgeRange } from '../../src/lib/age';
+import { CANONICAL_INTERESTS, isCanonicalInterest } from '../../src/lib/interests';
 import { useAppPrefs } from '../../src/stores/app-prefs';
+import { AgeStepper } from '../../src/components/AgeStepper';
+import { AvatarEmojiPicker, DEFAULT_AVATAR_EMOJI } from '../../src/components/AvatarEmojiPicker';
 import { Button } from '../../src/components/Button';
 import { Chip } from '../../src/components/Chip';
 import { ConfirmSheet } from '../../src/components/ConfirmSheet';
 import { Input } from '../../src/components/Input';
 import { Screen } from '../../src/components/Screen';
 import { ScreenHeader } from '../../src/components/ScreenHeader';
-import { SelectableCard } from '../../src/components/SelectableCard';
 import { ErrorState } from '../../src/components/states';
 
-const AGE_RANGES: AgeRange[] = [
-  AgeRange.AGE_0_2,
-  AgeRange.AGE_3_5,
-  AgeRange.AGE_6_8,
-  AgeRange.AGE_9_12,
-];
-
-/** Canonical interest keys under childSetup.interests.* (same set as /children/new). */
-const INTEREST_KEYS = [
-  'dinozorlar',
-  'uzay',
-  'hayvanlar',
-  'arabalar',
-  'prensesler',
-  'deniz',
-  'doğa',
-  'robotlar',
-  'futbol',
-  'periler',
-  'macera',
-  'müzik',
-] as const;
-
-/** Child detail/edit: prefill from the API, save via PATCH, danger-zone delete. */
+/**
+ * Child edit (design Child/02-EditProfile): avatar picker, name, exact-age
+ * stepper (persisted as preferences.ageYears, bucketed to ageRange for the
+ * API), interest chips keyed by raw canonical IDs, destructive delete.
+ */
 export default function ChildDetail() {
   const { t } = useTranslation();
+  const insets = useSafeAreaInsets();
   const { id } = useLocalSearchParams<{ id: string }>();
   const queryClient = useQueryClient();
   const selectedChildId = useAppPrefs((state) => state.selectedChildId);
   const setSelectedChildId = useAppPrefs((state) => state.setSelectedChildId);
 
   const [name, setName] = useState('');
-  const [ageRange, setAgeRange] = useState<AgeRange | null>(null);
+  const [avatarEmoji, setAvatarEmoji] = useState<string>(DEFAULT_AVATAR_EMOJI);
+  const [ageYears, setAgeYears] = useState(DEFAULT_AGE_YEARS);
   const [interests, setInterests] = useState<string[]>([]);
   const [customInterest, setCustomInterest] = useState('');
   const [showCustomInput, setShowCustomInput] = useState(false);
@@ -68,7 +62,8 @@ export default function ChildDetail() {
   useEffect(() => {
     if (child != null && prefilledFor !== child.id) {
       setName(child.name);
-      setAgeRange(child.ageRange);
+      setAvatarEmoji(child.preferences.avatarEmoji ?? DEFAULT_AVATAR_EMOJI);
+      setAgeYears(child.preferences.ageYears ?? yearsFromAgeRange(child.ageRange));
       setInterests(child.interests);
       setPrefilledFor(child.id);
     }
@@ -102,30 +97,38 @@ export default function ChildDetail() {
     onError: (error) => setServerError(apiErrorMessage(error)),
   });
 
-  const canonicalLabels = INTEREST_KEYS.map((key) => t(`childSetup.interests.${key}`));
-  const customInterests = interests.filter((interest) => !canonicalLabels.includes(interest));
+  // Canonical-vs-custom matching uses raw stored keys (the API lowercases
+  // interests with the tr locale, so canonical keys round-trip unchanged).
+  const customInterests = interests.filter((interest) => !isCanonicalInterest(interest));
 
-  const toggleInterest = (label: string) => {
+  const toggleInterest = (key: string) => {
     setInterests((prev) =>
-      prev.includes(label) ? prev.filter((item) => item !== label) : [...prev, label],
+      prev.includes(key) ? prev.filter((item) => item !== key) : [...prev, key],
     );
   };
 
   const addCustomInterest = () => {
     const trimmed = customInterest.trim();
     if (trimmed.length === 0) return;
-    setInterests((prev) => (prev.includes(trimmed) ? prev : [...prev, trimmed]));
+    // Typing a canonical interest by hand selects its chip instead of duplicating it.
+    const value = isCanonicalInterest(trimmed.toLocaleLowerCase('tr'))
+      ? trimmed.toLocaleLowerCase('tr')
+      : trimmed;
+    setInterests((prev) => (prev.includes(value) ? prev : [...prev, value]));
     setCustomInterest('');
   };
 
   const save = () => {
+    if (child == null) return;
     setServerError(null);
     const parsed = updateChildSchema.safeParse({
       name: name.trim(),
-      ageRange: ageRange ?? undefined,
+      ageRange: ageRangeFromYears(ageYears),
       interests,
+      // Preserve any other stored preference keys (nickname, notes, …).
+      preferences: { ...child.preferences, avatarEmoji, ageYears },
     });
-    if (!parsed.success || name.trim().length === 0 || ageRange == null) {
+    if (!parsed.success || name.trim().length === 0) {
       setServerError(t('errors.VALIDATION_FAILED'));
       return;
     }
@@ -160,67 +163,64 @@ export default function ChildDetail() {
   }
 
   return (
-    <Screen>
-      <ScreenHeader title={child.name} />
-
-      <View style={styles.form}>
-        <Input
-          label={t('childSetup.nameLabel')}
-          placeholder={t('childSetup.namePlaceholder')}
-          value={name}
-          onChangeText={setName}
-          autoCapitalize="words"
-          accessibilityLabel={t('childSetup.nameLabel')}
-        />
-
-        <View style={styles.field}>
-          <Text style={styles.fieldLabel}>
-            {t('childSetup.ageRangeLabel').toLocaleUpperCase('tr')}
-          </Text>
-          <View style={styles.ageGrid}>
-            {AGE_RANGES.map((range) => {
-              const selected = ageRange === range;
-              const label = `${AGE_RANGE_LABELS[range]} ${t('wizard.ageUnit')}`;
-              return (
-                <SelectableCard
-                  key={range}
-                  selected={selected}
-                  onPress={() => setAgeRange(range)}
-                  showCheck={false}
-                  style={styles.ageCard}
-                  accessibilityLabel={label}
-                >
-                  <Text style={[styles.ageLabel, selected && styles.ageLabelSelected]}>
-                    {label}
-                  </Text>
-                </SelectableCard>
-              );
+    <View style={styles.root}>
+      <KeyboardAvoidingView
+        style={styles.flex}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
+        <Screen>
+          <ScreenHeader
+            title={t('childSetup.editTitle', {
+              name: child.name,
+              nameGen: withSuffix(child.name, 'gen'),
             })}
-          </View>
-        </View>
+          />
 
-        <View style={styles.field}>
-          <Text style={styles.fieldLabel}>
+          <AvatarEmojiPicker value={avatarEmoji} onChange={setAvatarEmoji} />
+
+          <View style={styles.nameField}>
+            <Input
+              label={t('childSetup.nameLabel')}
+              placeholder={t('childSetup.namePlaceholder')}
+              value={name}
+              onChangeText={setName}
+              autoCapitalize="words"
+              accessibilityLabel={t('childSetup.nameLabel')}
+            />
+          </View>
+
+          <Text style={styles.sectionLabel}>
+            {t('childSetup.ageLabel').toLocaleUpperCase('tr')}
+          </Text>
+          <AgeStepper
+            value={ageYears}
+            onChange={setAgeYears}
+            unitLabel={t('wizard.ageUnit')}
+            decrementLabel={t('childSetup.ageDecrease')}
+            incrementLabel={t('childSetup.ageIncrease')}
+          />
+
+          <Text style={styles.sectionLabel}>
             {t('childSetup.interestsTitle').toLocaleUpperCase('tr')}
           </Text>
-          <Text style={styles.fieldHint}>{t('childSetup.interestsSubtitle')}</Text>
+          <Text style={styles.sectionHint}>{t('childSetup.interestsSubtitle')}</Text>
           <View style={styles.chipWrap}>
-            {INTEREST_KEYS.map((key) => {
-              const label = t(`childSetup.interests.${key}`);
-              return (
-                <Chip
-                  key={key}
-                  label={label}
-                  selected={interests.includes(label)}
-                  onPress={() => toggleInterest(label)}
-                />
-              );
-            })}
+            {CANONICAL_INTERESTS.map((interest) => (
+              <Chip
+                key={interest.key}
+                label={t(`childSetup.interests.${interest.key}`)}
+                emoji={interest.emoji}
+                selected={interests.includes(interest.key)}
+                onPress={() => toggleInterest(interest.key)}
+              />
+            ))}
             {customInterests.map((label) => (
-              <Chip key={label} label={label} selected onPress={() => toggleInterest(label)} />
+              <Chip key={label} label={label} emoji="✨" selected onPress={() => toggleInterest(label)} />
             ))}
             <Chip
               label={t('childSetup.addCustomInterest')}
+              emoji="➕"
+              dashed
               selected={showCustomInput}
               onPress={() => setShowCustomInput((visible) => !visible)}
             />
@@ -245,27 +245,34 @@ export default function ChildDetail() {
               />
             </View>
           ) : null}
-        </View>
 
-        {serverError ? <Text style={styles.error}>{serverError}</Text> : null}
+          {serverError ? <Text style={styles.error}>{serverError}</Text> : null}
 
-        <Button label={t('common.save')} onPress={save} loading={updateMutation.isPending} />
-
-        <View style={styles.dangerZone}>
           <Button
-            label={t('common.delete')}
+            label={t('childSetup.deleteChild')}
             onPress={() => setConfirmDelete(true)}
             variant="destructive"
+            compact
             loading={deleteMutation.isPending}
+            // Design: destructive tint — 6% fill / 20% border of colors.destructive (#E05454).
+            style={styles.deleteButton}
+          />
+        </Screen>
+
+        <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, spacing.md) }]}>
+          <Button
+            label={t('childSetup.updateChild')}
+            onPress={save}
+            loading={updateMutation.isPending}
           />
         </View>
-      </View>
+      </KeyboardAvoidingView>
 
       <ConfirmSheet
         visible={confirmDelete}
         title={t('childSetup.deleteConfirmTitle')}
-        body={t('childSetup.deleteConfirmBody', { name: child.name })}
-        confirmLabel={t('common.delete')}
+        body={t('childSetup.deleteConfirmBodyPermanent')}
+        confirmLabel={t('childSetup.deleteChild')}
         cancelLabel={t('common.cancel')}
         destructive
         onConfirm={() => {
@@ -274,63 +281,57 @@ export default function ChildDetail() {
         }}
         onCancel={() => setConfirmDelete(false)}
       />
-    </Screen>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  root: { flex: 1, backgroundColor: colors.background },
+  flex: { flex: 1 },
   loading: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  form: { gap: spacing.xl },
-  field: { gap: spacing.xs },
-  fieldLabel: {
+  nameField: { marginTop: spacing.xl },
+  sectionLabel: {
     fontFamily: fontFamilies.bodySemiBold,
     fontSize: fontSizes.md,
     color: colors.mutedForeground,
-    letterSpacing: 0.8,
+    letterSpacing: letterSpacing.eyebrow,
+    marginTop: spacing.xl,
+    marginBottom: spacing.sm,
   },
-  fieldHint: {
+  sectionHint: {
     fontFamily: fontFamilies.body,
-    fontSize: fontSizes.sm,
+    fontSize: fontSizes.md,
     color: colors.mutedForeground,
+    marginTop: -spacing.xs,
+    marginBottom: spacing.sm,
   },
-  ageGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
-    marginTop: spacing.xxs,
-  },
-  ageCard: {
-    flexGrow: 1,
-    flexBasis: '40%',
-    justifyContent: 'center',
-  },
-  ageLabel: {
-    fontFamily: fontFamilies.bodySemiBold,
-    fontSize: fontSizes.lg,
-    color: colors.foreground,
-  },
-  ageLabelSelected: { color: colors.primary, fontFamily: fontFamilies.bodyBold },
   chipWrap: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: spacing.xs,
-    marginTop: spacing.xxs,
   },
   customRow: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     gap: spacing.xs,
-    marginTop: spacing.xxs,
+    marginTop: spacing.sm,
   },
   customInput: { flex: 1 },
   error: {
     fontFamily: fontFamilies.bodySemiBold,
     fontSize: fontSizes.md,
     color: colors.destructive,
+    marginTop: spacing.lg,
   },
-  dangerZone: {
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
-    paddingTop: spacing.lg,
+  deleteButton: {
+    marginTop: spacing.xl,
+    borderRadius: radius.base,
+    backgroundColor: 'rgba(224,84,84,0.06)',
+    borderColor: 'rgba(224,84,84,0.2)',
+  },
+  footer: {
+    paddingHorizontal: spacing.pageX,
+    paddingTop: spacing.sm,
+    backgroundColor: colors.background,
   },
 });

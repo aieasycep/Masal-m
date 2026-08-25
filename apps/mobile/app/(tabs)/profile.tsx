@@ -162,7 +162,7 @@ export default function Profile() {
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionLabel}>{t('profile.childrenSection')}</Text>
           <Pressable
-            onPress={() => router.push('/children/new' as never)}
+            onPress={() => router.push('/children' as never)}
             accessibilityRole="button"
             accessibilityLabel={t('profile.addChild')}
             hitSlop={8}

@@ -6,6 +6,18 @@ export const ageRangeSchema = z.nativeEnum(AgeRange);
 
 export const interestSchema = z.string().trim().min(1).max(40);
 
+/**
+ * Free-form child preferences stored as JSON. `avatarEmoji` + `ageYears` back
+ * the design's avatar picker and exact-age stepper (Child/01) — `ageRange`
+ * stays the API-facing bucket derived from `ageYears`.
+ */
+const childPreferencesSchema = z.object({
+  nickname: z.string().trim().max(40).optional(),
+  notes: z.string().trim().max(500).optional(),
+  avatarEmoji: z.string().trim().min(1).max(8).optional(),
+  ageYears: z.number().int().min(0).max(12).optional(),
+});
+
 export const createChildSchema = z
   .object({
     name: personNameSchema,
@@ -13,12 +25,7 @@ export const createChildSchema = z
     ageRange: ageRangeSchema.optional(),
     avatarObjectKey: z.string().max(512).optional(),
     interests: z.array(interestSchema).max(20).default([]),
-    preferences: z
-      .object({
-        nickname: z.string().trim().max(40).optional(),
-        notes: z.string().trim().max(500).optional(),
-      })
-      .default({}),
+    preferences: childPreferencesSchema.default({}),
   })
   .refine((v) => v.birthDate != null || v.ageRange != null, {
     message: 'birthDate_or_ageRange_required',
@@ -32,12 +39,7 @@ export const updateChildSchema = z.object({
   ageRange: ageRangeSchema.optional(),
   avatarObjectKey: z.string().max(512).nullable().optional(),
   interests: z.array(interestSchema).max(20).optional(),
-  preferences: z
-    .object({
-      nickname: z.string().trim().max(40).optional(),
-      notes: z.string().trim().max(500).optional(),
-    })
-    .optional(),
+  preferences: childPreferencesSchema.optional(),
 });
 export type UpdateChildInput = z.infer<typeof updateChildSchema>;
 
@@ -51,6 +53,8 @@ export const childSchema = z.object({
   preferences: z.object({
     nickname: z.string().optional(),
     notes: z.string().optional(),
+    avatarEmoji: z.string().optional(),
+    ageYears: z.number().optional(),
   }),
   storyCount: z.number().int(),
   createdAt: z.string(),

@@ -107,7 +107,16 @@
       "müzik": "Music"
     },
     "deleteConfirmTitle": "Delete this profile?",
-    "deleteConfirmBody": "{{name}}'s profile will be removed. Stories you created stay in your library."
+    "deleteConfirmBody": "{{name}}'s profile will be removed. Stories you created stay in your library.",
+    "ageLabel": "Age",
+    "ageDecrease": "Decrease age",
+    "ageIncrease": "Increase age",
+    "updateChild": "Update Profile",
+    "deleteChild": "Delete Profile",
+    "deleteConfirmBodyPermanent": "This child profile and all of its stories will be deleted. This cannot be undone.",
+    "editTitle": "{{name}}'s Profile",
+    "listEmptyTitle": "No child profiles yet.",
+    "listEmptyBody": "Create a profile to personalize the stories."
   },
   "home": {
     "greetingMorning": "Good morning 👋",
