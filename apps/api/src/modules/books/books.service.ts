@@ -137,6 +137,7 @@ export class BooksService {
           subtitle: input.subtitle,
           dedication: input.dedication,
           backCoverText: input.backCoverText,
+          coverPalette: input.coverPalette,
         },
       });
       for (const page of input.pages ?? []) {
@@ -234,6 +235,8 @@ export class BooksService {
       coverImageUrl: row.coverImageKey
         ? await this.storage.getSignedUrl(row.coverImageKey)
         : null,
+      coverIllustrationId: row.coverIllustrationId,
+      coverPalette: row.coverPalette,
       backCoverText: row.backCoverText,
       status: row.status,
       pages: await Promise.all(

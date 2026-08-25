@@ -39,6 +39,7 @@ export class UsersService {
       timezone: user.timezone,
       onboardingCompleted: user.onboardingCompleted,
       subscriptionPlan: user.subscriptionPlan,
+      notificationPrefs: (user.notificationPrefs as Me['notificationPrefs']) ?? {},
       pendingDeletion: pending
         ? {
             requestedAt: pending.requestedAt.toISOString(),
@@ -58,6 +59,7 @@ export class UsersService {
         timezone: input.timezone,
         onboardingCompleted: input.onboardingCompleted,
         avatarKey: input.avatarObjectKey === undefined ? undefined : input.avatarObjectKey,
+        notificationPrefs: input.notificationPrefs,
       },
     });
     return this.getMe(userId);

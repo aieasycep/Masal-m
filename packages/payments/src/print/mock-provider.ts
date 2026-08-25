@@ -41,6 +41,8 @@ export class MockPrintProvider implements PrintProvider {
       providerOrderId,
       status: 'SHIPPED',
       trackingNumber: `MOCK${providerOrderId.slice(-8).toUpperCase()}`,
+      carrier: 'Masalım Test Kargo',
+      trackingUrl: `https://example.com/track/MOCK${providerOrderId.slice(-8).toUpperCase()}`,
     };
   }
 

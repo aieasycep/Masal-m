@@ -34,7 +34,7 @@ export class NotificationsService {
   ): Promise<void> {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
-      select: { locale: true, deletedAt: true },
+      select: { locale: true, deletedAt: true, notificationPrefs: true },
     });
     if (user == null || user.deletedAt != null) return;
 
@@ -44,6 +44,11 @@ export class NotificationsService {
     await this.prisma.notification.create({
       data: { userId, type, title: copy.title, body: copy.body, data: payload },
     });
+
+    // Per-category opt-out (Settings/04): absent key = enabled; only push is
+    // suppressed — the in-app inbox row above is always written.
+    const prefs = (user.notificationPrefs as Record<string, boolean> | null) ?? {};
+    if (prefs[type] === false) return;
 
     const devices = await this.prisma.deviceToken.findMany({ where: { userId } });
     if (devices.length === 0) return;

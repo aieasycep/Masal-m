@@ -18,6 +18,7 @@ export const updateBookSchema = z
     dedication: z.string().trim().max(300).nullable(),
     backCoverText: z.string().trim().max(600).nullable(),
     coverIllustrationId: z.string().cuid().nullable(),
+    coverPalette: z.enum(['purple', 'ocean', 'forest', 'sunset', 'night']).nullable(),
     pages: z.array(
       z.object({
         id: z.string().cuid(),
@@ -48,6 +49,8 @@ export const bookSchema = z.object({
   subtitle: z.string().nullable(),
   dedication: z.string().nullable(),
   coverImageUrl: z.string().nullable(),
+  coverIllustrationId: z.string().nullable(),
+  coverPalette: z.string().nullable(),
   backCoverText: z.string().nullable(),
   status: bookStatusSchema,
   pages: z.array(bookPageSchema),

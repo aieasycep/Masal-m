@@ -75,6 +75,11 @@ export const orderSchema = z.object({
   paymentStatus: paymentStatusSchema,
   shippingAddress: addressSchema.nullable(),
   trackingNumber: z.string().nullable(),
+  carrier: z.string().nullable(),
+  trackingUrl: z.string().nullable(),
+  estimatedDeliveryDays: z
+    .object({ min: z.number().int(), max: z.number().int() })
+    .nullable(),
   createdAt: z.string(),
   timeline: z.array(
     z.object({ status: orderStatusSchema, at: z.string() }),

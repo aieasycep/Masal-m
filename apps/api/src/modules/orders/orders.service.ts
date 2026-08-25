@@ -112,6 +112,8 @@ export class OrdersService {
           title: book.title,
           pageCount: book.pages.length,
         },
+        estimatedDeliveryMin: quote.estimatedDeliveryDays.min,
+        estimatedDeliveryMax: quote.estimatedDeliveryDays.max,
         idempotencyKey,
         statusTimeline: [{ status: OrderStatus.PENDING, at: new Date().toISOString() }],
       },
@@ -217,6 +219,12 @@ export class OrdersService {
       paymentStatus: row.paymentStatus,
       shippingAddress: snapshotAddress ? { id: row.shippingAddressId ?? '', isDefault: false, ...snapshotAddress } : null,
       trackingNumber: row.trackingNumber,
+      carrier: row.carrier,
+      trackingUrl: row.trackingUrl,
+      estimatedDeliveryDays:
+        row.estimatedDeliveryMin != null && row.estimatedDeliveryMax != null
+          ? { min: row.estimatedDeliveryMin, max: row.estimatedDeliveryMax }
+          : null,
       createdAt: row.createdAt.toISOString(),
       timeline: ((row.statusTimeline as Array<{ status: OrderStatus; at: string }>) ?? []).map(
         (entry) => ({ status: entry.status, at: entry.at }),

@@ -228,6 +228,7 @@ model User {
   locale              String    @default("tr")
   timezone            String?
   onboardingCompleted Boolean   @default(false)
+  notificationPrefs   Json      @default("{}")
   subscriptionPlan    SubscriptionPlan @default(FREE)
   createdAt           DateTime  @default(now())
   updatedAt           DateTime  @updatedAt
@@ -525,6 +526,7 @@ model Book {
   dedication          String?
   coverIllustrationId String?
   coverImageKey       String?
+  coverPalette        String?
   backCoverText       String?
   status              BookStatus @default(DRAFT)
   printPdfKey         String?
@@ -600,6 +602,10 @@ model Order {
   bookSnapshot         Json
   snapshotReady        Boolean       @default(false)
   trackingNumber       String?
+  carrier              String?
+  trackingUrl          String?
+  estimatedDeliveryMin Int?
+  estimatedDeliveryMax Int?
   printProviderOrderId String?
   idempotencyKey       String        @unique
   statusTimeline       Json          @default("[]")

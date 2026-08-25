@@ -25,6 +25,8 @@ export interface PrintOrderState {
   providerOrderId: string;
   status: PrintOrderStatus;
   trackingNumber: string | null;
+  carrier?: string | null;
+  trackingUrl?: string | null;
 }
 
 /**

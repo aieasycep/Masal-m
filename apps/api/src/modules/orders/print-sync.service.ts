@@ -65,13 +65,19 @@ export class PrintSyncService implements OnModuleInit, OnApplicationShutdown {
         if (state.trackingNumber != null && order.trackingNumber == null) {
           await this.prisma.order.update({
             where: { id: order.id },
-            data: { trackingNumber: state.trackingNumber },
+            data: {
+              trackingNumber: state.trackingNumber,
+              carrier: state.carrier ?? undefined,
+              trackingUrl: state.trackingUrl ?? undefined,
+            },
           });
         }
         continue;
       }
       await this.orders.transition(order.id, mapped, {
         trackingNumber: state.trackingNumber ?? order.trackingNumber,
+        carrier: state.carrier ?? order.carrier,
+        trackingUrl: state.trackingUrl ?? order.trackingUrl,
       });
       if (mapped === OrderStatus.SHIPPED) {
         await this.notifications.notify(
