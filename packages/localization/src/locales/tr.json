@@ -442,7 +442,14 @@
     "builderTitlePossessive": "{{nameGen}} Kitabı",
     "previewCta": "Önizle",
     "pageShort": "S{{number}}",
-    "layoutLabel": "Sayfa Düzeni"
+    "layoutLabel": "Sayfa Düzeni",
+    "palettes": {
+      "purple": "Mor Büyü",
+      "ocean": "Okyanus",
+      "forest": "Orman",
+      "sunset": "Günbatımı",
+      "night": "Gece"
+    }
   },
   "checkout": {
     "configTitle": "Kitap Seçenekleri",
@@ -493,7 +500,13 @@
     "priceLine": "{{qty}} × Kitap ({{size}} · {{cover}})",
     "paymentSummary": "Ödeme Özeti",
     "successSubtitle": "Siparişin alındı. 5–7 iş günü içinde kapında.",
-    "backHome": "Ana Sayfaya Dön"
+    "backHome": "Ana Sayfaya Dön",
+    "steps": {
+      "book": "Kitap",
+      "address": "Adres",
+      "summary": "Özet",
+      "payment": "Ödeme"
+    }
   },
   "orders": {
     "title": "Siparişlerim",
@@ -645,5 +658,58 @@
     "PAYMENT_AMOUNT_MISMATCH": "Ödeme tutarında bir uyuşmazlık oldu. Lütfen tekrar dene.",
     "ORDER_CREATION_FAILED": "Sipariş oluşturulamadı. Lütfen tekrar dene.",
     "ORDER_NOT_CANCELLABLE": "Bu sipariş artık iptal edilemiyor."
+  },
+  "preview": {
+    "play": "Önizle",
+    "pause": "Duraklat",
+    "loading": "Yükleniyor…",
+    "retry": "Hata — tekrar dene"
+  },
+  "premiumSheet": {
+    "badge": "Premium",
+    "title": "Bu özellik Premium'a özel.",
+    "bodyFallback": "özelliğini kullanmak için Premium'a geçebilirsin.",
+    "perkParentVoice": "Anne ve baba sesiyle anlatım",
+    "perkUnlimitedStories": "Daha fazla hikâye oluşturma",
+    "perkIllustrations": "AI illüstrasyon",
+    "cta": "Premium'u İncele",
+    "dismiss": "Şimdilik Değil"
+  },
+  "quotaBanner": {
+    "warningPrefix": "Bu ay ",
+    "warningCount": "{{n}} masal hakkın",
+    "warningSuffix": " kaldı.",
+    "seePremium": "Premium'u Gör",
+    "exhaustedTitle": "Bu ayki ücretsiz masal hakkını kullandın.",
+    "exhaustedBody": "Premium ile daha fazla hikâye oluşturabilirsin.",
+    "explorePremium": "Premium'u İncele"
+  },
+  "states": {
+    "error": {
+      "network": {
+        "title": "Bağlantı kurulamadı.",
+        "body": "İnternet bağlantını kontrol edip tekrar deneyebilirsin."
+      },
+      "server": {
+        "title": "Bir şeyler yolunda gitmedi.",
+        "body": "Sunucumuzda geçici bir sorun oluştu. Kısa süre içinde düzelecek."
+      },
+      "generation": {
+        "title": "Hikâye oluşturulamadı.",
+        "body": "Masalın hazırlanırken bir sorun oluştu. Tekrar deneyebilirsin."
+      },
+      "payment": {
+        "title": "Ödeme işlemi başarısız.",
+        "body": "Kart bilgilerini kontrol edip tekrar deneyebilirsin."
+      },
+      "voice": {
+        "title": "Ses hazırlanamadı.",
+        "body": "Ses klonlama sırasında bir sorun oluştu. Lütfen tekrar dene."
+      },
+      "illustration": {
+        "title": "Görsel oluşturulamadı.",
+        "body": "İllüstrasyon hazırlanırken bir sorun oluştu. Tekrar deneyelim."
+      }
+    }
   }
 }

@@ -1,7 +1,7 @@
-import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { colors, fontFamilies, fontSizes, radius, spacing } from '@masalim/ui';
+import { StyleSheet, Text, View } from 'react-native';
+import { colors, fontFamilies, fontSizes, spacing } from '@masalim/ui';
 import { Button } from './Button';
+import { SheetContainer } from './SheetContainer';
 
 interface ConfirmSheetProps {
   visible: boolean;
@@ -14,7 +14,10 @@ interface ConfirmSheetProps {
   onCancel: () => void;
 }
 
-/** Bottom confirmation sheet (destructive actions: voice/story/account deletion). */
+/**
+ * `Sheet/Confirm` from the final design — bottom confirmation sheet. Destructive
+ * variant adds the red trash circle above the title.
+ */
 export function ConfirmSheet({
   visible,
   title,
@@ -25,56 +28,53 @@ export function ConfirmSheet({
   onConfirm,
   onCancel,
 }: ConfirmSheetProps) {
-  const insets = useSafeAreaInsets();
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onCancel}>
-      <Pressable style={styles.backdrop} onPress={onCancel} />
-      <View style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, 24) }]}>
-        <View style={styles.grabber} />
-        <Text style={styles.title}>{title}</Text>
-        {body ? <Text style={styles.body}>{body}</Text> : null}
-        <View style={styles.buttons}>
-          <Button
-            label={confirmLabel}
-            onPress={onConfirm}
-            variant={destructive ? 'destructive' : 'primary'}
-          />
-          <Button label={cancelLabel} onPress={onCancel} variant="tertiary" compact />
+    <SheetContainer visible={visible} onDismiss={onCancel}>
+      {destructive ? (
+        <View style={styles.trashCircle}>
+          <Text style={styles.trashEmoji}>🗑</Text>
         </View>
+      ) : null}
+      <Text style={styles.title}>{title}</Text>
+      {body ? <Text style={styles.body}>{body}</Text> : null}
+      <View style={styles.buttons}>
+        <Button
+          label={confirmLabel}
+          onPress={onConfirm}
+          variant={destructive ? 'destructive' : 'primary'}
+        />
+        <Button label={cancelLabel} onPress={onCancel} variant="tertiary" compact />
       </View>
-    </Modal>
+    </SheetContainer>
   );
 }
 
 const styles = StyleSheet.create({
-  backdrop: { flex: 1, backgroundColor: 'rgba(20, 15, 35, 0.45)' },
-  sheet: {
-    backgroundColor: colors.background,
-    borderTopLeftRadius: radius.xl,
-    borderTopRightRadius: radius.xl,
-    paddingHorizontal: spacing.pageX,
-    paddingTop: 12,
-  },
-  grabber: {
+  trashCircle: {
     alignSelf: 'center',
-    width: 40,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: colors.border,
-    marginBottom: 20,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: 'rgba(224, 84, 84, 0.1)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing.md,
   },
+  trashEmoji: { fontSize: 26 },
   title: {
     fontFamily: fontFamilies.display,
-    fontSize: fontSizes.h3,
+    fontSize: 20,
     color: colors.foreground,
+    textAlign: 'center',
     marginBottom: 8,
   },
   body: {
     fontFamily: fontFamilies.body,
     fontSize: fontSizes.base,
     color: colors.mutedForeground,
-    lineHeight: 21,
-    marginBottom: 8,
+    textAlign: 'center',
+    lineHeight: 22,
+    marginBottom: spacing.lg,
   },
-  buttons: { gap: 8, marginTop: 16 },
+  buttons: { gap: spacing.xs, paddingBottom: spacing.xs },
 });

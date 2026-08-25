@@ -442,7 +442,14 @@
     "builderTitlePossessive": "{{name}}'s Book",
     "previewCta": "Preview",
     "pageShort": "P{{number}}",
-    "layoutLabel": "Page Layout"
+    "layoutLabel": "Page Layout",
+    "palettes": {
+      "purple": "Purple Magic",
+      "ocean": "Ocean",
+      "forest": "Forest",
+      "sunset": "Sunset",
+      "night": "Night"
+    }
   },
   "checkout": {
     "configTitle": "Book Options",
@@ -493,7 +500,13 @@
     "priceLine": "{{qty}} × Book ({{size}} · {{cover}})",
     "paymentSummary": "Payment Summary",
     "successSubtitle": "Your order has been received. It will be at your door within 5–7 business days.",
-    "backHome": "Back to Home"
+    "backHome": "Back to Home",
+    "steps": {
+      "book": "Book",
+      "address": "Address",
+      "summary": "Summary",
+      "payment": "Payment"
+    }
   },
   "orders": {
     "title": "My Orders",
@@ -645,5 +658,58 @@
     "PAYMENT_AMOUNT_MISMATCH": "There was a mismatch in the payment amount. Please try again.",
     "ORDER_CREATION_FAILED": "The order couldn't be created. Please try again.",
     "ORDER_NOT_CANCELLABLE": "This order can no longer be cancelled."
+  },
+  "preview": {
+    "play": "Preview",
+    "pause": "Pause",
+    "loading": "Loading…",
+    "retry": "Error — try again"
+  },
+  "premiumSheet": {
+    "badge": "Premium",
+    "title": "This feature is Premium-only.",
+    "bodyFallback": "upgrade to Premium to use this feature.",
+    "perkParentVoice": "Narration in mom and dad’s voice",
+    "perkUnlimitedStories": "Create more stories",
+    "perkIllustrations": "AI illustrations",
+    "cta": "Explore Premium",
+    "dismiss": "Not Now"
+  },
+  "quotaBanner": {
+    "warningPrefix": "This month ",
+    "warningCount": "{{n}} stories",
+    "warningSuffix": " left.",
+    "seePremium": "See Premium",
+    "exhaustedTitle": "You’ve used this month’s free stories.",
+    "exhaustedBody": "Create more stories with Premium.",
+    "explorePremium": "Explore Premium"
+  },
+  "states": {
+    "error": {
+      "network": {
+        "title": "Couldn’t connect.",
+        "body": "Check your internet connection and try again."
+      },
+      "server": {
+        "title": "Something went wrong.",
+        "body": "A temporary server issue occurred. It will be fixed shortly."
+      },
+      "generation": {
+        "title": "The story couldn’t be created.",
+        "body": "Something went wrong while preparing the tale. You can try again."
+      },
+      "payment": {
+        "title": "Payment failed.",
+        "body": "Check your card details and try again."
+      },
+      "voice": {
+        "title": "The voice couldn’t be prepared.",
+        "body": "Something went wrong during voice cloning. Please try again."
+      },
+      "illustration": {
+        "title": "The image couldn’t be created.",
+        "body": "Something went wrong while preparing the illustration. Let’s try again."
+      }
+    }
   }
 }

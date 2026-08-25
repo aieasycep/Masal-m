@@ -47,3 +47,25 @@ export const night = {
 
 /** Cover tint swatches used by story cards in the design. */
 export const coverTints = ['#D4C8F0', '#B8D8E8', '#C5DFC8', '#F5C4A8', '#A8D4E8'] as const;
+
+/** Premium/gold family (paywall hero, premium sheet, gold badges). */
+export const premiumGold = {
+  light: '#F5D080',
+  bright: '#F0D080',
+  mid: '#F0A56E',
+  text: '#C07840',
+} as const;
+
+/**
+ * Cover editor palettes (final design `Book/02-CoverEditor`). Keys are persisted
+ * in Book.coverPalette; labels come from i18n (`book.palettes.*`).
+ */
+export const coverPalettes = {
+  purple: ['#2D1B69', '#7C5CBF'],
+  ocean: ['#0F2040', '#1E6B8A'],
+  forest: ['#0F2A1A', '#2D6A4F'],
+  sunset: ['#3D1A0A', '#C4622D'],
+  night: ['#0D1B2E', '#1C3F6E'],
+} as const;
+
+export type CoverPaletteKey = keyof typeof coverPalettes;
