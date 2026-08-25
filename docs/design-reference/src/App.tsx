@@ -10,15 +10,26 @@ import AudioPlayer from "./screens/AudioPlayer"
 import StoryReader from "./screens/StoryReader"
 import StoryEdit from "./screens/StoryEdit"
 import IllustrationStyle from "./screens/IllustrationStyle"
+import IllustrationReady from "./screens/IllustrationReady"
 import BookBuilder from "./screens/BookBuilder"
+import CoverEditor from "./screens/CoverEditor"
 import PrintOrder from "./screens/PrintOrder"
 import Library from "./screens/Library"
 import VoiceStudio from "./screens/VoiceStudio"
 import Profile from "./screens/Profile"
+import Auth from "./screens/Auth"
+import ChildProfile from "./screens/ChildProfile"
+import NarrationSelect from "./screens/NarrationSelect"
+import Orders from "./screens/Orders"
+import Settings from "./screens/Settings"
+import Subscription from "./screens/Subscription"
+import BookPreview from "./screens/BookPreview"
+import CheckoutAddress from "./screens/CheckoutAddress"
 
 type Screen =
   | "splash"
   | "onboarding"
+  | "auth"
   | "home"
   | "create"
   | "generating"
@@ -27,11 +38,21 @@ type Screen =
   | "reader"
   | "edit"
   | "illustration"
+  | "illustrationReady"
   | "bookbuilder"
+  | "bookpreview"
+  | "coverEditor"
   | "print"
+  | "checkoutAddress"
   | "library"
   | "voice"
   | "profile"
+  | "childProfile"
+  | "narration"
+  | "orders"
+  | "settings"
+  | "subscription"
+  | "quota"
 
 type Tab = "home" | "library" | "create" | "profile"
 
@@ -80,7 +101,7 @@ export default function App() {
         }}
       >
         {/* Status bar */}
-        {screen !== "splash" && screen !== "onboarding" && screen !== "player" && screen !== "generating" && screen !== "reader" && (
+        {screen !== "splash" && screen !== "onboarding" && screen !== "auth" && screen !== "player" && screen !== "generating" && screen !== "reader" && screen !== "illustrationReady" && screen !== "bookpreview" && (
           <div
             style={{
               position: "absolute",
@@ -123,21 +144,33 @@ export default function App() {
         {/* Screens */}
         {screen === "splash" && <Splash onDone={() => setScreen("onboarding")} />}
 
-        {screen === "onboarding" && <Onboarding onDone={() => setScreen("home")} />}
+        {screen === "onboarding" && <Onboarding onDone={() => setScreen("auth")} />}
+
+        {screen === "auth" && <Auth onDone={() => setScreen("home")} />}
 
         {screen === "home" && (
           <Home
             onCreateStory={() => { setActiveTab("create"); setScreen("create") }}
             onOpenStory={() => setScreen("result")}
+            onSubscription={() => setScreen("subscription")}
           />
         )}
 
         {screen === "library" && (
-          <Library onOpenStory={() => setScreen("result")} />
+          <Library
+            onOpenStory={() => setScreen("result")}
+            onCreateStory={() => { setActiveTab("create"); setScreen("create") }}
+          />
         )}
 
         {screen === "profile" && (
-          <Profile onVoiceStudio={() => setScreen("voice")} />
+          <Profile
+            onVoiceStudio={() => setScreen("voice")}
+            onSettings={() => setScreen("settings")}
+            onOrders={() => setScreen("orders")}
+            onChildProfile={() => setScreen("childProfile")}
+            onSubscription={() => setScreen("subscription")}
+          />
         )}
 
         {screen === "create" && (
@@ -158,6 +191,7 @@ export default function App() {
             onEdit={() => setScreen("edit")}
             onIllustrate={() => setScreen("illustration")}
             onMakeBook={() => setScreen("bookbuilder")}
+            onNarrate={() => setScreen("narration")}
             onBack={() => setScreen(activeTab === "create" ? "home" : "library")}
           />
         )}
@@ -180,26 +214,87 @@ export default function App() {
         {screen === "illustration" && (
           <IllustrationStyle
             onBack={() => setScreen("result")}
-            onGenerate={() => setScreen("bookbuilder")}
+            onGenerate={() => setScreen("illustrationReady")}
+          />
+        )}
+
+        {screen === "illustrationReady" && (
+          <IllustrationReady
+            onBack={() => setScreen("illustration")}
+            onDone={() => setScreen("coverEditor")}
           />
         )}
 
         {screen === "bookbuilder" && (
           <BookBuilder
             onBack={() => setScreen("result")}
-            onPrint={() => setScreen("print")}
+            onPrint={() => setScreen("bookpreview")}
+          />
+        )}
+
+        {screen === "bookpreview" && (
+          <BookPreview
+            onBack={() => setScreen("bookbuilder")}
+            onPrint={() => setScreen("checkoutAddress")}
+          />
+        )}
+
+        {screen === "coverEditor" && (
+          <CoverEditor
+            onBack={() => setScreen("illustrationReady")}
+            onDone={() => setScreen("bookbuilder")}
+          />
+        )}
+
+        {screen === "checkoutAddress" && (
+          <CheckoutAddress
+            onBack={() => setScreen("bookpreview")}
+            onContinue={() => setScreen("print")}
           />
         )}
 
         {screen === "print" && (
           <PrintOrder
-            onBack={() => setScreen("bookbuilder")}
+            onBack={() => setScreen("checkoutAddress")}
             onSuccess={() => { setActiveTab("home"); setScreen("home") }}
           />
         )}
 
         {screen === "voice" && (
           <VoiceStudio onBack={() => setScreen("profile")} />
+        )}
+
+        {screen === "childProfile" && (
+          <ChildProfile onBack={() => setScreen("profile")} />
+        )}
+
+        {screen === "narration" && (
+          <NarrationSelect
+            onBack={() => setScreen("result")}
+            onDone={() => setScreen("player")}
+            onVoiceStudio={() => setScreen("voice")}
+            onSubscription={() => setScreen("subscription")}
+          />
+        )}
+
+        {screen === "orders" && (
+          <Orders onBack={() => setScreen("profile")} />
+        )}
+
+        {screen === "settings" && (
+          <Settings
+            onBack={() => setScreen("profile")}
+            onVoiceStudio={() => setScreen("voice")}
+            onChildProfile={() => setScreen("childProfile")}
+          />
+        )}
+
+        {screen === "subscription" && (
+          <Subscription onBack={() => setScreen("profile")} mode="paywall" />
+        )}
+
+        {screen === "quota" && (
+          <Subscription onBack={() => setScreen("home")} mode="quota" />
         )}
 
         {/* Bottom Nav */}
@@ -222,13 +317,14 @@ export default function App() {
           gap: 6,
           flexWrap: "wrap",
           justifyContent: "center",
-          maxWidth: 680,
+          maxWidth: 760,
         }}
       >
         {(
           [
             { s: "splash", label: "Splash" },
             { s: "onboarding", label: "Onboarding" },
+            { s: "auth", label: "Giriş/Kayıt" },
             { s: "home", label: "Ana Sayfa" },
             { s: "create", label: "Yeni Hikâye" },
             { s: "generating", label: "Oluşturuluyor" },
@@ -237,11 +333,21 @@ export default function App() {
             { s: "reader", label: "Okuma Modu" },
             { s: "edit", label: "Düzenle" },
             { s: "illustration", label: "İllüstrasyon" },
+            { s: "illustrationReady", label: "Görseller Hazır" },
             { s: "bookbuilder", label: "Kitap Editörü" },
-            { s: "print", label: "Sipariş" },
+            { s: "bookpreview", label: "Kitap Önizleme" },
+            { s: "coverEditor", label: "Kapak Editörü" },
+            { s: "checkoutAddress", label: "Adres" },
+            { s: "print", label: "Sipariş Özet" },
             { s: "library", label: "Kütüphane" },
             { s: "voice", label: "Ses Stüdyosu" },
+            { s: "narration", label: "Seslendir" },
             { s: "profile", label: "Profil" },
+            { s: "childProfile", label: "Çocuk Profili" },
+            { s: "orders", label: "Siparişler" },
+            { s: "settings", label: "Ayarlar" },
+            { s: "subscription", label: "Premium" },
+            { s: "quota", label: "Kota Doldu" },
           ] as const
         ).map(({ s, label }) => (
           <button

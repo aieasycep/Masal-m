@@ -4,18 +4,20 @@ interface Props {
   onEdit: () => void
   onIllustrate: () => void
   onMakeBook: () => void
+  onNarrate?: () => void
   onBack: () => void
 }
 
 const actions = [
   { label: "Oku", emoji: "📖", key: "read" },
+  { label: "Seslendir", emoji: "🎙", key: "narrate" },
   { label: "Düzenle", emoji: "✏️", key: "edit" },
   { label: "Görselleştir", emoji: "🎨", key: "illustrate" },
   { label: "Kitap Yap", emoji: "📚", key: "book" },
   { label: "Paylaş", emoji: "🔗", key: "share" },
 ]
 
-export default function StoryResult({ onListen, onRead, onEdit, onIllustrate, onMakeBook, onBack }: Props) {
+export default function StoryResult({ onListen, onRead, onEdit, onIllustrate, onMakeBook, onNarrate, onBack }: Props) {
   return (
     <div
       style={{
@@ -223,12 +225,13 @@ export default function StoryResult({ onListen, onRead, onEdit, onIllustrate, on
         </button>
 
         {/* Secondary actions */}
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr 1fr", gap: 8 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr 1fr 1fr", gap: 8 }}>
           {actions.map((action) => (
             <div
               key={action.label}
               onClick={() => {
                 if (action.key === "read") onRead()
+                else if (action.key === "narrate" && onNarrate) onNarrate()
                 else if (action.key === "edit") onEdit()
                 else if (action.key === "illustrate") onIllustrate()
                 else if (action.key === "book") onMakeBook()

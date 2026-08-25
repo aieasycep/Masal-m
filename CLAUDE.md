@@ -187,6 +187,28 @@ Local `.env` = `.env.example` + generated JWT secrets (already present, gitignor
 - Narrations list/create now prune stale FAILED rows (keep newest per voice,
   none once a newer non-failed exists). Mock-story Turkish fixed via
   packages/ai shared/turkish.ts (evidential, nounGenitive, dative suffix).
+- **FINAL Figma reconciliation applied** (Aug 25, KendiHikayem_2.zip — plan §top of
+  plan file): all previously self-designed screens replaced with the final specs.
+  New shared components (SheetContainer/ListRow/PremiumSheet/QuotaBanner/
+  AudioPreviewButton+usePreviewPlayer/LoadingState/StepBar/OrderStatusPill/
+  AgeStepper/AvatarEmojiPicker), premiumGold+coverPalettes tokens. Auth 5-view
+  spec (code-based reset; NO guest skip — approved deviation). Child flow: new
+  /children list, emoji avatar + age stepper stored in preferences
+  (avatarEmoji/ageYears; ageRange derived via src/lib/age.ts). Narration select
+  rebuilt (status pills, PremiumSheet gates, night generating/done views). Voice
+  previews LIVE everywhere (deferral closed). Illustration ready flow (thumb
+  strip/alternatives/regenerating overlay). Cover editor (5 palettes →
+  Book.coverPalette) + dark BookPreview. Checkout REORDERED:
+  preview→address→configure(Özet)→review(Ödeme), StepBar 4 labels. Orders:
+  status pill map + 5-step timeline + carrier/trackingUrl/ETA (additive Order
+  columns; mock print fills them). Paywall real-offering prices + computed
+  discount; /subscription/quota screen; Home QuotaBanner from entitlements.
+  Settings suite: ListRow hub, notificationPrefs 5 toggles (additive
+  User.notificationPrefs, push honors opt-out), voice-data screen, delete
+  double-confirm. EN stays selectable (approved deviation). Migration:
+  figma_reconciliation_additions. Deviations documented: no photo upload
+  (native surface frozen), postal code stays required, "Ses ve Oynatma" row
+  omitted (no backing feature).
 
 ## Environment gotchas
 
