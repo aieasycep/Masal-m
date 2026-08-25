@@ -2,28 +2,51 @@ import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useLocalSearchParams } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Animated, { FadeInUp } from 'react-native-reanimated';
+import Animated, {
+  Easing,
+  useAnimatedStyle,
+  useSharedValue,
+  withDelay,
+  withRepeat,
+  withTiming,
+} from 'react-native-reanimated';
+import Svg, { Circle } from 'react-native-svg';
 import {
   AIJobStatus,
+  DURATION_TARGETS,
   NarrationStatus,
   VoiceProfileStatus,
   type SystemVoiceCategory,
   type VoiceOwnerType,
 } from '@masalim/types';
 import { ApiError, NetworkError } from '@masalim/api-client';
-import type { CreateNarrationInput, Narration } from '@masalim/validation';
+import type {
+  CreateNarrationInput,
+  Narration,
+  SystemVoice,
+  VoiceProfile,
+} from '@masalim/validation';
 import { colors, fontFamilies, fontSizes, gradients, radius, spacing } from '@masalim/ui';
 import { api } from '../../../src/lib/api';
 import { useJobProgress } from '../../../src/lib/job-stream';
+import { stopPreview, usePreviewPlayer } from '../../../src/lib/preview-player';
+import { AudioPreviewButton } from '../../../src/components/AudioPreviewButton';
 import { Avatar } from '../../../src/components/Avatar';
 import { Badge } from '../../../src/components/Badge';
 import { Button } from '../../../src/components/Button';
-import { ScreenHeader } from '../../../src/components/ScreenHeader';
+import { PremiumSheet } from '../../../src/components/PremiumSheet';
 import { SelectableCard } from '../../../src/components/SelectableCard';
-import { CheckIcon, PlayIcon } from '../../../src/components/icons';
+import { storyThemeEmoji } from '../../../src/components/StorySheet';
+import {
+  CheckIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  PlayIcon,
+} from '../../../src/components/icons';
 import { ErrorState } from '../../../src/components/states';
 
 /** Parent voice avatars derive from the profile's owner type. */
@@ -44,11 +67,113 @@ const VOICE_CATEGORY_EMOJIS: Record<SystemVoiceCategory, string> = {
 };
 
 type VoiceSelection = { type: 'parent' | 'system'; id: string };
+type PreviewPlayer = ReturnType<typeof usePreviewPlayer>;
 
 /** "6 dk" from a narration's duration in seconds (null while not READY). */
 function durationMinutes(durationSeconds: number | null): number | null {
   if (durationSeconds == null) return null;
   return Math.max(1, Math.round(durationSeconds / 60));
+}
+
+/** Status pill on voice rows: Hazır (sage) / Hazırlanıyor… (dusty blue) / Hata (destructive). */
+function StatusPill({ tone, label }: { tone: 'ready' | 'processing' | 'error'; label: string }) {
+  return (
+    <View style={[styles.pill, pillTones[tone]]}>
+      <Text style={[styles.pillText, pillTextTones[tone]]}>{label}</Text>
+    </View>
+  );
+}
+
+/** One of the three staggered pulsing dots next to a processing parent voice. */
+function PulsingDot({ index }: { index: number }) {
+  const pulse = useSharedValue(1);
+  useEffect(() => {
+    pulse.value = withDelay(
+      index * 200,
+      withRepeat(withTiming(0.25, { duration: 500, easing: Easing.inOut(Easing.ease) }), -1, true),
+    );
+  }, [index, pulse]);
+  const style = useAnimatedStyle(() => ({ opacity: pulse.value }));
+  return <Animated.View style={[styles.pulsingDot, style]} />;
+}
+
+/** Spinning dashed-arc medallion of the night generating view (design: spin-slow 3s). */
+function SpinnerArc() {
+  const spin = useSharedValue(0);
+  useEffect(() => {
+    spin.value = withRepeat(withTiming(360, { duration: 3000, easing: Easing.linear }), -1, false);
+  }, [spin]);
+  const style = useAnimatedStyle(() => ({ transform: [{ rotate: `${spin.value}deg` }] }));
+  return (
+    <Animated.View style={[styles.spinnerCircle, style]}>
+      <Svg width={36} height={36} viewBox="0 0 24 24" fill="none">
+        <Circle
+          cx={12}
+          cy={12}
+          r={10}
+          stroke={colors.lavender}
+          strokeWidth={1.5}
+          strokeLinecap="round"
+          strokeDasharray="40"
+          strokeDashoffset="10"
+        />
+      </Svg>
+    </Animated.View>
+  );
+}
+
+/** Thin progress bar under the generating copy — driven only by the real job percent. */
+function NightProgress({ percent }: { percent: number }) {
+  const progressValue = useSharedValue(0);
+  useEffect(() => {
+    progressValue.value = withTiming(percent, { duration: 500, easing: Easing.out(Easing.cubic) });
+  }, [percent, progressValue]);
+  const fillStyle = useAnimatedStyle(() => ({ width: `${progressValue.value}%` }));
+  return (
+    <View style={styles.nightTrack}>
+      <Animated.View style={[styles.nightFill, fillStyle]}>
+        <LinearGradient
+          colors={gradients.generatingProgress as unknown as [string, string]}
+          start={{ x: 0, y: 0.5 }}
+          end={{ x: 1, y: 0.5 }}
+          style={StyleSheet.absoluteFill}
+        />
+      </Animated.View>
+    </View>
+  );
+}
+
+/** Floating confetti dots of the done view (design ref: NarrationSelect success). */
+function Confetti() {
+  return (
+    <>
+      {[colors.gold, colors.coral, colors.sage, colors.lavender].map((color, index) => (
+        <ConfettiDot key={color} color={color} index={index} />
+      ))}
+    </>
+  );
+}
+
+function ConfettiDot({ color, index }: { color: string; index: number }) {
+  const float = useSharedValue(0);
+  useEffect(() => {
+    float.value = withRepeat(
+      withTiming(-10, { duration: 2000 + index * 400, easing: Easing.inOut(Easing.ease) }),
+      -1,
+      true,
+    );
+  }, [float, index]);
+  const style = useAnimatedStyle(() => ({ transform: [{ translateY: float.value }] }));
+  return (
+    <Animated.View
+      pointerEvents="none"
+      style={[
+        styles.confettiDot,
+        { backgroundColor: color, top: `${20 + index * 14}%`, left: `${12 + index * 20}%` },
+        style,
+      ]}
+    />
+  );
 }
 
 interface NarrationRowProps {
@@ -138,21 +263,197 @@ function NarrationRow({ narration, onOpen, onRetry, retryDisabled }: NarrationRo
   );
 }
 
+interface ParentVoiceRowProps {
+  voice: VoiceProfile;
+  selected: boolean;
+  existing: Narration | null;
+  onSelect: () => void;
+  onRetryVoice: () => void;
+  preview: PreviewPlayer;
+}
+
 /**
- * "Hikâyeyi Seslendir" — re-voice an existing story: shows current narrations,
- * a parent + system voice picker (wizard step 5 design language, cream), and a
- * create CTA with real job progress. Completed narrations open in the player.
+ * Family voice row per the design: peach-gradient avatar when READY (muted
+ * otherwise), name + status pill, per-status sub line, preview button; only
+ * READY voices are selectable. FAILED voices deep-link into re-recording.
+ */
+function ParentVoiceRow({
+  voice,
+  selected,
+  existing,
+  onSelect,
+  onRetryVoice,
+  preview,
+}: ParentVoiceRowProps) {
+  const { t } = useTranslation();
+
+  if (voice.status === VoiceProfileStatus.READY) {
+    return (
+      <SelectableCard
+        glow
+        selected={selected}
+        showCheck={existing == null}
+        onPress={onSelect}
+        accessibilityLabel={voice.displayName}
+        style={styles.voiceRow}
+      >
+        <Avatar emoji={OWNER_EMOJIS[voice.ownerType]} size={46} kind="parentVoice" />
+        <View style={styles.voiceTextBlock}>
+          <View style={styles.voiceNameRow}>
+            <Text style={styles.voiceName} numberOfLines={1}>
+              {voice.displayName}
+            </Text>
+            <StatusPill tone="ready" label={t('voice.statusReady')} />
+          </View>
+          <Text style={styles.voiceSub} numberOfLines={1}>
+            {t(`voice.owners.${voice.ownerType}`)}
+          </Text>
+        </View>
+        <AudioPreviewButton
+          status={preview.statusFor(voice.id)}
+          onPress={() =>
+            preview.toggle(voice.id, () =>
+              voice.previewUrl != null
+                ? Promise.resolve(voice.previewUrl)
+                : api.voices.preview(voice.id).then((r) => r.previewUrl),
+            )
+          }
+        />
+        {existing != null ? (
+          <View style={styles.existingCheck}>
+            <CheckIcon size={10} />
+          </View>
+        ) : null}
+      </SelectableCard>
+    );
+  }
+
+  if (voice.status === VoiceProfileStatus.FAILED) {
+    return (
+      <View style={styles.voiceRowStatic}>
+        <View style={styles.mutedAvatar}>
+          <Text style={styles.mutedAvatarEmoji}>{OWNER_EMOJIS[voice.ownerType]}</Text>
+        </View>
+        <View style={styles.voiceTextBlock}>
+          <View style={styles.voiceNameRow}>
+            <Text style={styles.voiceName} numberOfLines={1}>
+              {voice.displayName}
+            </Text>
+            <StatusPill tone="error" label={t('narrate.statusError')} />
+          </View>
+          <Text style={styles.voiceSub}>{t('narrate.voiceFailedSub')}</Text>
+          <Pressable
+            onPress={onRetryVoice}
+            accessibilityRole="button"
+            accessibilityLabel={t('common.retry')}
+            hitSlop={8}
+            style={({ pressed }) => [styles.retryLinkWrap, { opacity: pressed ? 0.7 : 1 }]}
+          >
+            <Text style={styles.retryLink}>{t('common.retry')}</Text>
+          </Pressable>
+        </View>
+      </View>
+    );
+  }
+
+  // RECORDING_UPLOADED / PROCESSING — not selectable, three pulsing dots.
+  return (
+    <View style={styles.voiceRowStatic}>
+      <View style={styles.mutedAvatar}>
+        <Text style={styles.mutedAvatarEmoji}>{OWNER_EMOJIS[voice.ownerType]}</Text>
+      </View>
+      <View style={styles.voiceTextBlock}>
+        <View style={styles.voiceNameRow}>
+          <Text style={styles.voiceName} numberOfLines={1}>
+            {voice.displayName}
+          </Text>
+          <StatusPill tone="processing" label={t('wizard.voiceNotReady')} />
+        </View>
+        <Text style={styles.voiceSub}>{t('narrate.voiceProcessingSub')}</Text>
+      </View>
+      <View style={styles.dotsRow}>
+        {[0, 1, 2].map((index) => (
+          <PulsingDot key={index} index={index} />
+        ))}
+      </View>
+    </View>
+  );
+}
+
+interface SystemVoiceRowProps {
+  voice: SystemVoice;
+  selected: boolean;
+  existing: Narration | null;
+  onPress: () => void;
+  preview: PreviewPlayer;
+}
+
+/** Storyteller row: lavender-gradient avatar, name (+ premium badge), description, preview. */
+function SystemVoiceRow({ voice, selected, existing, onPress, preview }: SystemVoiceRowProps) {
+  const { t } = useTranslation();
+  return (
+    <SelectableCard
+      glow
+      selected={selected}
+      showCheck={existing == null}
+      onPress={onPress}
+      accessibilityLabel={voice.displayName}
+      style={styles.voiceRow}
+    >
+      <Avatar emoji={VOICE_CATEGORY_EMOJIS[voice.category]} size={46} kind="systemVoice" />
+      <View style={styles.voiceTextBlock}>
+        <View style={styles.voiceNameRow}>
+          <Text style={styles.voiceName} numberOfLines={1}>
+            {voice.displayName}
+          </Text>
+          {voice.premiumOnly ? (
+            <Badge label={t('wizard.premiumBadge')} variant="premium" uppercase />
+          ) : null}
+        </View>
+        <Text style={styles.voiceSub} numberOfLines={1}>
+          {voice.description}
+        </Text>
+      </View>
+      <AudioPreviewButton
+        status={preview.statusFor(voice.id)}
+        onPress={() =>
+          preview.toggle(voice.id, () =>
+            voice.previewUrl != null
+              ? Promise.resolve(voice.previewUrl)
+              : api.voices.systemPreview(voice.id).then((r) => r.previewUrl),
+          )
+        }
+      />
+      {existing != null ? (
+        <View style={styles.existingCheck}>
+          <CheckIcon size={10} />
+        </View>
+      ) : null}
+    </SelectableCard>
+  );
+}
+
+/**
+ * "Hikâyeyi kim anlatsın?" — re-voice an existing story: story info card,
+ * family voices (with clone statuses), system storytellers, shared premium
+ * gate sheet, and a full-bleed night generating/done takeover driven by the
+ * real narration job. Completed narrations open in the player.
  */
 export default function NarrateStory() {
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
   const { id } = useLocalSearchParams<{ id: string }>();
+  const preview = usePreviewPlayer();
 
   const [selected, setSelected] = useState<VoiceSelection | null>(null);
-  const [premiumHintId, setPremiumHintId] = useState<string | null>(null);
+  const [premiumGate, setPremiumGate] = useState<'voiceClone' | 'premiumVoice' | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const [activeJob, setActiveJob] = useState<{ jobId: string; narrationId: string } | null>(null);
+  const [activeJob, setActiveJob] = useState<{
+    jobId: string;
+    narrationId: string;
+    narratorName: string;
+  } | null>(null);
   const [done, setDone] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
 
@@ -171,28 +472,34 @@ export default function NarrateStory() {
     queryKey: ['entitlements'],
     queryFn: () => api.subscription.entitlements(),
   });
+  // Feeds the story info card (title, theme emoji, real duration target, child).
+  const storyQuery = useQuery({
+    queryKey: ['story', id],
+    queryFn: () => api.stories.detail(id),
+    enabled,
+  });
 
   const narrations = narrationsQuery.data ?? [];
   const parentVoices = (voicesQuery.data ?? []).filter(
-    (voice) => voice.status === VoiceProfileStatus.READY,
+    (voice) => voice.status !== VoiceProfileStatus.DELETED,
   );
   const systemVoices = systemVoicesQuery.data ?? [];
   const canUsePremiumVoices = entitlementsQuery.data?.features.premium_system_voices === true;
+  const canCloneVoice = entitlementsQuery.data?.features.parent_voice_clone;
+  const story = storyQuery.data ?? null;
 
   const job = useJobProgress(activeJob?.jobId);
 
-  // Resolve the CTA-created job: done beat → player; failure → inline error.
+  // Resolve the CTA-created job: success → done view (explicit CTA into the
+  // player replaces the old auto-redirect); failure → inline error.
   useEffect(() => {
-    if (activeJob == null) return;
+    if (activeJob == null || done) return;
     if (job.status === AIJobStatus.SUCCEEDED) {
       setDone(true);
       void queryClient.invalidateQueries({ queryKey: ['narrations', id] });
       void queryClient.invalidateQueries({ queryKey: ['story', id] });
       void queryClient.invalidateQueries({ queryKey: ['stories'] });
-      const timer = setTimeout(() => {
-        router.replace(`/story/${id}/player?narrationId=${activeJob.narrationId}` as never);
-      }, 900);
-      return () => clearTimeout(timer);
+      return;
     }
     if (job.status === AIJobStatus.FAILED || job.status === AIJobStatus.CANCELLED) {
       setCreateError(
@@ -203,7 +510,7 @@ export default function NarrateStory() {
       setActiveJob(null);
       void queryClient.invalidateQueries({ queryKey: ['narrations', id] });
     }
-  }, [activeJob, job.status, job.errorCode, id, queryClient, t]);
+  }, [activeJob, done, job.status, job.errorCode, id, queryClient, t]);
 
   const openPlayer = (narrationId: string) => {
     router.push(`/story/${id}/player?narrationId=${narrationId}` as never);
@@ -213,6 +520,7 @@ export default function NarrateStory() {
     if (submitting || activeJob != null) return;
     setCreateError(null);
     setSubmitting(true);
+    void stopPreview();
     try {
       const { narration, jobId } = await api.narrations.create(id, input);
       void queryClient.invalidateQueries({ queryKey: ['narrations', id] });
@@ -224,7 +532,7 @@ export default function NarrateStory() {
         return;
       }
       setDone(false);
-      setActiveJob({ jobId, narrationId: narration.id });
+      setActiveJob({ jobId, narrationId: narration.id, narratorName: narration.narratorName });
     } catch (err) {
       if (err instanceof ApiError) {
         setCreateError(t(`errors.${err.code}`, { defaultValue: t('errors.GENERIC') }));
@@ -254,6 +562,24 @@ export default function NarrateStory() {
     }
   };
 
+  // A FAILED voice profile needs a fresh recording — voice studio recreate flow.
+  const retryVoice = (voice: VoiceProfile) => {
+    router.push(
+      `/voice/create?recreateId=${encodeURIComponent(voice.id)}&ownerType=${encodeURIComponent(
+        voice.ownerType,
+      )}&displayName=${encodeURIComponent(voice.displayName)}` as never,
+    );
+  };
+
+  // Premium gate (§36): the user learns BEFORE any work starts.
+  const onCreateVoice = () => {
+    if (canCloneVoice === false) {
+      setPremiumGate('voiceClone');
+      return;
+    }
+    router.push('/voice' as never);
+  };
+
   // A voice with a READY narration for this story routes to it instead of re-creating.
   const readyByVoiceProfile = new Map<string, Narration>();
   const readyBySystemVoice = new Map<string, Narration>();
@@ -267,15 +593,142 @@ export default function NarrateStory() {
     }
   }
 
+  const selectedName =
+    selected == null
+      ? null
+      : selected.type === 'parent'
+        ? (parentVoices.find((voice) => voice.id === selected.id)?.displayName ?? null)
+        : (systemVoices.find((voice) => voice.id === selected.id)?.displayName ?? null);
+
   const isLoading = narrationsQuery.isPending || systemVoicesQuery.isPending;
   const isError = narrationsQuery.isError || systemVoicesQuery.isError;
   const busy = submitting || activeJob != null;
 
+  // ——— Night takeovers while the narration job runs ———
+  if (activeJob != null) {
+    if (done) {
+      return (
+        <View style={styles.nightRoot}>
+          <StatusBar style="light" />
+          <LinearGradient
+            colors={gradients.nightSky as unknown as [string, string, ...string[]]}
+            locations={[0, 0.5, 1]}
+            start={{ x: 0.2, y: 0 }}
+            end={{ x: 0.8, y: 1 }}
+            style={StyleSheet.absoluteFill}
+          />
+          <Confetti />
+          <View
+            style={[
+              styles.nightContent,
+              { paddingTop: insets.top, paddingBottom: Math.max(insets.bottom, 24) },
+            ]}
+          >
+            <View style={styles.doneCircle}>
+              <Text style={styles.doneEmoji}>🎉</Text>
+            </View>
+            <View style={styles.nightTextBlock}>
+              <Text style={styles.doneTitle}>{t('narrate.doneTitle')}</Text>
+              <Text style={styles.nightSub}>
+                {t('narrate.doneSub', { name: activeJob.narratorName })}
+              </Text>
+            </View>
+            <Button
+              label={t('storyResult.listen')}
+              onPress={() =>
+                router.replace(
+                  `/story/${id}/player?narrationId=${activeJob.narrationId}` as never,
+                )
+              }
+              style={styles.nightCta}
+            />
+            <Pressable
+              onPress={() => router.back()}
+              accessibilityRole="button"
+              accessibilityLabel={t('narrate.backToStory')}
+              hitSlop={8}
+              style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}
+            >
+              <Text style={styles.nightSecondary}>{t('narrate.backToStory')}</Text>
+            </Pressable>
+          </View>
+        </View>
+      );
+    }
+
+    const percent = Math.round(Math.min(Math.max(job.progress, 0), 100));
+    return (
+      <View style={styles.nightRoot}>
+        <StatusBar style="light" />
+        <LinearGradient
+          colors={gradients.nightSky as unknown as [string, string, ...string[]]}
+          locations={[0, 0.5, 1]}
+          start={{ x: 0.2, y: 0 }}
+          end={{ x: 0.8, y: 1 }}
+          style={StyleSheet.absoluteFill}
+        />
+        <View
+          style={[
+            styles.nightContent,
+            { paddingTop: insets.top, paddingBottom: Math.max(insets.bottom, 24) },
+          ]}
+        >
+          <SpinnerArc />
+          <View style={styles.nightTextBlock}>
+            <Text style={styles.generatingTitle}>{t('narrate.generatingTitle')}</Text>
+            <Text style={styles.nightSub}>
+              {t('narrate.generatingSub', { name: activeJob.narratorName })}
+            </Text>
+          </View>
+          <NightProgress percent={percent} />
+        </View>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.root}>
-      <View style={[styles.header, { paddingTop: Math.max(insets.top, 20) + 8 }]}>
-        <ScreenHeader title={t('narrate.title')} />
-        <Text style={styles.subtitle}>{t('narrate.subtitle')}</Text>
+      {/* Header — back + H1 over a lavender wash, then the story info card. */}
+      <View style={[styles.header, { paddingTop: Math.max(insets.top, 20) + spacing.xs }]}>
+        <LinearGradient
+          colors={['rgba(176,156,224,0.12)', 'rgba(176,156,224,0)']}
+          style={StyleSheet.absoluteFill}
+          pointerEvents="none"
+        />
+        <View style={styles.headerRow}>
+          <Pressable
+            onPress={() => router.back()}
+            accessibilityRole="button"
+            accessibilityLabel={t('common.back')}
+            style={({ pressed }) => [styles.backButton, { opacity: pressed ? 0.7 : 1 }]}
+          >
+            <ChevronLeftIcon />
+          </Pressable>
+          <Text style={styles.heading}>{t('narrate.heading')}</Text>
+        </View>
+        {story != null ? (
+          <View style={styles.storyCard}>
+            <LinearGradient
+              colors={[colors.lavenderLight, colors.primary]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.storyThumb}
+            >
+              <Text style={styles.storyThumbEmoji}>{storyThemeEmoji(story.themes)}</Text>
+            </LinearGradient>
+            <View style={styles.storyCardText}>
+              <Text style={styles.storyTitle} numberOfLines={1}>
+                {story.title}
+              </Text>
+              <Text style={styles.storyMeta} numberOfLines={1}>
+                {t('narrate.storyMeta', {
+                  minutes: DURATION_TARGETS[story.durationTarget].minutes,
+                  name: story.childName ?? story.heroName,
+                })}
+              </Text>
+            </View>
+          </View>
+        ) : null}
       </View>
 
       {isLoading ? (
@@ -319,124 +772,84 @@ export default function NarrateStory() {
             </View>
           ) : null}
 
-          {/* Voice picker — parent voices first, system voices below. */}
-          <View style={styles.cardList}>
-            {!voicesQuery.isPending && parentVoices.length === 0 ? (
-              <Pressable
-                onPress={() => router.push('/voice' as never)}
-                accessibilityRole="button"
-                accessibilityLabel={t('voice.emptyCta')}
-                style={({ pressed }) => [styles.emptyVoiceCard, { opacity: pressed ? 0.8 : 1 }]}
-              >
-                <View style={styles.emptyVoiceCircle}>
-                  <Text style={styles.emptyVoiceEmoji}>🎙️</Text>
-                </View>
-                <View style={styles.cardTextBlock}>
-                  <Text style={styles.emptyVoiceTitle}>{t('voice.emptyTitle')}</Text>
-                  <Text style={styles.emptyVoiceCta}>{t('voice.emptyCta')}</Text>
-                </View>
-              </Pressable>
-            ) : null}
-
+          {/* Family voices */}
+          <Text style={styles.sectionLabel}>
+            {t('voice.familyVoices').toLocaleUpperCase('tr')}
+          </Text>
+          <View style={styles.voiceList}>
             {parentVoices.map((voice) => {
               const existing = readyByVoiceProfile.get(voice.id) ?? null;
               return (
-                <SelectableCard
+                <ParentVoiceRow
                   key={voice.id}
-                  glow
+                  voice={voice}
                   selected={selected?.type === 'parent' && selected.id === voice.id}
-                  showCheck={existing == null}
+                  existing={existing}
+                  onSelect={() => {
+                    if (existing != null) {
+                      openPlayer(existing.id);
+                      return;
+                    }
+                    setSelected({ type: 'parent', id: voice.id });
+                  }}
+                  onRetryVoice={() => retryVoice(voice)}
+                  preview={preview}
+                />
+              );
+            })}
+
+            {/* Dashed "Sesimi Oluştur" CTA — premium gated via the shared sheet. */}
+            <Pressable
+              onPress={onCreateVoice}
+              accessibilityRole="button"
+              accessibilityLabel={t('voice.emptyCta')}
+              style={({ pressed }) => [styles.addVoiceCard, { opacity: pressed ? 0.8 : 1 }]}
+            >
+              <View style={styles.mutedAvatar}>
+                <Text style={styles.mutedAvatarEmoji}>🎙</Text>
+              </View>
+              <View style={styles.voiceTextBlock}>
+                <Text style={styles.addVoiceTitle}>{t('voice.emptyCta')}</Text>
+                <Text style={styles.voiceSub}>{t('narrate.createVoiceSub')}</Text>
+              </View>
+              <ChevronRightIcon color={colors.primary} />
+            </Pressable>
+          </View>
+
+          {/* Storytellers */}
+          <Text style={styles.sectionLabel}>
+            {t('narrate.systemSection').toLocaleUpperCase('tr')}
+          </Text>
+          <View style={styles.voiceList}>
+            {systemVoices.map((voice) => {
+              const existing = readyBySystemVoice.get(voice.id) ?? null;
+              const gated = voice.premiumOnly && !canUsePremiumVoices;
+              return (
+                <SystemVoiceRow
+                  key={voice.id}
+                  voice={voice}
+                  selected={selected?.type === 'system' && selected.id === voice.id}
+                  existing={existing}
                   onPress={() => {
                     if (existing != null) {
                       openPlayer(existing.id);
                       return;
                     }
-                    setPremiumHintId(null);
-                    setSelected({ type: 'parent', id: voice.id });
+                    if (gated) {
+                      setPremiumGate('premiumVoice');
+                      return;
+                    }
+                    setSelected({ type: 'system', id: voice.id });
                   }}
-                  accessibilityLabel={voice.displayName}
-                >
-                  <Avatar emoji={OWNER_EMOJIS[voice.ownerType]} size={44} kind="parentVoice" />
-                  <View style={styles.cardTextBlock}>
-                    <View style={styles.voiceNameRow}>
-                      <Text style={styles.voiceName}>{voice.displayName}</Text>
-                      <Badge label={t('wizard.personalBadge')} variant="personal" />
-                    </View>
-                  </View>
-                  {existing != null ? (
-                    <View style={styles.existingCheck}>
-                      <CheckIcon size={10} />
-                    </View>
-                  ) : null}
-                </SelectableCard>
-              );
-            })}
-
-            {systemVoices.map((voice) => {
-              const existing = readyBySystemVoice.get(voice.id) ?? null;
-              const gated = voice.premiumOnly && !canUsePremiumVoices;
-              return (
-                <View key={voice.id}>
-                  <SelectableCard
-                    glow
-                    selected={selected?.type === 'system' && selected.id === voice.id}
-                    showCheck={existing == null}
-                    onPress={() => {
-                      if (existing != null) {
-                        openPlayer(existing.id);
-                        return;
-                      }
-                      if (gated) {
-                        setPremiumHintId(voice.id);
-                        return;
-                      }
-                      setPremiumHintId(null);
-                      setSelected({ type: 'system', id: voice.id });
-                    }}
-                    accessibilityLabel={voice.displayName}
-                  >
-                    <Avatar
-                      emoji={VOICE_CATEGORY_EMOJIS[voice.category]}
-                      size={44}
-                      kind="systemVoice"
-                    />
-                    <View style={styles.cardTextBlock}>
-                      <View style={styles.voiceNameRow}>
-                        <Text style={styles.voiceName}>{voice.displayName}</Text>
-                        {voice.premiumOnly ? (
-                          <Badge label={t('wizard.premiumBadge')} variant="premium" uppercase />
-                        ) : null}
-                      </View>
-                      <Text style={styles.voiceDescription}>{voice.description}</Text>
-                    </View>
-                    {existing != null ? (
-                      <View style={styles.existingCheck}>
-                        <CheckIcon size={10} />
-                      </View>
-                    ) : null}
-                  </SelectableCard>
-                  {gated && premiumHintId === voice.id ? (
-                    <Animated.View entering={FadeInUp.duration(250)} style={styles.premiumHintRow}>
-                      <Text style={styles.premiumHint}>{t('errors.ENTITLEMENT_REQUIRED')}</Text>
-                      <Pressable
-                        onPress={() => router.push('/subscription/paywall' as never)}
-                        accessibilityRole="button"
-                        accessibilityLabel={t('subscription.subscribe')}
-                        hitSlop={8}
-                        style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}
-                      >
-                        <Text style={styles.premiumHintLink}>{t('subscription.subscribe')}</Text>
-                      </Pressable>
-                    </Animated.View>
-                  ) : null}
-                </View>
+                  preview={preview}
+                />
               );
             })}
           </View>
         </ScrollView>
       )}
 
-      {/* Fixed bottom CTA over a cream scrim (wizard pattern). */}
+      {/* Fixed bottom CTA over a cream scrim. */}
       {!isLoading && !isError ? (
         <View style={styles.footer} pointerEvents="box-none">
           <LinearGradient
@@ -450,62 +863,112 @@ export default function NarrateStory() {
             pointerEvents="box-none"
           >
             {createError != null ? <Text style={styles.submitError}>{createError}</Text> : null}
-            {activeJob != null ? (
-              done ? (
-                <Animated.Text entering={FadeInUp.duration(250)} style={styles.doneText}>
-                  {t('narrate.done')}
-                </Animated.Text>
-              ) : (
-                <View style={styles.creatingBlock}>
-                  <Text style={styles.creatingText}>{t('narrate.creating')}</Text>
-                  <View style={styles.footerTrack}>
-                    <LinearGradient
-                      colors={gradients.progress as unknown as [string, string]}
-                      start={{ x: 0, y: 0.5 }}
-                      end={{ x: 1, y: 0.5 }}
-                      style={[
-                        styles.footerFill,
-                        { width: `${Math.round(Math.min(Math.max(job.progress, 0), 100))}%` },
-                      ]}
-                    />
-                  </View>
-                </View>
-              )
-            ) : (
+            {selectedName != null ? (
               <Button
-                label={t('narrate.create')}
+                label={t('narrate.createWithVoice', { name: selectedName })}
                 onPress={onCreate}
-                disabled={selected == null}
                 loading={submitting}
               />
+            ) : (
+              <View style={styles.ctaDisabled}>
+                <Text style={styles.ctaDisabledText}>{t('narrate.selectVoice')}</Text>
+              </View>
             )}
           </View>
         </View>
       ) : null}
+
+      {/* Shared premium gate sheet (voice clone / premium storyteller). */}
+      <PremiumSheet
+        visible={premiumGate != null}
+        featureName={
+          premiumGate === 'voiceClone'
+            ? t('narrate.parentVoiceFeature')
+            : t('subscription.features.premiumVoices')
+        }
+        description={
+          premiumGate === 'voiceClone' ? t('narrate.parentVoiceFeatureDesc') : undefined
+        }
+        onUpgrade={() => {
+          setPremiumGate(null);
+          router.push('/subscription/paywall' as never);
+        }}
+        onDismiss={() => setPremiumGate(null)}
+      />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.background },
-  header: { paddingHorizontal: spacing.pageX },
-  subtitle: {
+  header: {
+    paddingHorizontal: spacing.pageX,
+    paddingBottom: spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  headerRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: spacing.md },
+  backButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: colors.card,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  heading: {
+    flex: 1,
+    fontFamily: fontFamilies.display,
+    fontSize: fontSizes.h3,
+    color: colors.foreground,
+    letterSpacing: -0.2,
+  },
+  storyCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: colors.card,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+  },
+  storyThumb: {
+    width: 40,
+    height: 50,
+    borderRadius: radius.sm,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  storyThumbEmoji: { fontSize: 20 },
+  storyCardText: { flex: 1, minWidth: 0, gap: 2 },
+  storyTitle: {
+    fontFamily: fontFamilies.display,
+    fontSize: fontSizes.base,
+    color: colors.foreground,
+  },
+  storyMeta: {
     fontFamily: fontFamilies.body,
-    fontSize: fontSizes.lg,
+    fontSize: fontSizes.sm,
     color: colors.mutedForeground,
-    marginTop: -8,
-    marginBottom: spacing.sm,
   },
   centerFill: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   scroll: { flex: 1 },
-  scrollContent: { paddingHorizontal: spacing.pageX, paddingBottom: 200 },
+  scrollContent: {
+    paddingHorizontal: spacing.pageX,
+    paddingTop: spacing.lg,
+    paddingBottom: 200,
+  },
   section: { marginBottom: spacing.xl },
   sectionLabel: {
     fontFamily: fontFamilies.bodyBold,
     fontSize: fontSizes.sm,
     color: colors.mutedForeground,
     letterSpacing: 0.72,
-    marginBottom: spacing.sm,
+    marginBottom: 10,
   },
   narrationList: { gap: spacing.xs },
   narrationRow: {
@@ -514,7 +977,7 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     paddingVertical: 14,
     paddingHorizontal: spacing.md,
-    borderRadius: radius.base,
+    borderRadius: radius.card,
     backgroundColor: colors.card,
     borderWidth: 1,
     borderColor: colors.border,
@@ -568,21 +1031,52 @@ const styles = StyleSheet.create({
     fontSize: fontSizes.sm,
     color: colors.primary,
   },
-  cardList: { gap: 10 },
-  cardTextBlock: { flex: 1, gap: 2 },
+  voiceList: { gap: 10, marginBottom: spacing.xl },
+  voiceRow: { paddingVertical: 14, paddingHorizontal: spacing.md, gap: 12 },
+  voiceRowStatic: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingVertical: 14,
+    paddingHorizontal: spacing.md,
+    borderRadius: radius.card,
+    borderWidth: 2,
+    borderColor: colors.border,
+    backgroundColor: colors.card,
+  },
+  mutedAvatar: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    backgroundColor: colors.muted,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  mutedAvatarEmoji: { fontSize: 22 },
+  voiceTextBlock: { flex: 1, minWidth: 0, gap: 2 },
   voiceNameRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   voiceName: {
-    fontFamily: fontFamilies.bodyBold,
+    fontFamily: fontFamilies.display,
     fontSize: fontSizes.lg,
     color: colors.foreground,
+    flexShrink: 1,
   },
-  voiceDescription: {
+  voiceSub: {
     fontFamily: fontFamilies.body,
-    fontSize: fontSizes.md,
+    fontSize: fontSizes.sm,
     color: colors.mutedForeground,
   },
+  retryLinkWrap: { alignSelf: 'flex-start', marginTop: 4 },
+  retryLink: {
+    fontFamily: fontFamilies.bodyBold,
+    fontSize: fontSizes.sm,
+    color: colors.primary,
+  },
+  dotsRow: { flexDirection: 'row', alignItems: 'center', gap: 3 },
+  pulsingDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: colors.dustyBlue },
+  pill: { borderRadius: radius.xs, paddingVertical: 2, paddingHorizontal: 8 },
+  pillText: { fontFamily: fontFamilies.bodyBold, fontSize: fontSizes.xxs },
   existingCheck: {
-    marginLeft: 'auto',
     width: 20,
     height: 20,
     borderRadius: 10,
@@ -590,51 +1084,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  premiumHintRow: {
+  addVoiceCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginTop: 6,
-    marginLeft: 4,
-  },
-  premiumHint: {
-    fontFamily: fontFamilies.bodySemiBold,
-    fontSize: fontSizes.sm,
-    color: colors.primary,
-  },
-  premiumHintLink: {
-    fontFamily: fontFamilies.bodyBold,
-    fontSize: fontSizes.sm,
-    color: colors.primary,
-    textDecorationLine: 'underline',
-  },
-  emptyVoiceCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 14,
+    gap: 12,
     paddingVertical: 14,
-    paddingHorizontal: 18,
+    paddingHorizontal: spacing.md,
     borderRadius: radius.card,
     borderWidth: 2,
     borderStyle: 'dashed',
     borderColor: colors.border,
+    backgroundColor: colors.card,
   },
-  emptyVoiceCircle: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: colors.muted,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  emptyVoiceEmoji: { fontSize: 20 },
-  emptyVoiceTitle: {
-    fontFamily: fontFamilies.body,
-    fontSize: fontSizes.md,
-    color: colors.mutedForeground,
-  },
-  emptyVoiceCta: {
+  addVoiceTitle: {
     fontFamily: fontFamilies.bodyBold,
     fontSize: fontSizes.base,
     color: colors.primary,
@@ -647,33 +1109,93 @@ const styles = StyleSheet.create({
     color: colors.destructive,
     textAlign: 'center',
   },
-  creatingBlock: {
-    paddingVertical: 14,
-    paddingHorizontal: 18,
-    borderRadius: radius.base,
-    backgroundColor: colors.card,
-    borderWidth: 1,
-    borderColor: colors.border,
-    gap: 10,
+  ctaDisabled: {
+    borderRadius: radius.lg,
+    backgroundColor: colors.muted,
+    paddingVertical: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  creatingText: {
-    fontFamily: fontFamilies.bodySemiBold,
-    fontSize: fontSizes.base,
-    color: colors.foreground,
+  ctaDisabledText: {
+    fontFamily: fontFamilies.bodyExtraBold,
+    fontSize: fontSizes.xxl,
+    color: colors.mutedForeground,
+  },
+  // ——— Night takeover (generating / done) ———
+  nightRoot: { flex: 1, backgroundColor: colors.purpleDarkest },
+  nightContent: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.xl,
+    paddingHorizontal: spacing.pageXWide,
+  },
+  spinnerCircle: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: 'rgba(176,156,224,0.15)',
+    borderWidth: 2,
+    borderColor: 'rgba(176,156,224,0.3)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  nightTextBlock: { alignItems: 'center', gap: spacing.xs },
+  generatingTitle: {
+    fontFamily: fontFamilies.display,
+    fontSize: fontSizes.h2,
+    color: colors.primaryForeground,
     textAlign: 'center',
   },
-  footerTrack: {
+  nightSub: {
+    fontFamily: fontFamilies.body,
+    fontSize: fontSizes.base,
+    color: 'rgba(176,156,224,0.75)',
+    textAlign: 'center',
+    lineHeight: 21,
+  },
+  nightTrack: {
+    alignSelf: 'stretch',
     height: 4,
     borderRadius: 2,
-    backgroundColor: colors.muted,
+    backgroundColor: 'rgba(255,255,255,0.12)',
     overflow: 'hidden',
   },
-  footerFill: { height: '100%', borderRadius: 2 },
-  doneText: {
-    fontFamily: fontFamilies.bodyBold,
-    fontSize: fontSizes.lg,
-    color: colors.primary,
-    textAlign: 'center',
-    paddingVertical: 18,
+  nightFill: { height: '100%', borderRadius: 2, overflow: 'hidden' },
+  doneCircle: {
+    width: 88,
+    height: 88,
+    borderRadius: 44,
+    backgroundColor: 'rgba(141,184,154,0.2)',
+    borderWidth: 2,
+    borderColor: 'rgba(141,184,154,0.4)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
+  doneEmoji: { fontSize: 40 },
+  doneTitle: {
+    fontFamily: fontFamilies.display,
+    fontSize: fontSizes.h1,
+    color: colors.primaryForeground,
+    textAlign: 'center',
+  },
+  nightCta: { alignSelf: 'stretch' },
+  nightSecondary: {
+    fontFamily: fontFamilies.bodySemiBold,
+    fontSize: fontSizes.base,
+    color: 'rgba(255,255,255,0.55)',
+  },
+  confettiDot: { position: 'absolute', width: 10, height: 10, borderRadius: 5 },
+});
+
+const pillTones = StyleSheet.create({
+  ready: { backgroundColor: 'rgba(141,184,154,0.15)' },
+  processing: { backgroundColor: 'rgba(123,167,201,0.15)' },
+  error: { backgroundColor: 'rgba(224,84,84,0.1)' },
+});
+
+const pillTextTones = StyleSheet.create({
+  ready: { color: colors.sage },
+  processing: { color: colors.dustyBlue },
+  error: { color: colors.destructive },
 });
