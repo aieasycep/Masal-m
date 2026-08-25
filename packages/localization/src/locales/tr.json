@@ -491,7 +491,18 @@
       "forest": "Orman",
       "sunset": "Günbatımı",
       "night": "Gece"
-    }
+    },
+    "paletteSection": "Kapak Rengi",
+    "coverTitleFallback": "Kitap Başlığı",
+    "changeCoverSection": "Kapak Görselini Değiştir",
+    "regenerateCover": "Yeniden Oluştur",
+    "pickFromAlternatives": "Alternatiflerden Seç",
+    "saveCover": "Kapağı Kaydet",
+    "frontCoverLabel": "Ön Kapak",
+    "backCoverPageLabel": "Arka Kapak",
+    "pageLabel": "Sayfa {{number}}",
+    "backQuote": "Her çocuk kendi hikâyesinin kahramanıdır.",
+    "backToEdit": "Düzenlemeye Dön"
   },
   "checkout": {
     "configTitle": "Kitap Seçenekleri",

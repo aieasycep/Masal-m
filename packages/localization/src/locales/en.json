@@ -491,7 +491,18 @@
       "forest": "Forest",
       "sunset": "Sunset",
       "night": "Night"
-    }
+    },
+    "paletteSection": "Cover Color",
+    "coverTitleFallback": "Book Title",
+    "changeCoverSection": "Change Cover Image",
+    "regenerateCover": "Regenerate",
+    "pickFromAlternatives": "Choose from Alternatives",
+    "saveCover": "Save Cover",
+    "frontCoverLabel": "Front Cover",
+    "backCoverPageLabel": "Back Cover",
+    "pageLabel": "Page {{number}}",
+    "backQuote": "Every child is the hero of their own story.",
+    "backToEdit": "Back to Editing"
   },
   "checkout": {
     "configTitle": "Book Options",
