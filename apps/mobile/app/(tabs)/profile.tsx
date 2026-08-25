@@ -4,7 +4,7 @@ import { router } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { LinearGradient } from 'expo-linear-gradient';
-import { AGE_RANGE_LABELS } from '@masalim/types';
+import { AGE_RANGE_LABELS, OrderStatus } from '@masalim/types';
 import { colors, fontFamilies, fontSizes, radius, shadows, spacing } from '@masalim/ui';
 import { api } from '../../src/lib/api';
 import { unregisterPush } from '../../src/lib/push';
@@ -31,7 +31,15 @@ interface MenuItem {
   label: string;
   sub: string;
   route: string;
+  badge?: string;
 }
+
+/** Orders in these states are finished — everything else counts as active. */
+const INACTIVE_ORDER_STATUSES: readonly OrderStatus[] = [
+  OrderStatus.DELIVERED,
+  OrderStatus.CANCELLED,
+  OrderStatus.REFUNDED,
+];
 
 /** Profile & family screen — pixel pass from docs/design-reference Profile.tsx. */
 export default function Profile() {
@@ -44,11 +52,15 @@ export default function Profile() {
   const meQuery = useQuery({ queryKey: ['me'], queryFn: () => api.users.me() });
   const childrenQuery = useQuery({ queryKey: ['children'], queryFn: () => api.children.list() });
   const voicesQuery = useQuery({ queryKey: ['voices'], queryFn: () => api.voices.list() });
+  const ordersQuery = useQuery({ queryKey: ['orders'], queryFn: () => api.orders.list() });
 
   const me = meQuery.data;
   const isPremium = me?.subscriptionPlan === 'PREMIUM';
   const children = childrenQuery.data ?? [];
   const voiceCount = voicesQuery.data?.length ?? 0;
+  const activeOrderCount = (ordersQuery.data ?? []).filter(
+    (order) => !INACTIVE_ORDER_STATUSES.includes(order.status),
+  ).length;
 
   const menuItems: MenuItem[] = [
     {
@@ -65,8 +77,12 @@ export default function Profile() {
       key: 'orders',
       icon: '📦',
       label: t('profile.menu.orders'),
-      sub: t('profile.menu.ordersEmpty'),
+      sub:
+        activeOrderCount > 0
+          ? t('profile.menu.ordersSub', { count: activeOrderCount })
+          : t('profile.menu.ordersEmpty'),
       route: '/orders',
+      ...(activeOrderCount > 0 ? { badge: String(activeOrderCount) } : {}),
     },
     {
       key: 'subscription',
@@ -227,6 +243,11 @@ export default function Profile() {
                 <Text style={styles.menuLabel}>{item.label}</Text>
                 <Text style={styles.menuSub}>{item.sub}</Text>
               </View>
+              {item.badge != null ? (
+                <View style={styles.menuBadge}>
+                  <Text style={styles.menuBadgeText}>{item.badge}</Text>
+                </View>
+              ) : null}
               <ChevronRightIcon size={14} />
             </Pressable>
           ))}
@@ -419,6 +440,19 @@ const styles = StyleSheet.create({
   },
   menuIcon: { fontSize: 20 },
   menuTextBlock: { flex: 1 },
+  menuBadge: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: colors.accent,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  menuBadgeText: {
+    fontFamily: fontFamilies.bodyExtraBold,
+    fontSize: fontSizes.xs,
+    color: colors.accentForeground,
+  },
   menuLabel: {
     fontFamily: fontFamilies.bodyBold,
     fontSize: fontSizes.lg,

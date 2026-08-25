@@ -559,6 +559,21 @@
       "address": "Address",
       "summary": "Summary",
       "payment": "Payment"
+    },
+    "neighborhood": "Neighborhood",
+    "street": "Street",
+    "buildingInfo": "Building / Apartment",
+    "fieldRequired": "This field is required.",
+    "saveAddressLater": "Save this address for later",
+    "placeholders": {
+      "fullName": "Ayşe Yılmaz",
+      "phone": "05XX XXX XX XX",
+      "city": "İstanbul",
+      "district": "Kadıköy",
+      "neighborhood": "Bağcılar Mahallesi",
+      "street": "Gül Sokak No:12",
+      "buildingInfo": "Floor 3, Apt 7",
+      "postalCode": "34710"
     }
   },
   "orders": {
@@ -575,7 +590,32 @@
     },
     "trackingNumber": "Tracking number",
     "cancelOrder": "Cancel Order",
-    "cancelConfirm": "Do you want to cancel this order?"
+    "cancelConfirm": "Do you want to cancel this order?",
+    "pills": {
+      "preparing": "Preparing",
+      "printing": "Printing",
+      "shipped": "Shipped",
+      "delivered": "Delivered"
+    },
+    "emptyTitle": "You don't have a book order yet.",
+    "emptyBody": "You can turn the stories you've created into a real printed book.",
+    "emptyCta": "Go to My Stories",
+    "trackingTitle": "Order Tracking",
+    "orderNumberMeta": "Order #{{number}}",
+    "statusTimeline": "Order Status",
+    "steps": {
+      "received": "Order received",
+      "preparing": "Preparing for print",
+      "printed": "Printed",
+      "shipped": "Shipped",
+      "delivered": "Delivered"
+    },
+    "shippingInfo": "Shipping Info",
+    "estimatedDeliveryLabel": "Estimated delivery",
+    "deliveryDays": "{{min}}–{{max}} business days",
+    "carrierLabel": "Carrier",
+    "trackingNoLabel": "Tracking number",
+    "trackShipment": "Track Shipment"
   },
   "profile": {
     "title": "Profile & Family",
@@ -633,7 +673,41 @@
     "version": "Version {{version}}",
     "pushDisabled": "Notifications are off",
     "pushPermissionDenied": "To allow notifications, open your device settings.",
-    "enablePush": "Enable Notifications"
+    "enablePush": "Enable Notifications",
+    "accountInfo": "Account Details",
+    "childrenSub": "{{count}} child profiles",
+    "voices": "My Voices",
+    "sectionPreferences": "Preferences",
+    "sectionPrivacy": "Privacy",
+    "privacyBody": "Masalım uses details such as your child's name and age range only to create personalised stories. Your voice recordings and data are stored encrypted and are never shared with third parties for marketing. When you delete your account, all of your data is permanently removed.",
+    "termsBody": "By using Masalım you agree that content is provided for personal, non-commercial use. Generated stories and images are for your family; they may not be redistributed or sold. Subscriptions renew each period and can be cancelled at any time.",
+    "saveChanges": "Save Changes",
+    "saved": "Saved",
+    "deleteWarningTitle": "Are you sure you want to delete your account?",
+    "deleteWarningIntro": "This cannot be undone. This will delete:",
+    "deleteBullets": {
+      "stories": "All stories and narrations",
+      "children": "Child profiles",
+      "voices": "Recorded parent voices",
+      "books": "Book data and orders"
+    },
+    "deleteFinalConfirmBody": "This is your final confirmation. This cannot be undone.",
+    "deleteFinalConfirm": "Yes, Delete My Account",
+    "notifSection": "Masalım Notifications",
+    "notifStory": "When my story is ready",
+    "notifStorySub": "When AI generation completes",
+    "notifVoice": "When my voice is ready",
+    "notifVoiceSub": "When voice cloning completes",
+    "notifIllustrations": "Book images ready",
+    "notifIllustrationsSub": "Illustration generation",
+    "notifOrders": "Order updates",
+    "notifOrdersSub": "Shipping and delivery",
+    "notifUpdates": "New features and suggestions",
+    "notifUpdatesSub": "App updates",
+    "voiceDataInfo": "Your voice recordings are used only to create the content you approve. You can delete them at any time.",
+    "voiceDeleteTitle": "Delete the voice {{name}}?",
+    "voiceDeleteBody": "Once deleted, this voice profile can no longer be used in new stories. Existing narrated stories are not affected.",
+    "voiceDeleteConfirm": "Delete My Voice"
   },
   "subscription": {
     "title": "Masalım Premium",
@@ -648,7 +722,10 @@
       "parentVoices": "Mom & dad voices",
       "premiumVoices": "Premium narrator voices",
       "illustrations": "More AI images",
-      "hdExport": "HD book images"
+      "hdExport": "HD book images",
+      "library": "Unlimited library storage",
+      "audiobook": "Audiobook mode",
+      "print": "Physical book printing"
     },
     "freePlan": "Free",
     "premiumPlan": "Premium",
@@ -657,7 +734,22 @@
     "manage": "Manage Subscription",
     "voiceCloneGate": "Creating mom & dad voices is a Premium feature.",
     "quotaReachedStories": "You've used this month's story quota. Create more with Premium.",
-    "quotaReachedIllustrations": "You've used this month's image quota. Create more with Premium."
+    "quotaReachedIllustrations": "You've used this month's image quota. Create more with Premium.",
+    "heroTitle": "Unlimited tales, unlimited magic ✨",
+    "heroSubtitle": "Fill your child's magical world with stars.",
+    "featuresLabel": "Premium Features",
+    "discountBadge": "{{percent}}% Off",
+    "monthlyPlan": "Monthly Plan",
+    "yearlyPlan": "Yearly Plan",
+    "cancelAnytime": "Cancel anytime",
+    "mostPopular": "Most Popular",
+    "perMonth": "/mo",
+    "perYear": "/yr",
+    "startCta": "Start Premium — {{price}}",
+    "legal": "Cancel anytime. Your subscription renews automatically.",
+    "quotaTitle": "You've used your {{limit}} stories this month!",
+    "quotaSubtitle": "Create unlimited stories with Masalım Premium and craft endless adventures for your child.",
+    "later": "Later"
   },
   "notificationsScreen": {
     "title": "Notifications",

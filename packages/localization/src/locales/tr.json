@@ -559,6 +559,21 @@
       "address": "Adres",
       "summary": "Özet",
       "payment": "Ödeme"
+    },
+    "neighborhood": "Mahalle",
+    "street": "Cadde / Sokak",
+    "buildingInfo": "Bina / Daire",
+    "fieldRequired": "Bu alan zorunludur.",
+    "saveAddressLater": "Bu adresi daha sonra kullanmak için kaydet",
+    "placeholders": {
+      "fullName": "Ayşe Yılmaz",
+      "phone": "05XX XXX XX XX",
+      "city": "İstanbul",
+      "district": "Kadıköy",
+      "neighborhood": "Bağcılar Mahallesi",
+      "street": "Gül Sokak No:12",
+      "buildingInfo": "Kat 3, Daire 7",
+      "postalCode": "34710"
     }
   },
   "orders": {
@@ -575,7 +590,32 @@
     },
     "trackingNumber": "Kargo takip numarası",
     "cancelOrder": "Siparişi İptal Et",
-    "cancelConfirm": "Bu siparişi iptal etmek istiyor musun?"
+    "cancelConfirm": "Bu siparişi iptal etmek istiyor musun?",
+    "pills": {
+      "preparing": "Hazırlanıyor",
+      "printing": "Basılıyor",
+      "shipped": "Kargoya Verildi",
+      "delivered": "Teslim Edildi"
+    },
+    "emptyTitle": "Henüz bir kitap siparişin yok.",
+    "emptyBody": "Oluşturduğun masalları gerçek bir kitaba dönüştürebilirsin.",
+    "emptyCta": "Hikâyelerime Git",
+    "trackingTitle": "Sipariş Takibi",
+    "orderNumberMeta": "Sipariş #{{number}}",
+    "statusTimeline": "Sipariş Durumu",
+    "steps": {
+      "received": "Sipariş Alındı",
+      "preparing": "Baskıya Hazırlanıyor",
+      "printed": "Basıldı",
+      "shipped": "Kargoya Verildi",
+      "delivered": "Teslim Edildi"
+    },
+    "shippingInfo": "Kargo Bilgileri",
+    "estimatedDeliveryLabel": "Tahmini Teslimat",
+    "deliveryDays": "{{min}}–{{max}} iş günü",
+    "carrierLabel": "Kargo Firması",
+    "trackingNoLabel": "Takip Numarası",
+    "trackShipment": "Kargoyu Takip Et"
   },
   "profile": {
     "title": "Profil & Aile",
@@ -633,7 +673,41 @@
     "version": "Sürüm {{version}}",
     "pushDisabled": "Bildirimler kapalı",
     "pushPermissionDenied": "Bildirimlere izin vermek için cihaz ayarlarını açman gerekiyor.",
-    "enablePush": "Bildirimleri Aç"
+    "enablePush": "Bildirimleri Aç",
+    "accountInfo": "Hesap Bilgileri",
+    "childrenSub": "{{count}} çocuk profili",
+    "voices": "Seslerim",
+    "sectionPreferences": "Tercihler",
+    "sectionPrivacy": "Gizlilik",
+    "privacyBody": "Masalım, çocuğunun adı ve yaş aralığı gibi bilgileri yalnızca kişisel masallar oluşturmak için kullanır. Ses kayıtların ve verilerin şifreli olarak saklanır; üçüncü taraflarla pazarlama amacıyla paylaşılmaz. Hesabını sildiğinde tüm verilerin kalıcı olarak silinir.",
+    "termsBody": "Masalım'ı kullanarak içeriklerin kişisel, ticari olmayan kullanım için sunulduğunu kabul edersin. Oluşturulan masallar ve görseller ailene özeldir; izinsiz çoğaltılamaz ve satılamaz. Abonelikler dönem sonunda yenilenir ve istediğin zaman iptal edilebilir.",
+    "saveChanges": "Değişiklikleri Kaydet",
+    "saved": "Kaydedildi",
+    "deleteWarningTitle": "Hesabını silmek istediğine emin misin?",
+    "deleteWarningIntro": "Bu işlem geri alınamaz. Silinecekler:",
+    "deleteBullets": {
+      "stories": "Tüm hikâyeler ve seslendirmeler",
+      "children": "Çocuk profilleri",
+      "voices": "Kayıtlı anne ve baba sesleri",
+      "books": "Kitap verileri ve siparişler"
+    },
+    "deleteFinalConfirmBody": "Son kez onaylıyorsun. Bu işlem geri alınamaz.",
+    "deleteFinalConfirm": "Evet, Hesabımı Sil",
+    "notifSection": "Masalım Bildirimleri",
+    "notifStory": "Hikâyem hazır olduğunda",
+    "notifStorySub": "AI oluşturma tamamlandığında",
+    "notifVoice": "Sesim hazır olduğunda",
+    "notifVoiceSub": "Ses klonlama tamamlandığında",
+    "notifIllustrations": "Kitap görselleri hazır",
+    "notifIllustrationsSub": "İllüstrasyon oluşturma",
+    "notifOrders": "Sipariş güncellemeleri",
+    "notifOrdersSub": "Kargo ve teslimat",
+    "notifUpdates": "Yeni özellikler ve öneriler",
+    "notifUpdatesSub": "Uygulama güncellemeleri",
+    "voiceDataInfo": "Ses kayıtların yalnızca izin verdiğin içerikleri oluşturmak için kullanılır. İstediğin zaman silebilirsin.",
+    "voiceDeleteTitle": "{{name}} sesini sil?",
+    "voiceDeleteBody": "Bu ses profilini sildiğinde yeni hikâyelerde kullanılamaz. Mevcut seslendirilmiş hikâyeler etkilenmez.",
+    "voiceDeleteConfirm": "Sesimi Sil"
   },
   "subscription": {
     "title": "Masalım Premium",
@@ -648,7 +722,10 @@
       "parentVoices": "Anne & baba sesleri",
       "premiumVoices": "Premium anlatıcı sesleri",
       "illustrations": "Daha fazla AI görsel",
-      "hdExport": "HD kitap görselleri"
+      "hdExport": "HD kitap görselleri",
+      "library": "Sınırsız kütüphane depolama",
+      "audiobook": "Sesli kitap modu",
+      "print": "Fiziksel kitap baskısı"
     },
     "freePlan": "Ücretsiz",
     "premiumPlan": "Premium",
@@ -657,7 +734,22 @@
     "manage": "Aboneliği Yönet",
     "voiceCloneGate": "Anne & baba sesi oluşturmak Premium'a özel.",
     "quotaReachedStories": "Bu ayki hikâye hakkın doldu. Premium ile daha fazlasını oluşturabilirsin.",
-    "quotaReachedIllustrations": "Bu ayki görsel hakkın doldu. Premium ile daha fazlasını oluşturabilirsin."
+    "quotaReachedIllustrations": "Bu ayki görsel hakkın doldu. Premium ile daha fazlasını oluşturabilirsin.",
+    "heroTitle": "Sınırsız masal, sınırsız büyü ✨",
+    "heroSubtitle": "Çocuğunun büyülü dünyasını yıldızlarla doldur.",
+    "featuresLabel": "Premium Özellikler",
+    "discountBadge": "%{{percent}} İndirim",
+    "monthlyPlan": "Aylık Plan",
+    "yearlyPlan": "Yıllık Plan",
+    "cancelAnytime": "İstediğin zaman iptal et",
+    "mostPopular": "En Popüler",
+    "perMonth": "/ay",
+    "perYear": "/yıl",
+    "startCta": "Premium'a Başla — {{price}}",
+    "legal": "İstediğin zaman iptal edebilirsin. Abonelik otomatik yenilenir.",
+    "quotaTitle": "Bu ay {{limit}} hikâye hakkın doldu!",
+    "quotaSubtitle": "Masalım Premium ile sınırsız hikâye oluştur, çocuğun için sonsuz macera yarat.",
+    "later": "Daha Sonra"
   },
   "notificationsScreen": {
     "title": "Bildirimler",

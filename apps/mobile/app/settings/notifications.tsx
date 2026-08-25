@@ -3,11 +3,14 @@ import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import * as Linking from 'expo-linking';
 import * as Notifications from 'expo-notifications';
 import { router, useFocusEffect } from 'expo-router';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import type { NotificationItem } from '@masalim/validation';
-import { colors, fontFamilies, fontSizes, radius, spacing } from '@masalim/ui';
+import { NotificationType } from '@masalim/types';
+import type { NotificationItem, NotificationPrefs } from '@masalim/validation';
+import { ApiError, NetworkError } from '@masalim/api-client';
+import { colors, fontFamilies, fontSizes, letterSpacing, radius, spacing } from '@masalim/ui';
 import { Button } from '../../src/components/Button';
+import { ListRow } from '../../src/components/ListRow';
 import { Screen } from '../../src/components/Screen';
 import { ScreenHeader } from '../../src/components/ScreenHeader';
 import { CheckIcon } from '../../src/components/icons';
@@ -17,12 +20,102 @@ import { registerForPush } from '../../src/lib/push';
 
 type PermissionState = 'loading' | 'undetermined' | 'denied' | 'granted' | 'unsupported';
 
-/** Notification settings — push permission state + a modest inbox preview. */
+const ALL_NOTIFICATION_TYPES = Object.values(NotificationType);
+
+/** Per-category toggle rows (`Settings/04-Notifications`). The illustration
+ * toggle governs both ILLUSTRATIONS_READY and BOOK_READY. */
+const PREF_ROWS: ReadonlyArray<{
+  key: string;
+  icon: string;
+  labelKey: string;
+  subKey: string;
+  types: NotificationType[];
+}> = [
+  {
+    key: 'story',
+    icon: '📖',
+    labelKey: 'settings.notifStory',
+    subKey: 'settings.notifStorySub',
+    types: [NotificationType.STORY_READY],
+  },
+  {
+    key: 'voice',
+    icon: '🎙',
+    labelKey: 'settings.notifVoice',
+    subKey: 'settings.notifVoiceSub',
+    types: [NotificationType.VOICE_READY],
+  },
+  {
+    key: 'illustrations',
+    icon: '🎨',
+    labelKey: 'settings.notifIllustrations',
+    subKey: 'settings.notifIllustrationsSub',
+    types: [NotificationType.ILLUSTRATIONS_READY, NotificationType.BOOK_READY],
+  },
+  {
+    key: 'orders',
+    icon: '📦',
+    labelKey: 'settings.notifOrders',
+    subKey: 'settings.notifOrdersSub',
+    types: [NotificationType.ORDER_SHIPPED],
+  },
+  {
+    key: 'updates',
+    icon: '✨',
+    labelKey: 'settings.notifUpdates',
+    subKey: 'settings.notifUpdatesSub',
+    types: [NotificationType.GENERIC],
+  },
+];
+
+/** Notification settings — push permission state, category toggles, inbox. */
 export default function NotificationSettings() {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [permission, setPermission] = useState<PermissionState>('loading');
   const [requesting, setRequesting] = useState(false);
+  const [pendingPrefs, setPendingPrefs] = useState<NotificationPrefs | null>(null);
+  const [prefsError, setPrefsError] = useState<string | null>(null);
+
+  const meQuery = useQuery({ queryKey: ['me'], queryFn: () => api.users.me() });
+  // Optimistic overlay while a write is in flight; absent key = enabled.
+  const prefs: NotificationPrefs = pendingPrefs ?? meQuery.data?.notificationPrefs ?? {};
+  const groupEnabled = (types: NotificationType[]): boolean =>
+    types.every((type) => prefs[type] !== false);
+
+  const prefsMutation = useMutation({
+    mutationFn: (next: NotificationPrefs) => api.users.updateMe({ notificationPrefs: next }),
+    onSuccess: async (updated) => {
+      queryClient.setQueryData(['me'], updated);
+      await queryClient.invalidateQueries({ queryKey: ['me'] });
+      setPendingPrefs(null);
+    },
+    onError: (error) => {
+      // Revert the optimistic overlay and surface the failure.
+      setPendingPrefs(null);
+      if (error instanceof ApiError) {
+        setPrefsError(t(`errors.${error.code}`, { defaultValue: t('errors.GENERIC') }));
+      } else if (error instanceof NetworkError) {
+        setPrefsError(t('errors.OFFLINE'));
+      } else {
+        setPrefsError(t('errors.GENERIC'));
+      }
+    },
+  });
+
+  const togglePrefs = (types: NotificationType[], value: boolean) => {
+    setPrefsError(null);
+    // Write the full explicit map so the server stores every current choice.
+    const next: NotificationPrefs = {};
+    for (const type of ALL_NOTIFICATION_TYPES) {
+      next[type] = prefs[type] !== false;
+    }
+    for (const type of types) {
+      next[type] = value;
+    }
+    setPendingPrefs(next);
+    prefsMutation.mutate(next);
+  };
 
   const refreshPermission = useCallback(async () => {
     if (Platform.OS === 'web') {
@@ -122,6 +215,34 @@ export default function NotificationSettings() {
         </View>
       ) : null}
 
+      {/* Masalım notification categories — bound to me.notificationPrefs. */}
+      {meQuery.data != null ? (
+        <View style={styles.prefsSection}>
+          <Text style={styles.prefsLabel}>
+            {t('settings.notifSection').toLocaleUpperCase('tr')}
+          </Text>
+          <View style={styles.prefsCard}>
+            {PREF_ROWS.map((row, index) => (
+              <ListRow
+                key={row.key}
+                icon={row.icon}
+                label={t(row.labelKey)}
+                sub={t(row.subKey)}
+                variant="toggle"
+                toggleValue={groupEnabled(row.types)}
+                onToggle={(value) => togglePrefs(row.types, value)}
+                showDivider={index < PREF_ROWS.length - 1}
+              />
+            ))}
+          </View>
+          {prefsError != null ? (
+            <Text style={styles.prefsError} accessibilityLiveRegion="polite">
+              {prefsError}
+            </Text>
+          ) : null}
+        </View>
+      ) : null}
+
       {showInbox ? (
         notificationsQuery.isError ? (
           <ErrorState
@@ -179,6 +300,29 @@ const styles = StyleSheet.create({
     padding: spacing.lg,
     alignItems: 'center',
     gap: spacing.md,
+    marginBottom: spacing.md,
+  },
+  prefsSection: { marginBottom: spacing.lg },
+  prefsLabel: {
+    fontFamily: fontFamilies.bodyBold,
+    fontSize: fontSizes.xs,
+    color: colors.mutedForeground,
+    letterSpacing: letterSpacing.eyebrow,
+    marginBottom: spacing.xs,
+    marginLeft: spacing.xxs,
+  },
+  prefsCard: {
+    backgroundColor: colors.card,
+    borderRadius: radius.card,
+    borderWidth: 1,
+    borderColor: colors.border,
+    overflow: 'hidden',
+  },
+  prefsError: {
+    fontFamily: fontFamilies.bodySemiBold,
+    fontSize: fontSizes.md,
+    color: colors.destructive,
+    marginTop: spacing.xs,
   },
   permissionEmoji: { fontSize: 40 },
   permissionBody: {

@@ -1,203 +1,252 @@
-import { useCallback, useState } from 'react';
-import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useState, type ReactNode } from 'react';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Constants from 'expo-constants';
-import * as Notifications from 'expo-notifications';
-import { router, useFocusEffect } from 'expo-router';
+import { router } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { colors, fontFamilies, fontSizes, radius, spacing } from '@masalim/ui';
+import { VoiceProfileStatus } from '@masalim/types';
+import { colors, fontFamilies, fontSizes, letterSpacing, radius, spacing } from '@masalim/ui';
+import { ConfirmSheet } from '../../src/components/ConfirmSheet';
+import { ListRow } from '../../src/components/ListRow';
 import { Screen } from '../../src/components/Screen';
 import { ScreenHeader } from '../../src/components/ScreenHeader';
 import { ChevronRightIcon } from '../../src/components/icons';
 import { api } from '../../src/lib/api';
+import { unregisterPush } from '../../src/lib/push';
+import { useAuthStore } from '../../src/stores/auth';
 
-/** Settings hub — account/language/notifications rows + AI & voice-data info. */
+/** Labeled section card from `Settings/01-Main`: uppercase eyebrow + white r18 card. */
+function SectionCard({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <View style={styles.section}>
+      <Text style={styles.sectionLabel}>{title.toLocaleUpperCase('tr')}</Text>
+      <View style={styles.sectionCard}>{children}</View>
+    </View>
+  );
+}
+
+/**
+ * Collapsible info row (privacy policy / terms / AI disclosure) — the inline
+ * static-copy approach: tapping expands the body instead of a dead link row.
+ */
+function ExpandableRow({
+  icon,
+  label,
+  body,
+  showDivider = true,
+}: {
+  icon: string;
+  label: string;
+  body: string;
+  showDivider?: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <View>
+      <Pressable
+        onPress={() => setOpen((value) => !value)}
+        accessibilityRole="button"
+        accessibilityLabel={label}
+        accessibilityState={{ expanded: open }}
+        style={({ pressed }) => [styles.expandRow, pressed && styles.expandRowPressed]}
+      >
+        <View style={styles.expandIconTile}>
+          <Text style={styles.expandIcon}>{icon}</Text>
+        </View>
+        <Text style={styles.expandLabel} numberOfLines={1}>
+          {label}
+        </Text>
+        <View style={open ? styles.chevronOpen : null}>
+          <ChevronRightIcon size={14} color={colors.mutedForeground} />
+        </View>
+      </Pressable>
+      {open ? <Text style={styles.expandBody}>{body}</Text> : null}
+      {showDivider ? <View style={styles.divider} /> : null}
+    </View>
+  );
+}
+
+/** Settings hub — `Settings/01-Main` from the final design. */
 export default function SettingsIndex() {
   const { t, i18n } = useTranslation();
-  const [pushGranted, setPushGranted] = useState<boolean | null>(null);
-  const [aiInfoOpen, setAiInfoOpen] = useState(false);
+  const [confirmSignOut, setConfirmSignOut] = useState(false);
 
   const meQuery = useQuery({ queryKey: ['me'], queryFn: () => api.users.me() });
-  const me = meQuery.data;
+  const childrenQuery = useQuery({ queryKey: ['children'], queryFn: () => api.children.list() });
+  const voicesQuery = useQuery({ queryKey: ['voices'], queryFn: () => api.voices.list() });
 
-  // Re-check on every focus — the user may grant/revoke on the next screen.
-  useFocusEffect(
-    useCallback(() => {
-      let active = true;
-      if (Platform.OS !== 'web') {
-        Notifications.getPermissionsAsync()
-          .then((permission) => {
-            if (active) setPushGranted(permission.granted);
-          })
-          .catch(() => undefined);
-      }
-      return () => {
-        active = false;
-      };
-    }, []),
-  );
+  const me = meQuery.data;
+  const childCount = childrenQuery.data?.length;
+  const voiceCount = voicesQuery.data?.filter(
+    (voice) => voice.status !== VoiceProfileStatus.DELETED,
+  ).length;
 
   const languageCode = i18n.language === 'en' ? 'en' : 'tr';
   const version = Constants.expoConfig?.version ?? '0.1.0';
 
-  const rows = [
-    {
-      key: 'account',
-      icon: '👤',
-      label: t('settings.account'),
-      sub: me?.email ?? t('settings.editProfile'),
-      route: '/settings/account',
-    },
-    {
-      key: 'language',
-      icon: '🌐',
-      label: t('settings.language'),
-      sub: t(`settings.languages.${languageCode}`),
-      route: '/settings/language',
-    },
-    {
-      key: 'notifications',
-      icon: '🔔',
-      label: t('settings.notifications'),
-      // No dedicated off-state copy exists yet — the neutral prefs line stands in.
-      sub: pushGranted === true ? t('settings.pushEnabled') : t('settings.pushDisabled'),
-      route: '/settings/notifications',
-    },
-  ] as const;
+  const signOut = async () => {
+    setConfirmSignOut(false);
+    // Best-effort: drop this device's push token while the session is still valid.
+    await unregisterPush();
+    try {
+      await api.auth.logout();
+    } catch {
+      // Signing out locally always succeeds even if the API call fails.
+    }
+    await useAuthStore.getState().clearSession();
+    router.replace('/(onboarding)/splash' as never);
+  };
 
   return (
     <Screen>
       <ScreenHeader title={t('settings.title')} />
 
-      <View style={styles.menuCard}>
-        {rows.map((row, index) => (
-          <Pressable
-            key={row.key}
-            onPress={() => router.push(row.route as never)}
-            accessibilityRole="button"
-            accessibilityLabel={row.label}
-            style={({ pressed }) => [
-              styles.menuRow,
-              index < rows.length - 1 && styles.menuRowBorder,
-              pressed && styles.menuRowPressed,
-            ]}
-          >
-            <View style={styles.iconTile}>
-              <Text style={styles.icon}>{row.icon}</Text>
-            </View>
-            <View style={styles.textBlock}>
-              <Text style={styles.label}>{row.label}</Text>
-              <Text style={styles.sub} numberOfLines={1}>
-                {row.sub}
-              </Text>
-            </View>
-            <ChevronRightIcon size={14} />
-          </Pressable>
-        ))}
-      </View>
+      <SectionCard title={t('settings.account')}>
+        <ListRow
+          icon="👤"
+          label={t('settings.accountInfo')}
+          sub={me?.name}
+          onPress={() => router.push('/settings/account' as never)}
+        />
+        <ListRow
+          icon="🧒"
+          label={t('profile.childrenSection')}
+          sub={childCount == null ? undefined : t('settings.childrenSub', { count: childCount })}
+          onPress={() => router.push('/children' as never)}
+        />
+        <ListRow
+          icon="🎙"
+          label={t('settings.voices')}
+          sub={
+            voiceCount == null
+              ? undefined
+              : voiceCount > 0
+                ? t('profile.menu.voicesSub', { count: voiceCount })
+                : t('profile.menu.voicesEmpty')
+          }
+          onPress={() => router.push('/voice' as never)}
+          showDivider={false}
+        />
+      </SectionCard>
 
-      {/* AI content disclosure — collapsible inline info (§ transparency). */}
-      <View style={styles.infoCard}>
-        <Pressable
-          onPress={() => setAiInfoOpen((open) => !open)}
-          accessibilityRole="button"
-          accessibilityLabel={t('settings.aiInfo')}
-          accessibilityState={{ expanded: aiInfoOpen }}
-          style={({ pressed }) => [styles.menuRow, pressed && styles.menuRowPressed]}
-        >
-          <View style={styles.iconTile}>
-            <Text style={styles.icon}>🤖</Text>
-          </View>
-          <View style={styles.textBlock}>
-            <Text style={styles.label}>{t('settings.aiInfo')}</Text>
-          </View>
-          <View style={aiInfoOpen ? styles.chevronOpen : styles.chevronClosed}>
-            <ChevronRightIcon size={14} />
-          </View>
-        </Pressable>
-        {aiInfoOpen ? <Text style={styles.infoBody}>{t('settings.aiInfoBody')}</Text> : null}
-      </View>
+      <SectionCard title={t('settings.sectionPreferences')}>
+        <ListRow
+          icon="🔔"
+          label={t('settings.notifications')}
+          onPress={() => router.push('/settings/notifications' as never)}
+        />
+        <ListRow
+          icon="🌍"
+          label={t('settings.language')}
+          sub={t(`settings.languages.${languageCode}`)}
+          onPress={() => router.push('/settings/language' as never)}
+          showDivider={false}
+        />
+      </SectionCard>
 
-      {/* Voice data — informational only; the management screen lands with the voice phase. */}
-      <View style={styles.infoCard}>
-        <View style={styles.menuRow}>
-          <View style={styles.iconTile}>
-            <Text style={styles.icon}>🎙</Text>
-          </View>
-          <View style={styles.textBlock}>
-            <Text style={styles.label}>{t('settings.voiceData')}</Text>
-          </View>
-        </View>
-        <Text style={styles.infoBody}>{t('settings.voiceDataBody')}</Text>
-      </View>
+      <SectionCard title={t('settings.sectionPrivacy')}>
+        <ListRow
+          icon="🔒"
+          label={t('settings.voiceData')}
+          onPress={() => router.push('/settings/voice-data' as never)}
+        />
+        <ExpandableRow icon="📄" label={t('settings.privacy')} body={t('settings.privacyBody')} />
+        <ExpandableRow icon="📋" label={t('settings.terms')} body={t('settings.termsBody')} />
+        <ExpandableRow
+          icon="🤖"
+          label={t('settings.aiInfo')}
+          body={t('settings.aiInfoBody')}
+          showDivider={false}
+        />
+      </SectionCard>
+
+      <SectionCard title={t('settings.account')}>
+        <ListRow icon="🚪" label={t('profile.signOut')} onPress={() => setConfirmSignOut(true)} />
+        <ListRow
+          icon="🗑"
+          label={t('settings.deleteAccount')}
+          variant="destructive"
+          onPress={() => router.push('/settings/account?delete=1' as never)}
+          showDivider={false}
+        />
+      </SectionCard>
 
       <Text style={styles.version}>{t('settings.version', { version })}</Text>
+
+      <ConfirmSheet
+        visible={confirmSignOut}
+        title={t('profile.signOutConfirm')}
+        confirmLabel={t('profile.signOut')}
+        cancelLabel={t('common.cancel')}
+        destructive
+        onConfirm={() => {
+          void signOut();
+        }}
+        onCancel={() => setConfirmSignOut(false)}
+      />
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  menuCard: {
+  section: { marginBottom: spacing.lg },
+  sectionLabel: {
+    fontFamily: fontFamilies.bodyBold,
+    fontSize: fontSizes.xs,
+    color: colors.mutedForeground,
+    letterSpacing: letterSpacing.eyebrow,
+    marginBottom: spacing.xs,
+    marginLeft: spacing.xxs,
+  },
+  sectionCard: {
     backgroundColor: colors.card,
-    borderRadius: radius.lg,
+    borderRadius: radius.card,
     borderWidth: 1,
     borderColor: colors.border,
     overflow: 'hidden',
-    marginBottom: spacing.md,
   },
-  infoCard: {
-    backgroundColor: colors.card,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
-    overflow: 'hidden',
-    marginBottom: spacing.md,
-  },
-  menuRow: {
+  expandRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 14,
-    paddingVertical: spacing.md,
+    paddingVertical: 14,
     paddingHorizontal: 18,
   },
-  menuRowBorder: { borderBottomWidth: 1, borderBottomColor: colors.border },
-  menuRowPressed: { backgroundColor: colors.muted },
-  iconTile: {
-    width: 40,
-    height: 40,
-    borderRadius: radius.chip,
+  expandRowPressed: { backgroundColor: colors.muted },
+  expandIconTile: {
+    width: 38,
+    height: 38,
+    borderRadius: 11,
     backgroundColor: colors.muted,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  icon: { fontSize: 20 },
-  textBlock: { flex: 1 },
-  label: {
-    fontFamily: fontFamilies.bodyBold,
+  expandIcon: { fontSize: 18 },
+  expandLabel: {
+    flex: 1,
+    fontFamily: fontFamilies.bodySemiBold,
     fontSize: fontSizes.lg,
     color: colors.foreground,
-    marginBottom: 1,
   },
-  sub: {
-    fontFamily: fontFamilies.body,
-    fontSize: fontSizes.sm,
-    color: colors.mutedForeground,
-  },
-  chevronClosed: { transform: [{ rotate: '0deg' }] },
   chevronOpen: { transform: [{ rotate: '90deg' }] },
-  infoBody: {
+  expandBody: {
     fontFamily: fontFamilies.body,
     fontSize: fontSizes.md,
     color: colors.mutedForeground,
     lineHeight: 20,
     paddingHorizontal: 18,
-    paddingBottom: spacing.md,
+    paddingBottom: 14,
+  },
+  divider: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: colors.border,
+    marginHorizontal: 18,
   },
   version: {
     fontFamily: fontFamilies.body,
-    fontSize: fontSizes.sm,
+    fontSize: fontSizes.xs,
     color: colors.mutedForeground,
     textAlign: 'center',
-    marginTop: spacing.lg,
+    marginTop: spacing.xs,
   },
 });
