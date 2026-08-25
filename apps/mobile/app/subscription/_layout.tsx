@@ -1,7 +1,7 @@
 import { Stack } from 'expo-router';
 import { colors } from '@masalim/ui';
 
-/** Subscription stack (paywall) — screens draw their own headers. */
+/** Subscription stack (paywall, quota) — screens draw their own headers. */
 export default function SubscriptionLayout() {
   return (
     <Stack

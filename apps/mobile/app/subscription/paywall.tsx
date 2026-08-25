@@ -1,41 +1,138 @@
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+  type DimensionValue,
+} from 'react-native';
 import { router } from 'expo-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import Animated, { FadeInUp } from 'react-native-reanimated';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Animated, {
+  Easing,
+  FadeInUp,
+  useAnimatedStyle,
+  useSharedValue,
+  withDelay,
+  withRepeat,
+  withTiming,
+} from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
-import { PLAN_ENTITLEMENTS, SubscriptionPlan } from '@masalim/types';
+import { SubscriptionPlan } from '@masalim/types';
 import { ApiError, NetworkError } from '@masalim/api-client';
-import { colors, fontFamilies, fontSizes, radius, shadows, spacing } from '@masalim/ui';
+import {
+  colors,
+  fontFamilies,
+  fontSizes,
+  premiumGold,
+  radius,
+  shadows,
+  spacing,
+} from '@masalim/ui';
 import { api } from '../../src/lib/api';
 import { purchases, type Offering } from '../../src/lib/purchases';
-import { Badge } from '../../src/components/Badge';
 import { Button } from '../../src/components/Button';
-import { Screen } from '../../src/components/Screen';
-import { ScreenHeader } from '../../src/components/ScreenHeader';
-import { SelectableCard } from '../../src/components/SelectableCard';
+import { CloseIcon } from '../../src/components/icons';
 import { ErrorState } from '../../src/components/states';
 
-/**
- * Free-vs-premium comparison rows (§36). Quota rows show the real monthly
- * limits from PLAN_ENTITLEMENTS; boolean features render ✓ / –.
- */
-const FEATURE_ROWS: { key: string; free: string; premium: string }[] = [
-  {
-    key: 'stories',
-    free: String(PLAN_ENTITLEMENTS.FREE.storyMonthlyLimit),
-    premium: String(PLAN_ENTITLEMENTS.PREMIUM.storyMonthlyLimit),
-  },
-  { key: 'parentVoices', free: '–', premium: '✓' },
-  { key: 'premiumVoices', free: '–', premium: '✓' },
-  {
-    key: 'illustrations',
-    free: String(PLAN_ENTITLEMENTS.FREE.illustrationMonthlyLimit),
-    premium: String(PLAN_ENTITLEMENTS.PREMIUM.illustrationMonthlyLimit),
-  },
-  { key: 'hdExport', free: '–', premium: '✓' },
+type PlanPeriod = Offering['period'];
+
+/** `Subscription/01-Paywall` premium feature grid — icons from the final design. */
+const FEATURES = [
+  { key: 'stories', icon: '✨' },
+  { key: 'parentVoices', icon: '🎙' },
+  { key: 'illustrations', icon: '🎨' },
+  { key: 'library', icon: '📚' },
+  { key: 'audiobook', icon: '📖' },
+  { key: 'print', icon: '🖨' },
+] as const;
+
+/** Fixed star dots of the paywall hero (positions from the final design). */
+const HERO_STARS: ReadonlyArray<{ x: DimensionValue; y: DimensionValue; s: number }> = [
+  { x: '10%', y: '20%', s: 6 },
+  { x: '80%', y: '10%', s: 4 },
+  { x: '50%', y: '60%', s: 5 },
+  { x: '30%', y: '80%', s: 3 },
+  { x: '90%', y: '70%', s: 6 },
 ];
+
+/** One softly pulsing hero star (design: `pulse-soft 2s`, staggered 0.4s). */
+function HeroStar({ star, index }: { star: (typeof HERO_STARS)[number]; index: number }) {
+  const pulse = useSharedValue(1);
+
+  useEffect(() => {
+    pulse.value = withDelay(
+      index * 400,
+      withRepeat(
+        withTiming(0.35, { duration: 2000, easing: Easing.inOut(Easing.ease) }),
+        -1,
+        true,
+      ),
+    );
+  }, [index, pulse]);
+
+  const pulseStyle = useAnimatedStyle(() => ({ opacity: 0.6 * pulse.value }));
+
+  return (
+    <Animated.View
+      pointerEvents="none"
+      style={[
+        styles.heroStar,
+        {
+          left: star.x,
+          top: star.y,
+          width: star.s,
+          height: star.s,
+          borderRadius: star.s / 2,
+        },
+        pulseStyle,
+      ]}
+    />
+  );
+}
+
+/**
+ * Parse a store-formatted price label ("₺129,99", "₺1.068,50", "$9.99") into a
+ * number. The last separator counts as the decimal point only when followed by
+ * at most two digits; every other separator is a thousands group.
+ */
+function parsePriceLabel(label: string): number | null {
+  const cleaned = label.replace(/[^\d.,]/g, '');
+  if (cleaned.length === 0) return null;
+  const sep = Math.max(cleaned.lastIndexOf(','), cleaned.lastIndexOf('.'));
+  let intPart = cleaned;
+  let fracPart = '';
+  if (sep >= 0) {
+    const frac = cleaned.slice(sep + 1);
+    if (frac.length > 0 && frac.length <= 2 && !frac.includes(',') && !frac.includes('.')) {
+      intPart = cleaned.slice(0, sep);
+      fracPart = frac;
+    }
+  }
+  const digits = intPart.replace(/[.,]/g, '');
+  if (digits.length === 0) return null;
+  const value = Number(`${digits}.${fracPart.length > 0 ? fracPart : '0'}`);
+  return Number.isFinite(value) && value > 0 ? value : null;
+}
+
+/** Format a price the Turkish store way ("1.068,50") — no Intl dependency. */
+function formatPrice(value: number): string {
+  const fixed = value.toFixed(2);
+  const intPart = fixed.slice(0, -3);
+  const fracPart = fixed.slice(-2);
+  return `${intPart.replace(/\B(?=(\d{3})+(?!\d))/g, '.')},${fracPart}`;
+}
+
+/** Currency prefix/suffix of a store label (e.g. "₺" + "" or "" + " TL"). */
+function currencyParts(label: string): { prefix: string; suffix: string } {
+  const prefix = /^[^\d]*/.exec(label)?.[0] ?? '';
+  const suffix = /[^\d]*$/.exec(label)?.[0] ?? '';
+  return { prefix: prefix.trimStart(), suffix: suffix.trimEnd() };
+}
 
 function formatExpiryDate(iso: string): string {
   const date = new Date(iso);
@@ -47,13 +144,18 @@ function formatExpiryDate(iso: string): string {
   }
 }
 
-/** Subscription paywall (§36) — crown hero, plan toggle, comparison matrix, CTA. */
+/**
+ * Subscription paywall — `Subscription/01-Paywall` from the final design:
+ * night-gradient hero with pulsing stars, premium feature grid, monthly/yearly
+ * segmented toggle + plan cards with real store prices, gradient CTA.
+ */
 export default function Paywall() {
   const { t } = useTranslation();
+  const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
 
-  // Yearly preselected — the "En Avantajlı" plan.
-  const [selected, setSelected] = useState<Offering['productId']>('masalim_premium_yearly');
+  // Yearly preselected — the "En Popüler" plan.
+  const [period, setPeriod] = useState<PlanPeriod>('yearly');
   const [busy, setBusy] = useState(false);
   const [restoring, setRestoring] = useState(false);
   const [done, setDone] = useState(false);
@@ -80,6 +182,43 @@ export default function Paywall() {
   const monthly = offerings.find((offering) => offering.period === 'monthly');
   const yearly = offerings.find((offering) => offering.period === 'yearly');
 
+  const monthlyValue = monthly == null ? null : parsePriceLabel(monthly.priceLabel);
+  const yearlyValue = yearly == null ? null : parsePriceLabel(yearly.priceLabel);
+
+  // Discount % computed from real offering prices — never hardcoded.
+  const discountPercent =
+    monthlyValue != null && yearlyValue != null
+      ? Math.round((1 - yearlyValue / (monthlyValue * 12)) * 100)
+      : null;
+  const showDiscount = discountPercent != null && discountPercent > 0;
+
+  // Yearly card leads with the per-month equivalent when the label parses.
+  const yearlyPerMonth =
+    yearly != null && yearlyValue != null
+      ? (() => {
+          const { prefix, suffix } = currencyParts(yearly.priceLabel);
+          return `${prefix}${formatPrice(yearlyValue / 12)}${suffix}`;
+        })()
+      : null;
+
+  /** Headline price + small period suffix for a plan card / the CTA. */
+  const priceParts = (plan: PlanPeriod): { price: string; suffix: string } | null => {
+    if (plan === 'monthly') {
+      return monthly == null
+        ? null
+        : { price: monthly.priceLabel, suffix: t('subscription.perMonth') };
+    }
+    if (yearly == null) return null;
+    return yearlyPerMonth != null
+      ? { price: yearlyPerMonth, suffix: t('subscription.perMonth') }
+      : { price: yearly.priceLabel, suffix: t('subscription.perYear') };
+  };
+
+  const selectedParts = priceParts(period);
+  const selectedProductId: Offering['productId'] =
+    (period === 'yearly' ? yearly?.productId : monthly?.productId) ??
+    (period === 'yearly' ? 'masalim_premium_yearly' : 'masalim_premium_monthly');
+
   const mapError = (err: unknown): string => {
     if (err instanceof ApiError) {
       return t(`errors.${err.code}`, { defaultValue: t('errors.GENERIC') });
@@ -93,11 +232,9 @@ export default function Paywall() {
    * keys already carry the ₺ symbol, so strip a leading ₺ before interpolating;
    * a non-₺ store locale (RevenueCat) shows the label as-is.
    */
-  const priceLine = (offering: Offering): string => {
-    const key =
-      offering.period === 'monthly' ? 'subscription.pricePerMonth' : 'subscription.pricePerYear';
+  const yearlyTotalLine = (offering: Offering): string => {
     if (offering.priceLabel.startsWith('₺')) {
-      return t(key, { price: offering.priceLabel.slice(1).trim() });
+      return t('subscription.pricePerYear', { price: offering.priceLabel.slice(1).trim() });
     }
     return offering.priceLabel;
   };
@@ -123,7 +260,7 @@ export default function Paywall() {
     setRestoreNote(null);
     setBusy(true);
     try {
-      const result = await purchases.purchase(selected);
+      const result = await purchases.purchase(selectedProductId);
       if (result.cancelled === true) return; // user backed out — no-op
       if (!result.success) {
         setError(t('errors.GENERIC'));
@@ -161,8 +298,42 @@ export default function Paywall() {
 
   const expiresAt = subscriptionQuery.data?.expiresAt ?? null;
 
+  // Night-gradient hero: 160deg purpleDeep→primary, star dots, close circle.
+  const renderHero = () => (
+    <LinearGradient
+      colors={[colors.purpleDeep, colors.primary]}
+      start={{ x: 0.2, y: 0 }}
+      end={{ x: 0.8, y: 1 }}
+      style={[styles.hero, { paddingTop: Math.max(insets.top, 20) + 12 }]}
+    >
+      {HERO_STARS.map((star, index) => (
+        <HeroStar key={index} star={star} index={index} />
+      ))}
+      <Pressable
+        onPress={() => router.back()}
+        accessibilityRole="button"
+        accessibilityLabel={t('common.close')}
+        hitSlop={8}
+        style={({ pressed }) => [
+          styles.closeButton,
+          { top: Math.max(insets.top, 20) + 12, opacity: pressed ? 0.7 : 1 },
+        ]}
+      >
+        <CloseIcon />
+      </Pressable>
+      <View style={styles.eyebrowRow}>
+        <Text style={styles.eyebrowSparkle}>✨</Text>
+        <Text style={styles.eyebrow}>{t('subscription.title').toLocaleUpperCase('tr-TR')}</Text>
+      </View>
+      <Text style={styles.heroTitle} accessibilityRole="header">
+        {t('subscription.heroTitle')}
+      </Text>
+      <Text style={styles.heroSubtitle}>{t('subscription.heroSubtitle')}</Text>
+    </LinearGradient>
+  );
+
   const renderActive = () => (
-    <>
+    <View style={styles.content}>
       <LinearGradient
         colors={[colors.primary, colors.purpleSoft]}
         start={{ x: 0, y: 0 }}
@@ -181,89 +352,105 @@ export default function Paywall() {
       </LinearGradient>
       {/* Store subscriptions are managed in the store — a note, not a CTA. */}
       <Text style={styles.manageNote}>{t('subscription.manage')}</Text>
-    </>
-  );
-
-  const renderPlans = () => (
-    <View style={styles.planRow}>
-      {monthly != null ? (
-        <SelectableCard
-          glow
-          selected={selected === monthly.productId}
-          onPress={() => setSelected(monthly.productId)}
-          showCheck={false}
-          style={styles.planCard}
-          accessibilityLabel={t('subscription.monthly')}
-        >
-          <View style={styles.planCardBody}>
-            <Text style={styles.planName}>{t('subscription.monthly')}</Text>
-            <Text style={styles.planPrice}>{priceLine(monthly)}</Text>
-          </View>
-        </SelectableCard>
-      ) : null}
-      {yearly != null ? (
-        <SelectableCard
-          glow
-          selected={selected === yearly.productId}
-          onPress={() => setSelected(yearly.productId)}
-          showCheck={false}
-          style={styles.planCard}
-          accessibilityLabel={t('subscription.yearly')}
-        >
-          <View style={styles.planCardBody}>
-            <Badge label={t('subscription.bestValue')} variant="premium" />
-            <Text style={styles.planName}>{t('subscription.yearly')}</Text>
-            <Text style={styles.planPrice}>{priceLine(yearly)}</Text>
-          </View>
-        </SelectableCard>
-      ) : null}
     </View>
   );
 
-  const renderMatrix = () => (
-    <View style={styles.matrixCard}>
-      <View style={[styles.matrixRow, styles.matrixRowBorder]}>
-        <View style={styles.matrixLabelCell} />
-        <Text style={[styles.matrixHeader, styles.matrixValueCell]}>
-          {t('subscription.freePlan')}
-        </Text>
-        <Text style={[styles.matrixHeader, styles.matrixHeaderPremium, styles.matrixValueCell]}>
-          {t('subscription.premiumPlan')}
-        </Text>
+  const renderFeatures = () => (
+    <View style={styles.featuresCard}>
+      <Text style={styles.featuresLabel}>
+        {t('subscription.featuresLabel').toLocaleUpperCase('tr-TR')}
+      </Text>
+      <View style={styles.featuresGrid}>
+        {FEATURES.map((feature) => (
+          <View key={feature.key} style={styles.featureItem}>
+            <Text style={styles.featureIcon}>{feature.icon}</Text>
+            <Text style={styles.featureText}>{t(`subscription.features.${feature.key}`)}</Text>
+          </View>
+        ))}
       </View>
-      {FEATURE_ROWS.map((row, index) => (
-        <View
-          key={row.key}
-          style={[styles.matrixRow, index < FEATURE_ROWS.length - 1 && styles.matrixRowBorder]}
-        >
-          <Text style={[styles.matrixLabel, styles.matrixLabelCell]}>
-            {t(`subscription.features.${row.key}`)}
-          </Text>
-          <Text
-            style={[
-              styles.matrixValue,
-              row.free === '–' && styles.matrixValueMuted,
-              styles.matrixValueCell,
-            ]}
-          >
-            {row.free}
-          </Text>
-          <Text style={[styles.matrixValue, styles.matrixValuePremium, styles.matrixValueCell]}>
-            {row.premium}
-          </Text>
-        </View>
-      ))}
     </View>
   );
+
+  const renderToggle = () => (
+    <View style={styles.toggleTrack}>
+      {(['monthly', 'yearly'] as const).map((plan) => {
+        const active = period === plan;
+        return (
+          <Pressable
+            key={plan}
+            onPress={() => setPeriod(plan)}
+            accessibilityRole="button"
+            accessibilityState={{ selected: active }}
+            accessibilityLabel={t(`subscription.${plan}`)}
+            style={[styles.segment, active && styles.segmentActive]}
+          >
+            <Text style={[styles.segmentLabel, active && styles.segmentLabelActive]}>
+              {t(`subscription.${plan}`)}
+            </Text>
+            {plan === 'yearly' && showDiscount ? (
+              <View style={styles.discountChip}>
+                <Text style={styles.discountText}>
+                  {t('subscription.discountBadge', { percent: discountPercent })}
+                </Text>
+              </View>
+            ) : null}
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+
+  const renderPlanCard = (plan: PlanPeriod) => {
+    const offering = plan === 'monthly' ? monthly : yearly;
+    if (offering == null) return null;
+    const parts = priceParts(plan);
+    const selected = period === plan;
+    return (
+      <Pressable
+        key={plan}
+        onPress={() => setPeriod(plan)}
+        accessibilityRole="button"
+        accessibilityState={{ selected }}
+        accessibilityLabel={t(plan === 'monthly' ? 'subscription.monthlyPlan' : 'subscription.yearlyPlan')}
+        style={[styles.planCard, selected ? styles.planCardSelected : styles.planCardIdle]}
+      >
+        {plan === 'yearly' ? (
+          <View style={styles.popularBadge}>
+            <Text style={styles.popularBadgeText}>{t('subscription.mostPopular')}</Text>
+          </View>
+        ) : null}
+        <View style={styles.planRow}>
+          <View style={styles.planTextBlock}>
+            <Text style={styles.planName}>
+              {t(plan === 'monthly' ? 'subscription.monthlyPlan' : 'subscription.yearlyPlan')}
+            </Text>
+            <Text style={styles.planDesc}>
+              {plan === 'monthly' ? t('subscription.cancelAnytime') : yearlyTotalLine(offering)}
+            </Text>
+          </View>
+          {parts != null ? (
+            <View style={styles.priceRow}>
+              <Text style={[styles.planPrice, selected && styles.planPriceSelected]}>
+                {parts.price}
+              </Text>
+              <Text style={styles.planPeriod}>{parts.suffix}</Text>
+            </View>
+          ) : null}
+        </View>
+      </Pressable>
+    );
+  };
 
   const renderPurchase = () =>
     offeringsQuery.isError ? (
-      <ErrorState
-        emoji="🌧️"
-        title={mapError(offeringsQuery.error)}
-        ctaLabel={t('common.retry')}
-        onCta={() => void offeringsQuery.refetch()}
-      />
+      <View style={styles.content}>
+        <ErrorState
+          emoji="🌧️"
+          title={mapError(offeringsQuery.error)}
+          ctaLabel={t('common.retry')}
+          onCta={() => void offeringsQuery.refetch()}
+        />
+      </View>
     ) : offeringsQuery.data == null ? (
       <ActivityIndicator
         color={colors.primary}
@@ -271,9 +458,15 @@ export default function Paywall() {
         accessibilityLabel={t('common.loading')}
       />
     ) : (
-      <>
-        {renderPlans()}
-        {renderMatrix()}
+      <View style={styles.content}>
+        {renderFeatures()}
+        {renderToggle()}
+
+        {/* Monthly toggle shows the monthly card only; yearly shows both. */}
+        <View style={styles.planList}>
+          {renderPlanCard('monthly')}
+          {period === 'yearly' ? renderPlanCard('yearly') : null}
+        </View>
 
         {error != null ? <Text style={styles.errorText}>{error}</Text> : null}
         {restoreNote != null ? <Text style={styles.restoreNote}>{restoreNote}</Text> : null}
@@ -284,7 +477,17 @@ export default function Paywall() {
           </Animated.Text>
         ) : (
           <>
-            <Button label={t('subscription.subscribe')} onPress={() => void onSubscribe()} loading={busy} />
+            <Button
+              label={
+                selectedParts != null
+                  ? t('subscription.startCta', {
+                      price: `${selectedParts.price}${selectedParts.suffix}`,
+                    })
+                  : t('subscription.subscribe')
+              }
+              onPress={() => void onSubscribe()}
+              loading={busy}
+            />
             <Pressable
               onPress={() => void onRestore()}
               disabled={busy || restoring}
@@ -293,114 +496,191 @@ export default function Paywall() {
               style={({ pressed }) => [styles.restoreLink, { opacity: pressed ? 0.7 : 1 }]}
             >
               {restoring ? (
-                <ActivityIndicator size="small" color={colors.mutedForeground} />
+                <ActivityIndicator size="small" color={colors.primary} />
               ) : (
                 <Text style={styles.restoreLinkText}>{t('subscription.restore')}</Text>
               )}
             </Pressable>
+            <Text style={styles.legal}>{t('subscription.legal')}</Text>
           </>
         )}
-      </>
+      </View>
     );
 
   return (
-    <Screen>
-      {/* Back-only header — the crown hero carries the title. */}
-      <ScreenHeader />
-
-      {/* Crown hero */}
-      <View style={styles.hero}>
-        <View style={styles.crownCircle}>
-          <Text style={styles.crownEmoji}>👑</Text>
-        </View>
-        <Text style={styles.heroTitle} accessibilityRole="header">
-          {t('subscription.title')}
-        </Text>
-        <Text style={styles.heroSubtitle}>{t('subscription.subtitle')}</Text>
-      </View>
-
+    <ScrollView
+      style={styles.root}
+      contentContainerStyle={{ paddingBottom: Math.max(insets.bottom, 24) + spacing.xl }}
+      showsVerticalScrollIndicator={false}
+    >
+      {renderHero()}
       {isPremium && !done ? renderActive() : renderPurchase()}
-    </Screen>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  hero: { alignItems: 'center', marginBottom: spacing.xl },
-  crownCircle: {
-    width: 84,
-    height: 84,
-    borderRadius: 42,
-    backgroundColor: 'rgba(255,217,125,0.25)',
-    borderWidth: 2,
-    borderColor: 'rgba(255,217,125,0.5)',
+  root: { flex: 1, backgroundColor: colors.background },
+  loader: { marginTop: spacing.xxl },
+
+  /* Hero */
+  hero: {
+    paddingHorizontal: spacing.pageX,
+    paddingBottom: spacing.xxl,
+    overflow: 'hidden',
+  },
+  heroStar: { position: 'absolute', backgroundColor: colors.primaryForeground },
+  closeButton: {
+    position: 'absolute',
+    right: spacing.pageX,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255,255,255,0.15)',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: spacing.md,
+    zIndex: 1,
   },
-  crownEmoji: { fontSize: 40 },
+  eyebrowRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: spacing.xs },
+  eyebrowSparkle: { fontSize: 24 },
+  eyebrow: {
+    fontFamily: fontFamilies.bodyExtraBold,
+    fontSize: fontSizes.sm,
+    color: premiumGold.bright,
+    letterSpacing: 1.2,
+  },
   heroTitle: {
-    fontFamily: fontFamilies.display,
-    fontSize: fontSizes.display,
-    color: colors.foreground,
-    textAlign: 'center',
-    letterSpacing: -0.5,
-    marginBottom: spacing.xs,
+    fontFamily: fontFamilies.displayBold,
+    fontSize: fontSizes.displayLg,
+    color: colors.primaryForeground,
+    lineHeight: 36,
+    marginBottom: 10,
+    paddingRight: 44,
   },
   heroSubtitle: {
     fontFamily: fontFamilies.body,
-    fontSize: fontSizes.lg,
-    color: colors.mutedForeground,
-    textAlign: 'center',
+    fontSize: fontSizes.base,
+    color: 'rgba(255,255,255,0.75)',
     lineHeight: 22,
   },
-  loader: { marginTop: spacing.xxl },
 
-  planRow: { flexDirection: 'row', gap: 10, marginBottom: spacing.lg },
-  planCard: { flex: 1, paddingVertical: 14, paddingHorizontal: 14 },
-  planCardBody: { flex: 1, gap: 4, alignItems: 'flex-start' },
-  planName: {
-    fontFamily: fontFamilies.bodyBold,
-    fontSize: fontSizes.xl,
-    color: colors.foreground,
-  },
-  planPrice: {
-    fontFamily: fontFamilies.bodySemiBold,
-    fontSize: fontSizes.md,
-    color: colors.mutedForeground,
-  },
+  content: { paddingHorizontal: spacing.pageX, paddingTop: spacing.xl },
 
-  matrixCard: {
+  /* Feature grid card */
+  featuresCard: {
     backgroundColor: colors.card,
     borderRadius: radius.lg,
     borderWidth: 1,
     borderColor: colors.border,
-    paddingHorizontal: 16,
+    paddingVertical: spacing.lg,
+    paddingHorizontal: 18,
     marginBottom: spacing.lg,
   },
-  matrixRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, gap: 8 },
-  matrixRowBorder: { borderBottomWidth: 1, borderBottomColor: colors.border },
-  matrixLabelCell: { flex: 1 },
-  matrixValueCell: { width: 64, textAlign: 'center' },
-  matrixHeader: {
+  featuresLabel: {
     fontFamily: fontFamilies.bodyBold,
     fontSize: fontSizes.sm,
     color: colors.mutedForeground,
-    letterSpacing: 0.4,
+    letterSpacing: 0.72,
+    marginBottom: 14,
   },
-  matrixHeaderPremium: { color: colors.primary },
-  matrixLabel: {
+  featuresGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  featureItem: { width: '47%', flexDirection: 'row', alignItems: 'flex-start', gap: spacing.xs },
+  featureIcon: { fontSize: 16 },
+  featureText: {
+    flex: 1,
     fontFamily: fontFamilies.bodySemiBold,
-    fontSize: fontSizes.base,
+    fontSize: fontSizes.md,
     color: colors.foreground,
-    lineHeight: 19,
+    lineHeight: 18,
   },
-  matrixValue: {
+
+  /* Plan toggle */
+  toggleTrack: {
+    flexDirection: 'row',
+    backgroundColor: colors.muted,
+    borderRadius: radius.base,
+    padding: 4,
+    marginBottom: 14,
+  },
+  segment: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 10,
+    borderRadius: radius.chip,
+  },
+  segmentActive: { backgroundColor: colors.card, ...shadows.cardSubtle },
+  segmentLabel: {
     fontFamily: fontFamilies.bodyBold,
     fontSize: fontSizes.base,
+    color: colors.mutedForeground,
+  },
+  segmentLabelActive: { color: colors.foreground },
+  /* rgba stops derive from colors.sage (#8DB89A). */
+  discountChip: {
+    backgroundColor: 'rgba(141,184,154,0.12)',
+    borderRadius: radius.xs,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  discountText: {
+    fontFamily: fontFamilies.bodyExtraBold,
+    fontSize: fontSizes.xxs,
     color: colors.sage,
   },
-  matrixValueMuted: { color: colors.mutedForeground },
-  matrixValuePremium: { color: colors.sage },
+
+  /* Plan cards */
+  planList: { gap: 10, marginBottom: spacing.lg },
+  planCard: {
+    paddingVertical: spacing.md,
+    paddingHorizontal: 18,
+    borderRadius: radius.card,
+    backgroundColor: colors.card,
+    borderWidth: 2,
+  },
+  planCardSelected: { borderColor: colors.primary },
+  planCardIdle: { borderColor: colors.border },
+  popularBadge: {
+    position: 'absolute',
+    top: -10,
+    right: spacing.md,
+    backgroundColor: colors.coral,
+    borderRadius: radius.sm,
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+  },
+  popularBadgeText: {
+    fontFamily: fontFamilies.bodyExtraBold,
+    fontSize: fontSizes.xxs,
+    color: colors.primaryForeground,
+  },
+  planRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  planTextBlock: { flexShrink: 1, paddingRight: spacing.sm },
+  planName: {
+    fontFamily: fontFamilies.bodyBold,
+    fontSize: fontSizes.lg,
+    color: colors.foreground,
+    marginBottom: 2,
+  },
+  planDesc: {
+    fontFamily: fontFamilies.body,
+    fontSize: fontSizes.sm,
+    color: colors.mutedForeground,
+  },
+  priceRow: { flexDirection: 'row', alignItems: 'baseline' },
+  planPrice: {
+    fontFamily: fontFamilies.displayBold,
+    fontSize: fontSizes.h1,
+    color: colors.foreground,
+  },
+  planPriceSelected: { color: colors.primary },
+  planPeriod: {
+    fontFamily: fontFamilies.body,
+    fontSize: fontSizes.sm,
+    color: colors.mutedForeground,
+  },
 
   errorText: {
     fontFamily: fontFamilies.bodySemiBold,
@@ -423,14 +703,21 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     paddingVertical: 18,
   },
-  restoreLink: { alignItems: 'center', paddingVertical: 14 },
+  restoreLink: { alignItems: 'center', paddingVertical: spacing.sm, marginTop: 4 },
   restoreLinkText: {
     fontFamily: fontFamilies.bodyBold,
     fontSize: fontSizes.md,
+    color: colors.primary,
+  },
+  legal: {
+    fontFamily: fontFamilies.body,
+    fontSize: fontSizes.xs,
     color: colors.mutedForeground,
-    textDecorationLine: 'underline',
+    textAlign: 'center',
+    marginTop: 4,
   },
 
+  /* Active premium */
   activeCard: {
     alignItems: 'center',
     padding: spacing.xl,

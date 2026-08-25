@@ -24,6 +24,14 @@ export function ChevronRightIcon({ size = 16, color = '#8A7D72', strokeWidth = 2
   );
 }
 
+export function CloseIcon({ size = 16, color = '#FFFFFF', strokeWidth = 2.5 }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Path d="M18 6L6 18M6 6l12 12" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" />
+    </Svg>
+  );
+}
+
 export function CheckIcon({ size = 12, color = '#FFFFFF', strokeWidth = 3 }: IconProps) {
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">

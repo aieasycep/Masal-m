@@ -265,7 +265,10 @@ export default function CreateStory() {
           setModerationError(t('errors.MODERATION_REJECTED'));
           setStep(3);
         } else if (err.code === 'QUOTA_EXCEEDED') {
+          // Full-screen quota stop; the inline banner stays as a fallback so
+          // dismissing the screen never leaves a dead end.
           setQuotaError(true);
+          router.push('/subscription/quota' as never);
         } else {
           setSubmitError(t(`errors.${err.code}`, { defaultValue: t('errors.GENERIC') }));
         }

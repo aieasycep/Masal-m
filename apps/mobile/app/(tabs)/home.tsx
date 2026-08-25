@@ -5,10 +5,12 @@ import { router } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SubscriptionPlan } from '@masalim/types';
 import type { StorySummary } from '@masalim/validation';
 import { colors, fontFamilies, fontSizes, gradients, radius, shadows, spacing } from '@masalim/ui';
 import { Avatar } from '../../src/components/Avatar';
 import { ChildSwitcherSheet, childAvatarEmoji } from '../../src/components/ChildSwitcherSheet';
+import { QuotaBanner } from '../../src/components/QuotaBanner';
 import { Screen } from '../../src/components/Screen';
 import { SectionHeader } from '../../src/components/SectionHeader';
 import { StoryCardVertical, StoryCardWide } from '../../src/components/StoryCard';
@@ -46,6 +48,26 @@ export default function Home() {
 
   const meQuery = useQuery({ queryKey: ['me'], queryFn: () => api.users.me() });
   const childrenQuery = useQuery({ queryKey: ['children'], queryFn: () => api.children.list() });
+  const entitlementsQuery = useQuery({
+    queryKey: ['entitlements'],
+    queryFn: () => api.subscription.entitlements(),
+  });
+
+  // Quota banner (final design): warning at ≤2 remaining, exhausted at 0.
+  // Premium plans never see it — their quota headroom is not a sales surface.
+  const entitlements = entitlementsQuery.data;
+  const storyQuota = entitlements?.quotas.story_monthly_limit;
+  const quotaRemaining = storyQuota == null ? null : storyQuota.limit - storyQuota.used;
+  const quotaVariant: 'warning' | 'exhausted' | null =
+    entitlements == null ||
+    entitlements.plan === SubscriptionPlan.PREMIUM ||
+    quotaRemaining == null
+      ? null
+      : quotaRemaining <= 0
+        ? 'exhausted'
+        : quotaRemaining <= 2
+          ? 'warning'
+          : null;
 
   const childList = childrenQuery.data ?? [];
   const selectedChild = childList.find((child) => child.id === selectedChildId) ?? childList[0];
@@ -138,6 +160,17 @@ export default function Home() {
   return (
     <Screen withTabBar padded={false} style={styles.content}>
       {header}
+
+      {/* Quota banner — between header and hero CTA (final design). */}
+      {quotaVariant != null ? (
+        <View style={styles.quotaSection}>
+          <QuotaBanner
+            variant={quotaVariant}
+            remaining={Math.max(quotaRemaining ?? 0, 0)}
+            onSeePremium={() => router.push('/subscription/paywall' as never)}
+          />
+        </View>
+      ) : null}
 
       {/* Hero CTA */}
       <View style={styles.section}>
@@ -300,8 +333,9 @@ const styles = StyleSheet.create({
   content: { paddingTop: 0 },
   header: {
     paddingHorizontal: spacing.pageX,
-    paddingBottom: spacing.xl,
+    paddingBottom: spacing.md,
   },
+  quotaSection: { paddingHorizontal: spacing.pageX, marginBottom: spacing.md },
   headerRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
