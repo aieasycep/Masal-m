@@ -21,39 +21,113 @@ import { Input } from '../../../src/components/Input';
 import { Screen } from '../../../src/components/Screen';
 import { ScreenHeader } from '../../../src/components/ScreenHeader';
 import { SelectableCard } from '../../../src/components/SelectableCard';
+import { StepBar } from '../../../src/components/StepBar';
 import { CheckIcon } from '../../../src/components/icons';
 import { ErrorState } from '../../../src/components/states';
 
-type FieldName = keyof Omit<CreateAddressInput, 'isDefault'>;
+/**
+ * Decomposed form fields per `Checkout/02-Address`. The backend keeps a single
+ * `addressLine` — mahalle + cadde/sokak + bina/daire are composed on submit.
+ */
+type FormField =
+  | 'fullName'
+  | 'phone'
+  | 'city'
+  | 'district'
+  | 'neighborhood'
+  | 'street'
+  | 'buildingInfo'
+  | 'postalCode';
 
-const FIELD_ORDER: FieldName[] = [
-  'fullName',
-  'phone',
-  'addressLine',
-  'city',
-  'district',
-  'postalCode',
+interface FieldDef {
+  key: FormField;
+  labelKey: string;
+  placeholderKey: string;
+  required: boolean;
+  keyboardType?: 'phone-pad' | 'number-pad';
+  autoCapitalize?: 'words';
+  maxLength?: number;
+}
+
+const FIELD_DEFS: FieldDef[] = [
+  {
+    key: 'fullName',
+    labelKey: 'checkout.fullName',
+    placeholderKey: 'checkout.placeholders.fullName',
+    required: true,
+    autoCapitalize: 'words',
+  },
+  {
+    key: 'phone',
+    labelKey: 'checkout.phone',
+    placeholderKey: 'checkout.placeholders.phone',
+    required: true,
+    keyboardType: 'phone-pad',
+  },
+  {
+    key: 'city',
+    labelKey: 'checkout.city',
+    placeholderKey: 'checkout.placeholders.city',
+    required: true,
+    autoCapitalize: 'words',
+  },
+  {
+    key: 'district',
+    labelKey: 'checkout.district',
+    placeholderKey: 'checkout.placeholders.district',
+    required: true,
+    autoCapitalize: 'words',
+  },
+  {
+    key: 'neighborhood',
+    labelKey: 'checkout.neighborhood',
+    placeholderKey: 'checkout.placeholders.neighborhood',
+    required: true,
+    autoCapitalize: 'words',
+  },
+  {
+    key: 'street',
+    labelKey: 'checkout.street',
+    placeholderKey: 'checkout.placeholders.street',
+    required: true,
+    autoCapitalize: 'words',
+  },
+  {
+    key: 'buildingInfo',
+    labelKey: 'checkout.buildingInfo',
+    placeholderKey: 'checkout.placeholders.buildingInfo',
+    required: false,
+    autoCapitalize: 'words',
+  },
+  // Design marks the postal code optional, but the backend contract requires a
+  // valid 5-digit code — kept required so submission cannot dead-end.
+  {
+    key: 'postalCode',
+    labelKey: 'checkout.postalCode',
+    placeholderKey: 'checkout.placeholders.postalCode',
+    required: true,
+    keyboardType: 'number-pad',
+    maxLength: 5,
+  },
 ];
 
-/** Checkout flow: configure → address (this) → review. */
-const TOTAL_STEPS = 3;
-const STEP_INDEX = 1;
+const EMPTY_FORM: Record<FormField, string> = {
+  fullName: '',
+  phone: '',
+  city: '',
+  district: '',
+  neighborhood: '',
+  street: '',
+  buildingInfo: '',
+  postalCode: '',
+};
 
-/** Thin 3-segment checkout progress bar under the header (design: PrintOrder). */
-function StepBar() {
-  return (
-    <View style={styles.progressRow}>
-      {Array.from({ length: TOTAL_STEPS }, (_, index) => (
-        <View
-          key={index}
-          style={[
-            styles.progressSegment,
-            index <= STEP_INDEX ? styles.progressFilled : styles.progressEmpty,
-          ]}
-        />
-      ))}
-    </View>
-  );
+/** Join the decomposed street parts into the backend's single addressLine. */
+function composeAddressLine(form: Record<FormField, string>): string {
+  return [form.neighborhood, form.street, form.buildingInfo]
+    .map((part) => part.trim())
+    .filter((part) => part.length > 0)
+    .join(', ');
 }
 
 /** Checkout step 2 — pick a saved shipping address or create a new one (§34). */
@@ -71,17 +145,11 @@ export default function CheckoutAddress() {
   }, [bookId, begin]);
 
   const [formOpen, setFormOpen] = useState(false);
-  const [form, setForm] = useState<Record<FieldName, string>>({
-    fullName: '',
-    phone: '',
-    addressLine: '',
-    city: '',
-    district: '',
-    postalCode: '',
-  });
-  const [fieldErrors, setFieldErrors] = useState<Partial<Record<FieldName, string>>>({});
-  // "Adresi kaydet" — the address is ALWAYS persisted (orders need an address id);
-  // the checkbox marks it as the default for the next checkout.
+  const [form, setForm] = useState<Record<FormField, string>>(EMPTY_FORM);
+  const [fieldErrors, setFieldErrors] = useState<Partial<Record<FormField, string>>>({});
+  // "Bu adresi daha sonra kullanmak için kaydet" — the address is ALWAYS
+  // persisted (orders need an address id); the checkbox marks it as the
+  // default for the next checkout.
   const [saveAsDefault, setSaveAsDefault] = useState(true);
   const [serverError, setServerError] = useState<string | null>(null);
 
@@ -112,12 +180,12 @@ export default function CheckoutAddress() {
     onSuccess: async (created: Address) => {
       await queryClient.invalidateQueries({ queryKey: ['addresses'] });
       setAddressId(created.id);
-      router.push(`/checkout/${bookId}/review` as never);
+      router.push(`/checkout/${bookId}/configure` as never);
     },
     onError: (error) => setServerError(mapError(error)),
   });
 
-  const setField = (field: FieldName, value: string) => {
+  const setField = (field: FormField, value: string) => {
     setForm((prev) => ({ ...prev, [field]: value }));
     if (fieldErrors[field] != null) {
       setFieldErrors((prev) => ({ ...prev, [field]: undefined }));
@@ -127,15 +195,42 @@ export default function CheckoutAddress() {
   const onContinue = () => {
     setServerError(null);
     if (formOpen) {
-      const parsed = createAddressSchema.safeParse({ ...form, isDefault: saveAsDefault });
+      const nextErrors: Partial<Record<FormField, string>> = {};
+      for (const def of FIELD_DEFS) {
+        if (def.required && form[def.key].trim().length === 0) {
+          nextErrors[def.key] = t('checkout.fieldRequired');
+        }
+      }
+
+      const parsed = createAddressSchema.safeParse({
+        fullName: form.fullName,
+        phone: form.phone,
+        addressLine: composeAddressLine(form),
+        city: form.city,
+        district: form.district,
+        postalCode: form.postalCode,
+        isDefault: saveAsDefault,
+      });
       if (!parsed.success) {
         const flat = parsed.error.flatten().fieldErrors;
-        const nextErrors: Partial<Record<FieldName, string>> = {};
-        for (const field of FIELD_ORDER) {
-          if (flat[field] != null && flat[field].length > 0) {
+        const direct: Extract<
+          FormField,
+          'fullName' | 'phone' | 'city' | 'district' | 'postalCode'
+        >[] = ['fullName', 'phone', 'city', 'district', 'postalCode'];
+        for (const field of direct) {
+          if (flat[field] != null && flat[field].length > 0 && nextErrors[field] == null) {
             nextErrors[field] = t('errors.VALIDATION_FAILED');
           }
         }
+        // The composed addressLine (min 10 chars) maps back to its source fields.
+        if (flat.addressLine != null && flat.addressLine.length > 0) {
+          if (nextErrors.neighborhood == null && nextErrors.street == null) {
+            nextErrors.street = t('errors.VALIDATION_FAILED');
+          }
+        }
+      }
+
+      if (Object.keys(nextErrors).length > 0 || !parsed.success) {
         setFieldErrors(nextErrors);
         return;
       }
@@ -143,7 +238,7 @@ export default function CheckoutAddress() {
       return;
     }
     if (addressId == null) return;
-    router.push(`/checkout/${bookId}/review` as never);
+    router.push(`/checkout/${bookId}/configure` as never);
   };
 
   const canContinue = formOpen || addressId != null;
@@ -155,7 +250,17 @@ export default function CheckoutAddress() {
     >
       <Screen>
         <ScreenHeader eyebrow={t('checkout.eyebrow')} title={t('checkout.addressTitle')} />
-        <StepBar />
+        <View style={styles.stepBar}>
+          <StepBar
+            labels={[
+              t('checkout.steps.book'),
+              t('checkout.steps.address'),
+              t('checkout.steps.summary'),
+              t('checkout.steps.payment'),
+            ]}
+            activeIndex={1}
+          />
+        </View>
 
         {addressesQuery.isError ? (
           <ErrorState
@@ -212,58 +317,19 @@ export default function CheckoutAddress() {
 
             {formOpen ? (
               <View style={styles.form}>
-                <Input
-                  label={t('checkout.fullName')}
-                  value={form.fullName}
-                  onChangeText={(text) => setField('fullName', text)}
-                  autoCapitalize="words"
-                  error={fieldErrors.fullName}
-                />
-                <Input
-                  label={t('checkout.phone')}
-                  placeholder="05XX XXX XX XX"
-                  value={form.phone}
-                  onChangeText={(text) => setField('phone', text)}
-                  keyboardType="phone-pad"
-                  error={fieldErrors.phone}
-                />
-                <Input
-                  label={t('checkout.addressLine')}
-                  value={form.addressLine}
-                  onChangeText={(text) => setField('addressLine', text)}
-                  multiline
-                  numberOfLines={3}
-                  style={styles.addressLineInput}
-                  error={fieldErrors.addressLine}
-                />
-                <View style={styles.fieldRow}>
-                  <View style={styles.fieldHalf}>
-                    <Input
-                      label={t('checkout.city')}
-                      value={form.city}
-                      onChangeText={(text) => setField('city', text)}
-                      autoCapitalize="words"
-                      error={fieldErrors.city}
-                    />
-                  </View>
-                  <View style={styles.fieldHalf}>
-                    <Input
-                      label={t('checkout.district')}
-                      value={form.district}
-                      onChangeText={(text) => setField('district', text)}
-                      autoCapitalize="words"
-                      error={fieldErrors.district}
-                    />
-                  </View>
-                </View>
-                <Input
-                  label={t('checkout.postalCode')}
-                  value={form.postalCode}
-                  onChangeText={(text) => setField('postalCode', text)}
-                  keyboardType="number-pad"
-                  maxLength={5}
-                  error={fieldErrors.postalCode}
-                />
+                {FIELD_DEFS.map((def) => (
+                  <Input
+                    key={def.key}
+                    label={`${t(def.labelKey)}${def.required ? ' *' : ''}`}
+                    placeholder={t(def.placeholderKey)}
+                    value={form[def.key]}
+                    onChangeText={(text) => setField(def.key, text)}
+                    keyboardType={def.keyboardType}
+                    autoCapitalize={def.autoCapitalize ?? 'none'}
+                    maxLength={def.maxLength}
+                    error={fieldErrors[def.key]}
+                  />
+                ))}
 
                 <Pressable
                   onPress={() => setSaveAsDefault((value) => !value)}
@@ -274,7 +340,7 @@ export default function CheckoutAddress() {
                   <View style={[styles.checkbox, saveAsDefault && styles.checkboxChecked]}>
                     {saveAsDefault ? <CheckIcon /> : null}
                   </View>
-                  <Text style={styles.checkboxLabel}>{t('checkout.saveAddress')}</Text>
+                  <Text style={styles.checkboxLabel}>{t('checkout.saveAddressLater')}</Text>
                 </Pressable>
               </View>
             ) : null}
@@ -302,10 +368,7 @@ export default function CheckoutAddress() {
 const styles = StyleSheet.create({
   flex: { flex: 1 },
   loader: { marginTop: spacing.xxxl },
-  progressRow: { flexDirection: 'row', gap: 4, marginTop: -8, marginBottom: spacing.lg },
-  progressSegment: { flex: 1, height: 4, borderRadius: 2 },
-  progressFilled: { backgroundColor: colors.primary },
-  progressEmpty: { backgroundColor: colors.border },
+  stepBar: { marginTop: -8, marginBottom: spacing.lg },
   addressList: { gap: spacing.xs, marginBottom: spacing.sm },
   addressBody: { flex: 1, gap: 2 },
   addressName: {
@@ -341,18 +404,21 @@ const styles = StyleSheet.create({
     color: colors.primary,
   },
   form: { gap: spacing.md, marginTop: spacing.lg },
-  addressLineInput: { minHeight: 84, textAlignVertical: 'top' },
-  fieldRow: { flexDirection: 'row', gap: spacing.xs },
-  fieldHalf: { flex: 1 },
   checkboxRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
-    paddingVertical: 4,
+    gap: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderRadius: radius.base,
+    backgroundColor: colors.card,
+    borderWidth: 1,
+    borderColor: colors.border,
+    marginTop: 4,
   },
   checkbox: {
-    width: 24,
-    height: 24,
+    width: 22,
+    height: 22,
     borderRadius: radius.xs,
     borderWidth: 2,
     borderColor: colors.border,
@@ -362,6 +428,7 @@ const styles = StyleSheet.create({
   },
   checkboxChecked: { backgroundColor: colors.primary, borderColor: colors.primary },
   checkboxLabel: {
+    flex: 1,
     fontFamily: fontFamilies.bodySemiBold,
     fontSize: fontSizes.base,
     color: colors.foreground,

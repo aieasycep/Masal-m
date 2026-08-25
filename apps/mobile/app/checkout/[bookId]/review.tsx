@@ -24,15 +24,12 @@ import { useCheckoutStore } from '../../../src/stores/checkout';
 import { Button } from '../../../src/components/Button';
 import { Screen } from '../../../src/components/Screen';
 import { ScreenHeader } from '../../../src/components/ScreenHeader';
+import { StepBar } from '../../../src/components/StepBar';
 import { ErrorState } from '../../../src/components/states';
 
 const PAYMENT_POLL_MS = 3_000;
 /** ~3 minutes of polling before giving up on the hosted checkout. */
 const PAYMENT_MAX_POLLS = 60;
-
-/** Checkout flow: configure → address → review (this). */
-const TOTAL_STEPS = 3;
-const STEP_INDEX = 2;
 
 /** "649.00" → "₺649,00" (Turkish decimal comma + thousands dots). */
 function formatPrice(amount: string): string {
@@ -42,24 +39,25 @@ function formatPrice(amount: string): string {
 
 type PayPhase = 'idle' | 'working' | 'polling';
 
-/** Thin 3-segment checkout progress bar under the header (design: PrintOrder). */
-function StepBar() {
+/** Shared labeled step bar — review is the "Ödeme" step (index 3 of 4). */
+function ReviewStepBar() {
+  const { t } = useTranslation();
   return (
-    <View style={styles.progressRow}>
-      {Array.from({ length: TOTAL_STEPS }, (_, index) => (
-        <View
-          key={index}
-          style={[
-            styles.progressSegment,
-            index <= STEP_INDEX ? styles.progressFilled : styles.progressEmpty,
-          ]}
-        />
-      ))}
+    <View style={styles.stepBar}>
+      <StepBar
+        labels={[
+          t('checkout.steps.book'),
+          t('checkout.steps.address'),
+          t('checkout.steps.summary'),
+          t('checkout.steps.payment'),
+        ]}
+        activeIndex={3}
+      />
     </View>
   );
 }
 
-/** Checkout step 3 — order summary, print-file readiness gate and payment (§34). */
+/** Checkout step 4 — order summary, print-file readiness gate and payment (§34). */
 export default function CheckoutReview() {
   const { t } = useTranslation();
   const { bookId } = useLocalSearchParams<{ bookId: string }>();
@@ -253,7 +251,7 @@ export default function CheckoutReview() {
     return (
       <Screen>
         <ScreenHeader eyebrow={t('checkout.eyebrow')} title={t('checkout.reviewTitle')} />
-        <StepBar />
+        <ReviewStepBar />
         <ErrorState
           emoji="🌧️"
           title={mapError(bookQuery.error)}
@@ -267,7 +265,7 @@ export default function CheckoutReview() {
   return (
     <Screen>
       <ScreenHeader eyebrow={t('checkout.eyebrow')} title={t('checkout.reviewTitle')} />
-      <StepBar />
+      <ReviewStepBar />
 
       {book == null || quote == null ? (
         quoteQuery.isError ? (
@@ -428,10 +426,7 @@ export default function CheckoutReview() {
 
 const styles = StyleSheet.create({
   loader: { marginTop: spacing.xxxl },
-  progressRow: { flexDirection: 'row', gap: 4, marginTop: -8, marginBottom: spacing.lg },
-  progressSegment: { flex: 1, height: 4, borderRadius: 2 },
-  progressFilled: { backgroundColor: colors.primary },
-  progressEmpty: { backgroundColor: colors.border },
+  stepBar: { marginTop: -8, marginBottom: spacing.lg },
   card: {
     marginTop: spacing.md,
     paddingVertical: spacing.md,

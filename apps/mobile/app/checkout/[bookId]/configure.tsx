@@ -23,15 +23,12 @@ import { Button } from '../../../src/components/Button';
 import { Screen } from '../../../src/components/Screen';
 import { ScreenHeader } from '../../../src/components/ScreenHeader';
 import { SelectableCard } from '../../../src/components/SelectableCard';
+import { StepBar } from '../../../src/components/StepBar';
 import { ErrorState } from '../../../src/components/states';
 
 const QUOTE_DEBOUNCE_MS = 300;
 const MIN_QUANTITY = 1;
 const MAX_QUANTITY = 20;
-
-/** Checkout flow: configure (this) → address → review. */
-const TOTAL_STEPS = 3;
-const STEP_INDEX = 0;
 
 const BOOK_SIZES: BookSize[] = [BookSize.SQUARE, BookSize.STANDARD];
 const COVER_TYPES: CoverType[] = [CoverType.HARDCOVER, CoverType.SOFTCOVER];
@@ -52,24 +49,25 @@ function useDebouncedValue<T>(value: T, delayMs: number): T {
   return debounced;
 }
 
-/** Thin 3-segment checkout progress bar under the header (design: PrintOrder). */
-function StepBar() {
+/** Shared labeled step bar — configure is the "Özet" step (index 2 of 4). */
+function ConfigureStepBar() {
+  const { t } = useTranslation();
   return (
-    <View style={styles.progressRow}>
-      {Array.from({ length: TOTAL_STEPS }, (_, index) => (
-        <View
-          key={index}
-          style={[
-            styles.progressSegment,
-            index <= STEP_INDEX ? styles.progressFilled : styles.progressEmpty,
-          ]}
-        />
-      ))}
+    <View style={styles.stepBar}>
+      <StepBar
+        labels={[
+          t('checkout.steps.book'),
+          t('checkout.steps.address'),
+          t('checkout.steps.summary'),
+          t('checkout.steps.payment'),
+        ]}
+        activeIndex={2}
+      />
     </View>
   );
 }
 
-/** Checkout step 1 — product configuration with a live server quote (§34, §82). */
+/** Checkout step 3 — product configuration with a live server quote (§34, §82). */
 export default function CheckoutConfigure() {
   const { t } = useTranslation();
   const { bookId } = useLocalSearchParams<{ bookId: string }>();
@@ -131,7 +129,7 @@ export default function CheckoutConfigure() {
     return (
       <Screen>
         <ScreenHeader eyebrow={t('checkout.eyebrow')} title={t('checkout.configTitle')} />
-        <StepBar />
+        <ConfigureStepBar />
         <ErrorState
           emoji="🌧️"
           title={mapError(bookQuery.error)}
@@ -147,7 +145,7 @@ export default function CheckoutConfigure() {
   return (
     <Screen>
       <ScreenHeader eyebrow={t('checkout.eyebrow')} title={t('checkout.configTitle')} />
-      <StepBar />
+      <ConfigureStepBar />
 
       {book == null ? (
         <ActivityIndicator
@@ -338,7 +336,7 @@ export default function CheckoutConfigure() {
 
           <Button
             label={t('checkout.continue')}
-            onPress={() => router.push(`/checkout/${bookId}/address` as never)}
+            onPress={() => router.push(`/checkout/${bookId}/review` as never)}
             disabled={quote == null}
             style={styles.cta}
           />
@@ -350,10 +348,7 @@ export default function CheckoutConfigure() {
 
 const styles = StyleSheet.create({
   loader: { marginTop: spacing.xxxl },
-  progressRow: { flexDirection: 'row', gap: 4, marginTop: -8, marginBottom: spacing.lg },
-  progressSegment: { flex: 1, height: 4, borderRadius: 2 },
-  progressFilled: { backgroundColor: colors.primary },
-  progressEmpty: { backgroundColor: colors.border },
+  stepBar: { marginTop: -8, marginBottom: spacing.lg },
   productCard: {
     flexDirection: 'row',
     alignItems: 'center',

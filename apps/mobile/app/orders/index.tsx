@@ -9,23 +9,19 @@ import {
   View,
 } from 'react-native';
 import { Image } from 'expo-image';
+import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import type { OrderStatus } from '@masalim/types';
 import type { Order } from '@masalim/validation';
 import { ApiError, NetworkError } from '@masalim/api-client';
-import { colors, fontFamilies, fontSizes, radius, shadows, spacing } from '@masalim/ui';
+import { colors, fontFamilies, fontSizes, gradients, radius, shadows, spacing } from '@masalim/ui';
 import { api } from '../../src/lib/api';
+import { OrderStatusPill } from '../../src/components/OrderStatusPill';
 import { ScreenHeader } from '../../src/components/ScreenHeader';
+import { ChevronRightIcon } from '../../src/components/icons';
 import { EmptyState, ErrorState } from '../../src/components/states';
-
-/** "649.00" → "₺649,00" (Turkish decimal comma + thousands dots). */
-function formatPrice(amount: string): string {
-  const [int = '0', frac = '00'] = amount.split('.');
-  return `₺${int.replace(/\B(?=(\d{3})+(?!\d))/g, '.')},${frac}`;
-}
 
 function formatDate(iso: string): string {
   const date = new Date(iso);
@@ -37,29 +33,7 @@ function formatDate(iso: string): string {
   }
 }
 
-/** Tinted chip per order status (tints derived from the token palette). */
-const STATUS_CHIP: Record<OrderStatus, { bg: string; fg: string }> = {
-  PENDING: { bg: 'rgba(255,217,125,0.3)', fg: colors.foreground },
-  PAID: { bg: colors.secondary, fg: colors.primary },
-  IN_PRODUCTION: { bg: 'rgba(240,139,110,0.15)', fg: colors.coral },
-  SHIPPED: { bg: 'rgba(123,167,201,0.18)', fg: colors.dustyBlue },
-  DELIVERED: { bg: 'rgba(141,184,154,0.18)', fg: colors.sage },
-  CANCELLED: { bg: 'rgba(224,84,84,0.12)', fg: colors.destructive },
-  REFUNDED: { bg: colors.muted, fg: colors.mutedForeground },
-};
-
-function StatusChip({ status }: { status: OrderStatus }) {
-  const { t } = useTranslation();
-  const chip = STATUS_CHIP[status];
-  return (
-    <View style={[styles.statusChip, { backgroundColor: chip.bg }]}>
-      <Text style={[styles.statusChipText, { color: chip.fg }]}>
-        {t(`orders.statuses.${status}`)}
-      </Text>
-    </View>
-  );
-}
-
+/** Order card per `Orders/01` — 56×72 cover, Fraunces title, meta, status pill. */
 function OrderCard({ order, onPress }: { order: Order; onPress: () => void }) {
   return (
     <Pressable
@@ -69,6 +43,12 @@ function OrderCard({ order, onPress }: { order: Order; onPress: () => void }) {
       style={({ pressed }) => [styles.card, shadows.cardSubtle, { opacity: pressed ? 0.88 : 1 }]}
     >
       <View style={styles.coverThumb}>
+        <LinearGradient
+          colors={gradients.playerCover as unknown as [string, string]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={StyleSheet.absoluteFill}
+        />
         {order.coverImageUrl != null ? (
           <Image
             source={{ uri: order.coverImageUrl }}
@@ -77,7 +57,7 @@ function OrderCard({ order, onPress }: { order: Order; onPress: () => void }) {
             accessibilityIgnoresInvertColors
           />
         ) : (
-          <Text style={styles.coverEmoji}>📦</Text>
+          <Text style={styles.coverEmoji}>⭐</Text>
         )}
       </View>
       <View style={styles.cardBody}>
@@ -85,13 +65,11 @@ function OrderCard({ order, onPress }: { order: Order; onPress: () => void }) {
           {order.bookTitle}
         </Text>
         <Text style={styles.cardMeta} numberOfLines={1}>
-          {`${order.orderNumber} · ${formatDate(order.createdAt)}`}
+          {`#${order.orderNumber} · ${formatDate(order.createdAt)}`}
         </Text>
-        <View style={styles.cardFooter}>
-          <StatusChip status={order.status} />
-          <Text style={styles.cardTotal}>{formatPrice(order.total)}</Text>
-        </View>
+        <OrderStatusPill status={order.status} />
       </View>
+      <ChevronRightIcon size={14} color={colors.mutedForeground} />
     </Pressable>
   );
 }
@@ -153,9 +131,10 @@ export default function OrdersList() {
           ListEmptyComponent={
             <EmptyState
               emoji="📦"
-              title={t('orders.empty')}
-              ctaLabel={t('common.back')}
-              onCta={() => router.back()}
+              title={t('orders.emptyTitle')}
+              body={t('orders.emptyBody')}
+              ctaLabel={t('orders.emptyCta')}
+              onCta={() => router.replace('/(tabs)/library')}
             />
           }
           contentContainerStyle={styles.listContent}
@@ -187,25 +166,26 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 14,
-    padding: 14,
-    borderRadius: radius.card,
+    padding: spacing.md,
+    borderRadius: radius.lg,
     backgroundColor: colors.card,
     borderWidth: 1,
     borderColor: colors.border,
   },
   coverThumb: {
-    width: 52,
-    height: 68,
-    borderRadius: radius.sm,
-    backgroundColor: colors.lavenderLight,
+    width: 56,
+    height: 72,
+    // Design spec: r10 cover thumb (between radius.sm and radius.chip).
+    borderRadius: 10,
+    backgroundColor: colors.purpleDeep,
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
   },
-  coverEmoji: { fontSize: 22 },
+  coverEmoji: { fontSize: 28 },
   cardBody: { flex: 1, gap: 4 },
   cardTitle: {
-    fontFamily: fontFamilies.bodyBold,
+    fontFamily: fontFamilies.display,
     fontSize: fontSizes.lg,
     color: colors.foreground,
   },
@@ -213,22 +193,5 @@ const styles = StyleSheet.create({
     fontFamily: fontFamilies.body,
     fontSize: fontSizes.sm,
     color: colors.mutedForeground,
-  },
-  cardFooter: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginTop: 2,
-  },
-  statusChip: {
-    borderRadius: radius.xs,
-    paddingVertical: 2,
-    paddingHorizontal: 8,
-  },
-  statusChipText: { fontFamily: fontFamilies.bodyBold, fontSize: 10, letterSpacing: 0.4 },
-  cardTotal: {
-    fontFamily: fontFamilies.bodyExtraBold,
-    fontSize: fontSizes.lg,
-    color: colors.foreground,
   },
 });
