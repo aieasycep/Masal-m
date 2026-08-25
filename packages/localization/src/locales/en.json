@@ -292,7 +292,6 @@
     },
     "badgeBookReady": "Book ready",
     "emptyTitle": "Your first tale will live here.",
-    "emptyBody": "No stories in this category yet.",
     "emptyCta": "Create My First Story",
     "dates": {
       "today": "Today",
@@ -315,7 +314,12 @@
     "deleteConfirmTitle": "Delete this story?",
     "deleteConfirmBody": "This story will be removed from your library.",
     "deleteConfirmBodyWithBook": "A book is linked to this story. Existing orders won't be affected.",
-    "deleted": "Story deleted."
+    "deleted": "Story deleted.",
+    "emptyLibraryBody": "Every story you create will be waiting for you here.",
+    "noFavoritesTitle": "No favorite stories yet.",
+    "noFavoritesBody": "You can add the stories you love to your favorites.",
+    "noResultsTitle": "No results found.",
+    "noResultsBody": "Try a different search or change your filter."
   },
   "voice": {
     "studioTitle": "My Voice Studio",

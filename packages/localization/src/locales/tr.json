@@ -292,7 +292,6 @@
     },
     "badgeBookReady": "Kitap hazır",
     "emptyTitle": "İlk masalın burada yaşayacak.",
-    "emptyBody": "Henüz bu kategoride hikâye yok.",
     "emptyCta": "İlk Hikâyemi Oluştur",
     "dates": {
       "today": "Bugün",
@@ -315,7 +314,12 @@
     "deleteConfirmTitle": "Hikâyeyi silmek istiyor musun?",
     "deleteConfirmBody": "Bu hikâye kütüphanenden kaldırılacak.",
     "deleteConfirmBodyWithBook": "Bu hikâyeye bağlı bir kitap var. Hikâye silinse de mevcut siparişlerin etkilenmez.",
-    "deleted": "Hikâye silindi."
+    "deleted": "Hikâye silindi.",
+    "emptyLibraryBody": "Oluşturduğun her hikâye burada seni bekleyecek.",
+    "noFavoritesTitle": "Henüz favori hikâyen yok.",
+    "noFavoritesBody": "Sevdiğin hikâyeleri favorilere ekleyebilirsin.",
+    "noResultsTitle": "Sonuç bulunamadı.",
+    "noResultsBody": "Farklı bir arama dene veya filtreni değiştir."
   },
   "voice": {
     "studioTitle": "Ses Stüdyom",

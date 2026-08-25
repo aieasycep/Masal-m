@@ -22,7 +22,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 import type { TFunction } from 'i18next';
-import { ApiError } from '@masalim/api-client';
+import { NetworkError } from '@masalim/api-client';
 import { DURATION_TARGETS, StoryStatus } from '@masalim/types';
 import type { ListStoriesQuery, StorySummary } from '@masalim/validation';
 import { colors, coverTints, fontFamilies, fontSizes, radius, shadows, spacing } from '@masalim/ui';
@@ -30,6 +30,7 @@ import { Badge } from '../../src/components/Badge';
 import { Input } from '../../src/components/Input';
 import { StorySheet, storyThemeEmoji } from '../../src/components/StorySheet';
 import { KebabIcon, PlayIcon, SearchIcon } from '../../src/components/icons';
+import { LoadingState } from '../../src/components/LoadingState';
 import { EmptyState, ErrorState } from '../../src/components/states';
 import { api } from '../../src/lib/api';
 
@@ -250,15 +251,10 @@ export default function Library() {
     }
   };
 
-  const listErrorTitle =
-    storiesQuery.error instanceof ApiError
-      ? t(`errors.${storiesQuery.error.code}`, { defaultValue: t('errors.GENERIC') })
-      : t('errors.OFFLINE');
-
   const isDefaultView = filter === 'all' && debouncedSearch.length === 0;
 
   const header = (
-    <View style={styles.header}>
+    <View>
       <Text style={styles.title} accessibilityRole="header">
         {t('library.title')}
       </Text>
@@ -299,26 +295,36 @@ export default function Library() {
   );
 
   const listEmpty = storiesQuery.isLoading ? (
-    <View style={styles.loading}>
-      <ActivityIndicator color={colors.primary} />
+    <View style={styles.skeletonBleed}>
+      <LoadingState variant="list" />
     </View>
   ) : storiesQuery.isError ? (
     <ErrorState
-      emoji="🌧️"
-      title={listErrorTitle}
-      ctaLabel={t('common.retry')}
-      onCta={() => void storiesQuery.refetch()}
+      kind={storiesQuery.error instanceof NetworkError ? 'network' : 'server'}
+      onRetry={() => void storiesQuery.refetch()}
     />
   ) : isDefaultView ? (
     <EmptyState
       emoji="📚"
       title={t('library.emptyTitle')}
-      body={t('library.emptyBody')}
+      body={t('library.emptyLibraryBody')}
       ctaLabel={t('library.emptyCta')}
       onCta={goCreate}
     />
+  ) : filter === 'favorites' ? (
+    <EmptyState
+      variant="card"
+      emoji="🤍"
+      title={t('library.noFavoritesTitle')}
+      body={t('library.noFavoritesBody')}
+    />
   ) : (
-    <EmptyState emoji="📚" title={t('library.emptyBody')} />
+    <EmptyState
+      variant="card"
+      emoji="🔍"
+      title={t('library.noResultsTitle')}
+      body={t('library.noResultsBody')}
+    />
   );
 
   const footer = storiesQuery.isFetchingNextPage ? (
@@ -369,7 +375,6 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.tabBarClearance,
     gap: spacing.sm,
   },
-  header: { paddingBottom: spacing.xs },
   title: {
     fontFamily: fontFamilies.displayBold,
     fontSize: fontSizes.displayLg,
@@ -381,9 +386,9 @@ const styles = StyleSheet.create({
     fontFamily: fontFamilies.body,
     fontSize: fontSizes.base,
     color: colors.mutedForeground,
-    marginBottom: spacing.lg,
+    marginBottom: spacing.md,
   },
-  searchWrap: { marginBottom: spacing.md },
+  searchWrap: { marginBottom: 14 },
   searchIcon: {
     position: 'absolute',
     left: 14,
@@ -397,7 +402,7 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     fontSize: fontSizes.lg,
   },
-  chips: { flexDirection: 'row', gap: spacing.xs, paddingBottom: spacing.sm },
+  chips: { flexDirection: 'row', gap: spacing.xs, paddingBottom: 18 },
   chip: {
     paddingVertical: spacing.xs,
     paddingHorizontal: 18,
@@ -445,7 +450,7 @@ const styles = StyleSheet.create({
     fontFamily: fontFamilies.body,
     fontSize: fontSizes.sm,
     color: colors.mutedForeground,
-    marginBottom: 6,
+    marginBottom: 4,
   },
   rowThemes: {
     fontFamily: fontFamilies.body,
@@ -491,6 +496,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  loading: { paddingVertical: 60, alignItems: 'center' },
+  /** Cancels the list gutter so LoadingState's own pageX padding aligns skeletons with rows. */
+  skeletonBleed: { marginHorizontal: -spacing.pageX },
   footerLoading: { paddingVertical: spacing.lg, alignItems: 'center' },
 });
