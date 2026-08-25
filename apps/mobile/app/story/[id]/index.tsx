@@ -84,10 +84,10 @@ function ConfettiDot({ index }: { index: number }) {
 /**
  * Story result — cover hero + actions. With a READY narration the primary CTA
  * is "Dinlemeye Başla" (player); otherwise "Oku" stays primary. The action row
- * is the design's five tiles (Oku/Düzenle/Görselleştir/Kitap Yap/Paylaş); a
- * wide "Seslendir" tile below it is the (re-)narration entry point.
- * Görselleştir routes to the illustration flow; Kitap Yap reuses (or creates)
- * the story's book and opens the builder.
+ * is the design's six tiles (Oku/Seslendir/Düzenle/Görselleştir/Kitap Yap/
+ * Paylaş); Seslendir is the (re-)narration entry point. Görselleştir routes to
+ * the illustration flow; Kitap Yap reuses (or creates) the story's book and
+ * opens the builder.
  */
 export default function StoryResult() {
   const { t } = useTranslation();
@@ -234,9 +234,10 @@ export default function StoryResult() {
     });
   };
 
-  // Single row of 5 tiles, design order (reference design's action grid, StoryResult.tsx).
+  // Single row of 6 tiles, design order (reference design's action grid, StoryResult.tsx).
   const actions = [
     { key: 'read', emoji: '📖', label: t('storyResult.read'), onPress: openReader },
+    { key: 'narrate', emoji: '🎙', label: t('narrate.create'), onPress: openNarrate },
     { key: 'edit', emoji: '✏️', label: t('storyResult.edit'), onPress: openEdit },
     {
       key: 'illustrate',
@@ -381,17 +382,6 @@ export default function StoryResult() {
           ))}
         </View>
 
-        {/* Seslendir — beyond the design's 5-tile row; sole (re-)narration entry. */}
-        <Pressable
-          onPress={openNarrate}
-          accessibilityRole="button"
-          accessibilityLabel={t('narrate.create')}
-          style={({ pressed }) => [styles.narrateTile, { opacity: pressed ? 0.7 : 1 }]}
-        >
-          <Text style={styles.actionEmoji}>🎙</Text>
-          <Text style={styles.actionLabel}>{t('narrate.create')}</Text>
-        </Pressable>
-
         {actionError != null ? <Text style={styles.actionError}>{actionError}</Text> : null}
 
         {excerpt.length > 0 ? (
@@ -513,19 +503,6 @@ const styles = StyleSheet.create({
     fontSize: fontSizes.xxs,
     color: colors.mutedForeground,
     textAlign: 'center',
-  },
-  narrateTile: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    marginTop: spacing.xs,
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.xxs,
-    borderRadius: radius.md,
-    backgroundColor: colors.card,
-    borderWidth: 1,
-    borderColor: colors.border,
   },
   actionError: {
     fontFamily: fontFamilies.bodySemiBold,

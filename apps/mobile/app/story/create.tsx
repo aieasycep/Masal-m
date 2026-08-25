@@ -29,8 +29,10 @@ import { ApiError, NetworkError } from '@masalim/api-client';
 import { withSuffix } from '@masalim/localization';
 import { colors, fontFamilies, fontSizes, letterSpacing, radius, spacing } from '@masalim/ui';
 import { api } from '../../src/lib/api';
+import { usePreviewPlayer } from '../../src/lib/preview-player';
 import { useAppPrefs } from '../../src/stores/app-prefs';
 import { useWizardStore } from '../../src/stores/wizard';
+import { AudioPreviewButton } from '../../src/components/AudioPreviewButton';
 import { Avatar } from '../../src/components/Avatar';
 import { Badge } from '../../src/components/Badge';
 import { Button } from '../../src/components/Button';
@@ -114,6 +116,7 @@ export default function CreateStory() {
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
+  const preview = usePreviewPlayer();
   const scrollRef = useRef<ScrollView>(null);
   const { theme: themeParam } = useLocalSearchParams<{ theme?: string }>();
   const selectedChildId = useAppPrefs((state) => state.selectedChildId);
@@ -618,6 +621,17 @@ export default function CreateStory() {
                     </View>
                     <Text style={styles.voiceDescription}>{voice.description}</Text>
                   </View>
+                  <AudioPreviewButton
+                    size="sm"
+                    status={preview.statusFor(voice.id)}
+                    onPress={() =>
+                      preview.toggle(voice.id, () =>
+                        voice.previewUrl != null
+                          ? Promise.resolve(voice.previewUrl)
+                          : api.voices.systemPreview(voice.id).then((r) => r.previewUrl),
+                      )
+                    }
+                  />
                 </SelectableCard>
                 {gated && premiumHintVoiceId === voice.id ? (
                   <Animated.Text entering={FadeInUp.duration(250)} style={styles.premiumHint}>

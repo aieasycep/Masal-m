@@ -24,6 +24,8 @@ import type { VoiceProfile } from '@masalim/validation';
 import { ApiError, NetworkError } from '@masalim/api-client';
 import { colors, fontFamilies, fontSizes, letterSpacing, radius, shadows, spacing } from '@masalim/ui';
 import { api } from '../../src/lib/api';
+import { usePreviewPlayer } from '../../src/lib/preview-player';
+import { AudioPreviewButton } from '../../src/components/AudioPreviewButton';
 import { Avatar } from '../../src/components/Avatar';
 import { Badge } from '../../src/components/Badge';
 import { Button } from '../../src/components/Button';
@@ -77,6 +79,7 @@ export default function VoiceStudio() {
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
+  const preview = usePreviewPlayer();
 
   const [menuVoice, setMenuVoice] = useState<VoiceProfile | null>(null);
   const [renameVoice, setRenameVoice] = useState<VoiceProfile | null>(null);
@@ -239,6 +242,19 @@ export default function VoiceStudio() {
                     {`${t(`voice.owners.${voice.ownerType}`)} · ${formatCreatedDate(voice.createdAt)}`}
                   </Text>
                 </View>
+                {voice.status === VoiceProfileStatus.READY ? (
+                  <AudioPreviewButton
+                    size="md"
+                    status={preview.statusFor(voice.id)}
+                    onPress={() =>
+                      preview.toggle(voice.id, () =>
+                        voice.previewUrl != null
+                          ? Promise.resolve(voice.previewUrl)
+                          : api.voices.preview(voice.id).then((r) => r.previewUrl),
+                      )
+                    }
+                  />
+                ) : null}
                 <Pressable
                   onPress={() => setMenuVoice(voice)}
                   accessibilityRole="button"
@@ -289,10 +305,7 @@ export default function VoiceStudio() {
         </>
       )}
 
-      {/* Kebab menu — bottom sheet (ConfirmSheet's Modal pattern).
-          NOTE: the "Sesi Dinle" (preview playback) row is intentionally omitted
-          this phase — preview playback lands with the player integration pass
-          (RNTP owns all playback; expo-audio records only). */}
+      {/* Kebab menu — bottom sheet (ConfirmSheet's Modal pattern). */}
       <Modal
         visible={menuVoice != null}
         transparent
