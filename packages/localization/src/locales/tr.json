@@ -279,6 +279,7 @@
     "title": "Hikâyelerim",
     "subtitle": "{{storyCount}} hikâye · {{childCount}} çocuk",
     "searchPlaceholder": "Hikâye ara…",
+    "allChildren": "Tüm çocuklar",
     "filters": {
       "all": "Tümü",
       "audio": "Sesli",

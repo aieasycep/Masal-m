@@ -26,6 +26,7 @@ import { NetworkError } from '@masalim/api-client';
 import { DURATION_TARGETS, StoryStatus } from '@masalim/types';
 import type { ListStoriesQuery, StorySummary } from '@masalim/validation';
 import { colors, coverTints, fontFamilies, fontSizes, radius, shadows, spacing } from '@masalim/ui';
+import { DEFAULT_AVATAR_EMOJI } from '../../src/components/AvatarEmojiPicker';
 import { Badge } from '../../src/components/Badge';
 import { Input } from '../../src/components/Input';
 import { StorySheet, storyThemeEmoji } from '../../src/components/StorySheet';
@@ -200,6 +201,7 @@ export default function Library() {
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const [filter, setFilter] = useState<LibraryFilter>('all');
+  const [childFilter, setChildFilter] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [refreshing, setRefreshing] = useState(false);
@@ -213,11 +215,12 @@ export default function Library() {
   const childrenQuery = useQuery({ queryKey: ['children'], queryFn: () => api.children.list() });
 
   const storiesQuery = useInfiniteQuery({
-    queryKey: ['stories', { filter, search: debouncedSearch }],
+    queryKey: ['stories', { filter, childId: childFilter, search: debouncedSearch }],
     queryFn: ({ pageParam }) =>
       api.stories.list({
         page: pageParam,
         filter,
+        childId: childFilter ?? undefined,
         search: debouncedSearch.length > 0 ? debouncedSearch : undefined,
       }),
     initialPageParam: 1,
@@ -251,7 +254,9 @@ export default function Library() {
     }
   };
 
-  const isDefaultView = filter === 'all' && debouncedSearch.length === 0;
+  const isDefaultView =
+    filter === 'all' && childFilter == null && debouncedSearch.length === 0;
+  const childList = childrenQuery.data ?? [];
 
   const header = (
     <View>
@@ -291,6 +296,28 @@ export default function Library() {
           />
         ))}
       </ScrollView>
+
+      {childList.length >= 2 ? (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={[styles.chips, styles.childChips]}
+        >
+          <FilterChip
+            label={t('library.allChildren')}
+            active={childFilter == null}
+            onPress={() => setChildFilter(null)}
+          />
+          {childList.map((child) => (
+            <FilterChip
+              key={child.id}
+              label={`${child.preferences.avatarEmoji ?? DEFAULT_AVATAR_EMOJI} ${child.name}`}
+              active={childFilter === child.id}
+              onPress={() => setChildFilter(childFilter === child.id ? null : child.id)}
+            />
+          ))}
+        </ScrollView>
+      ) : null}
     </View>
   );
 
@@ -403,6 +430,7 @@ const styles = StyleSheet.create({
     fontSize: fontSizes.lg,
   },
   chips: { flexDirection: 'row', gap: spacing.xs, paddingBottom: 18 },
+  childChips: { paddingBottom: 18, marginTop: -6 },
   chip: {
     paddingVertical: spacing.xs,
     paddingHorizontal: 18,
