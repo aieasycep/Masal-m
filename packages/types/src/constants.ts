@@ -3,7 +3,8 @@ import type { AgeRange, StoryDuration } from './enums';
 /** Domain constants — kept central so no magic numbers/strings spread through the codebase. */
 
 export const VOICE_RECORDING = {
-  MIN_DURATION_SECONDS: 30,
+  // UI/UX QA pass raised the quality floor from 30s to 45s.
+  MIN_DURATION_SECONDS: 45,
   MAX_DURATION_SECONDS: 90,
   TARGET_DURATION_SECONDS: 60,
   MAX_UPLOAD_BYTES: 25 * 1024 * 1024,

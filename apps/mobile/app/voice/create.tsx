@@ -38,7 +38,9 @@ import {
 } from '@masalim/ui';
 import { api } from '../../src/lib/api';
 import { useJobProgress } from '../../src/lib/job-stream';
+import { usePreviewPlayer } from '../../src/lib/preview-player';
 import { useVoiceRecorder, VOICE_RECORDING_CONTENT_TYPE } from '../../src/lib/recorder';
+import { AudioPreviewButton } from '../../src/components/AudioPreviewButton';
 import { Avatar } from '../../src/components/Avatar';
 import { Badge } from '../../src/components/Badge';
 import { Button } from '../../src/components/Button';
@@ -94,6 +96,8 @@ const SILENCE_DB = -50;
 const SILENCE_SAMPLES = 10;
 /** Sentinel for a non-2xx signed PUT so the catch can map it to voice.uploadFailed. */
 const UPLOAD_FAILED = 'VOICE_UPLOAD_FAILED';
+/** Preview-player key for the not-yet-uploaded local take (review step). */
+const LOCAL_TAKE_KEY = 'voice-local-take';
 
 function parseOwnerType(value: string | undefined): VoiceOwnerType | null {
   return value != null && (Object.values(VoiceOwnerType) as string[]).includes(value)
@@ -274,6 +278,7 @@ export default function VoiceCreate() {
   const [jobId, setJobId] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const job = useJobProgress(jobId ?? undefined);
+  const preview = usePreviewPlayer();
 
   const entitlementsQuery = useQuery({
     queryKey: ['entitlements'],
@@ -634,7 +639,9 @@ export default function VoiceCreate() {
       <Text style={styles.stepTitle} accessibilityRole="header">
         {t('voice.consentTitle')}
       </Text>
+      <Text style={styles.consentSubtitle}>{t('voice.consentSubtitle')}</Text>
       <View style={styles.consentCard}>
+        <Text style={styles.consentCardTitle}>{t('voice.consentCardTitle')}</Text>
         <Text style={styles.consentBody}>{t('voice.consentBody')}</Text>
       </View>
       <Pressable
@@ -652,8 +659,20 @@ export default function VoiceCreate() {
         <Text style={styles.metaEmoji}>🛡️</Text>
         <Text style={styles.consentNoteText}>{t('voice.consentDeleteNote')}</Text>
       </View>
+      <View style={styles.consentNoteRow}>
+        <Text style={styles.metaEmoji}>ℹ️</Text>
+        <Text style={styles.consentNoteText}>{t('voice.consentNoChildVoices')}</Text>
+      </View>
     </>
   );
+
+  // Live level meter: −60…0 dBFS mapped onto the track; frozen full on verdict.
+  const meterPct =
+    micPhase === 'done'
+      ? micResult === 'ok' || micResult === 'quiet'
+        ? 0.7
+        : 0.95
+      : Math.min(1, Math.max(0, ((rec.meteringDb ?? -60) + 60) / 60));
 
   const renderMicTest = () => (
     <View style={styles.nightCenter}>
@@ -669,8 +688,19 @@ export default function VoiceCreate() {
                 ? t('voice.micTestNoisy')
                 : t('voice.micTestGood')}
           </Text>
-          {micPhase === 'done' && micResult === 'noisy' ? (
-            <Text style={styles.nightBody}>{t('voice.introTip')}</Text>
+          <View style={styles.meterRow}>
+            <Text style={styles.meterLabel}>{t('voice.micLevelLabel')}</Text>
+            <View style={styles.meterTrack}>
+              <View style={[styles.meterFill, { width: `${Math.round(meterPct * 100)}%` }]} />
+            </View>
+            {micPhase === 'done' && micResult !== 'noisy' ? (
+              <Text style={styles.meterOk}>{t('voice.micLevelOk')}</Text>
+            ) : null}
+          </View>
+          {micPhase === 'done' ? (
+            <Text style={styles.nightBody}>
+              {micResult === 'noisy' ? t('voice.introTip') : t('voice.micTestHold')}
+            </Text>
           ) : null}
         </>
       )}
@@ -701,36 +731,54 @@ export default function VoiceCreate() {
         {showSilenceHint ? <Text style={styles.silenceHint}>{t('voice.silenceHint')}</Text> : null}
       </View>
 
+      {isActiveRecording ? (
+        <Text style={[styles.coachingLine, canFinish ? styles.coachingOk : styles.coachingWarn]}>
+          {canFinish
+            ? t('voice.lengthOk')
+            : t('voice.minCoaching', { seconds: VOICE_RECORDING.MIN_DURATION_SECONDS })}
+        </Text>
+      ) : null}
+
       {!isActiveRecording ? (
-        <Pressable
-          onPress={() => {
-            setBars([]);
-            void rec.start();
-          }}
-          accessibilityRole="button"
-          accessibilityLabel={t('voice.addVoiceCta')}
-          style={({ pressed }) => [
-            styles.recordButton,
-            shadows.recordButton,
-            { transform: [{ scale: pressed ? 0.96 : 1 }] },
-          ]}
-        >
-          <MicIcon size={32} />
-        </Pressable>
-      ) : (
         <View style={styles.recordingControls}>
           <Pressable
-            onPress={() => (rec.state === 'paused' ? rec.resume() : rec.pause())}
+            onPress={() => {
+              setBars([]);
+              void rec.start();
+            }}
             accessibilityRole="button"
-            accessibilityLabel={rec.state === 'paused' ? t('voice.recording') : t('voice.paused')}
-            style={styles.pausePill}
+            accessibilityLabel={t('voice.startRecording')}
+            style={({ pressed }) => [
+              styles.recordButton,
+              shadows.recordButton,
+              { transform: [{ scale: pressed ? 0.96 : 1 }] },
+            ]}
           >
-            {rec.state === 'paused' ? (
-              <PlayIcon size={18} color="rgba(255,255,255,0.85)" />
-            ) : (
-              <PauseIcon size={18} color="rgba(255,255,255,0.85)" />
-            )}
+            <MicIcon size={32} />
           </Pressable>
+          <Text style={styles.startLabel}>{t('voice.startRecording')}</Text>
+        </View>
+      ) : (
+        <View style={styles.recordingControls}>
+          {rec.state === 'paused' ? (
+            <Pressable
+              onPress={() => rec.resume()}
+              accessibilityRole="button"
+              style={styles.resumeButton}
+            >
+              <PlayIcon size={18} color="#FFFFFF" />
+              <Text style={styles.resumeButtonText}>{t('voice.resumeRecording')}</Text>
+            </Pressable>
+          ) : (
+            <Pressable
+              onPress={() => rec.pause()}
+              accessibilityRole="button"
+              accessibilityLabel={t('voice.paused')}
+              style={styles.pausePill}
+            >
+              <PauseIcon size={18} color="rgba(255,255,255,0.85)" />
+            </Pressable>
+          )}
           <View style={styles.recordingButtonsRow}>
             <Pressable
               onPress={() => void finishRecording()}
@@ -749,23 +797,38 @@ export default function VoiceCreate() {
               <Text style={styles.restartButtonText}>{t('voice.restartRecording')}</Text>
             </Pressable>
           </View>
-          {!canFinish ? (
-            <Text style={styles.minHint}>
-              {t('voice.tooShort', { seconds: VOICE_RECORDING.MIN_DURATION_SECONDS })}
-            </Text>
-          ) : null}
         </View>
       )}
     </View>
   );
 
-  // NOTE: local-recording playback preview is intentionally absent this phase —
-  // RNTP owns all playback and lands with the player integration pass.
+  // QA §7: the review step MUST let the user hear the local take before any
+  // upload — the shared preview player accepts the on-disk file URI directly.
+  const localTakePlaying = preview.statusFor(LOCAL_TAKE_KEY) === 'playing';
   const renderReview = () => (
     <View style={styles.nightCenter}>
-      <Text style={styles.reviewTimer}>{formatTimer(kept?.durationSeconds ?? 0)}</Text>
       <Text style={styles.nightTitle}>{t('voice.reviewTitle')}</Text>
       <Text style={styles.nightBody}>{t('voice.reviewBody')}</Text>
+      <View style={styles.reviewPlayCard}>
+        <AudioPreviewButton
+          status={kept == null ? 'disabled' : preview.statusFor(LOCAL_TAKE_KEY)}
+          onPress={() =>
+            kept != null && preview.toggle(LOCAL_TAKE_KEY, () => Promise.resolve(kept.uri))
+          }
+        />
+        <View style={styles.reviewPlayText}>
+          <Text style={styles.reviewPlayTitle}>
+            {localTakePlaying ? t('voice.reviewPause') : t('voice.reviewListen')}
+          </Text>
+          <Text style={styles.reviewPlaySub}>
+            {t('voice.reviewDuration', { duration: formatTimer(kept?.durationSeconds ?? 0) })}
+          </Text>
+        </View>
+      </View>
+      <View style={styles.reviewSafeRow}>
+        <Text style={[styles.metaEmoji, styles.reviewSafeCheck]}>✓</Text>
+        <Text style={styles.reviewSafeText}>{t('voice.reviewSafeNote')}</Text>
+      </View>
     </View>
   );
 
@@ -785,6 +848,22 @@ export default function VoiceCreate() {
       </View>
       <Text style={styles.nightTitleLg}>{t('voice.successTitle', { name: voiceLabel })}</Text>
       <Text style={styles.nightBody}>{t('voice.successBody')}</Text>
+      {activeVoiceId != null ? (
+        <View style={styles.reviewPlayCard}>
+          <AudioPreviewButton
+            status={preview.statusFor(`voice-${activeVoiceId}`)}
+            onPress={() =>
+              preview.toggle(`voice-${activeVoiceId}`, () =>
+                api.voices.preview(activeVoiceId).then((r) => r.previewUrl),
+              )
+            }
+          />
+          <View style={styles.reviewPlayText}>
+            <Text style={styles.reviewPlayTitle}>{t('voice.successSampleTitle')}</Text>
+            <Text style={styles.reviewPlaySub}>{t('voice.successSampleSub')}</Text>
+          </View>
+        </View>
+      ) : null}
     </View>
   );
 
@@ -845,7 +924,7 @@ export default function VoiceCreate() {
         // §21 — consent is blocking: the CTA stays disabled until checked.
         return (
           <Button
-            label={t('common.continue')}
+            label={t('voice.consentCta')}
             onPress={() => setStep('micTest')}
             disabled={!consentChecked}
           />
@@ -870,7 +949,7 @@ export default function VoiceCreate() {
         }
         return (
           <>
-            <Button label={t('common.continue')} onPress={() => setStep('recording')} />
+            <Button label={t('voice.micTestCta')} onPress={() => setStep('recording')} />
             <Button
               label={t('common.retry')}
               onPress={() => setMicNonce((nonce) => nonce + 1)}
@@ -898,7 +977,9 @@ export default function VoiceCreate() {
         );
       case 'processing':
         // Leaving is safe: the job continues server-side and push notifies.
-        return <Button label={t('common.later')} onPress={exit} variant="ghostDark" compact />;
+        return (
+          <Button label={t('voice.processingBack')} onPress={exit} variant="ghostDark" compact />
+        );
       case 'success':
         return (
           <>
@@ -1067,11 +1148,24 @@ const styles = StyleSheet.create({
   ownerList: { gap: 10, marginBottom: spacing.xl },
   ownerLabel: { fontFamily: fontFamilies.bodyBold, fontSize: fontSizes.xl, color: colors.foreground },
 
+  consentSubtitle: {
+    fontFamily: fontFamilies.body,
+    fontSize: fontSizes.lg,
+    color: colors.mutedForeground,
+    marginTop: -spacing.sm,
+    marginBottom: spacing.md,
+  },
   consentCard: {
     backgroundColor: colors.secondary,
     borderRadius: radius.base,
     padding: 18,
     marginBottom: spacing.md,
+  },
+  consentCardTitle: {
+    fontFamily: fontFamilies.bodyBold,
+    fontSize: fontSizes.xl,
+    color: colors.secondaryForeground,
+    marginBottom: 6,
   },
   consentBody: {
     fontFamily: fontFamilies.body,
@@ -1265,19 +1359,96 @@ const styles = StyleSheet.create({
     fontSize: fontSizes.lg,
     color: 'rgba(255,255,255,0.7)',
   },
-  minHint: {
-    fontFamily: fontFamilies.bodySemiBold,
-    fontSize: fontSizes.sm,
-    color: 'rgba(255,255,255,0.5)',
+  coachingLine: {
+    fontFamily: fontFamilies.bodyBold,
+    fontSize: fontSizes.base,
     textAlign: 'center',
     paddingHorizontal: spacing.lg,
   },
-
-  reviewTimer: {
-    fontFamily: fontFamilies.display,
-    fontSize: 48,
+  coachingWarn: { color: '#F2C58A' },
+  coachingOk: { color: '#A7D4B4' },
+  startLabel: {
+    fontFamily: fontFamilies.bodyBold,
+    fontSize: fontSizes.lg,
+    color: 'rgba(255,255,255,0.85)',
+  },
+  resumeButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    alignSelf: 'stretch',
+    minHeight: 52,
+    borderRadius: radius.lg,
+    backgroundColor: 'rgba(255,255,255,0.14)',
+  },
+  resumeButtonText: {
+    fontFamily: fontFamilies.bodyBold,
+    fontSize: fontSizes.xl,
     color: '#FFFFFF',
-    letterSpacing: -1,
+  },
+  meterRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    alignSelf: 'stretch',
+    paddingHorizontal: spacing.xl,
+    marginBottom: spacing.sm,
+  },
+  meterLabel: {
+    fontFamily: fontFamilies.bodySemiBold,
+    fontSize: fontSizes.sm,
+    color: 'rgba(255,255,255,0.7)',
+  },
+  meterTrack: {
+    flex: 1,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    overflow: 'hidden',
+  },
+  meterFill: { height: '100%', borderRadius: 4, backgroundColor: '#A7D4B4' },
+  meterOk: {
+    fontFamily: fontFamilies.bodyBold,
+    fontSize: fontSizes.sm,
+    color: '#A7D4B4',
+  },
+  reviewPlayCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    alignSelf: 'stretch',
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderRadius: radius.base,
+    padding: 14,
+    marginTop: spacing.lg,
+  },
+  reviewPlayText: { flex: 1, gap: 2 },
+  reviewPlayTitle: {
+    fontFamily: fontFamilies.bodyBold,
+    fontSize: fontSizes.xl,
+    color: '#FFFFFF',
+  },
+  reviewPlaySub: {
+    fontFamily: fontFamilies.body,
+    fontSize: fontSizes.base,
+    color: 'rgba(255,255,255,0.6)',
+  },
+  reviewSafeRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    alignSelf: 'stretch',
+    marginTop: spacing.md,
+    paddingHorizontal: spacing.xs,
+  },
+  reviewSafeCheck: { color: '#A7D4B4' },
+  reviewSafeText: {
+    flex: 1,
+    fontFamily: fontFamilies.body,
+    fontSize: fontSizes.base,
+    lineHeight: 20,
+    color: 'rgba(255,255,255,0.65)',
   },
 
   spinnerCircle: {
