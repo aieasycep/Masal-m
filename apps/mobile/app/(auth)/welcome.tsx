@@ -356,7 +356,7 @@ const styles = StyleSheet.create({
   spacer: { flex: 1 },
   terms: {
     fontFamily: fontFamilies.body,
-    fontSize: fontSizes.xs,
+    fontSize: fontSizes.sm,
     color: colors.mutedForeground,
     textAlign: 'center',
     lineHeight: 18,

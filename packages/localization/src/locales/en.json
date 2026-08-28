@@ -53,6 +53,8 @@
     "emailPlaceholder": "you@example.com",
     "password": "Password",
     "passwordPlaceholder": "At least 8 characters",
+    "showPassword": "Show password",
+    "hidePassword": "Hide password",
     "name": "Your name",
     "namePlaceholder": "e.g. Ayşe",
     "signIn": "Sign In",

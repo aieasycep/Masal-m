@@ -49,6 +49,16 @@ export default function Home() {
 
   const meQuery = useQuery({ queryKey: ['me'], queryFn: () => api.users.me() });
   const childrenQuery = useQuery({ queryKey: ['children'], queryFn: () => api.children.list() });
+
+  // Cold-start gate (QA P0): a restored session may reach Home before the
+  // user record is known. Once /users/me resolves and shows child setup was
+  // never finished, send the user back into it instead of a personalized Home.
+  const onboardingCompleted = meQuery.data?.onboardingCompleted;
+  useEffect(() => {
+    if (onboardingCompleted === false) {
+      router.replace('/children/new' as never);
+    }
+  }, [onboardingCompleted]);
   const entitlementsQuery = useQuery({
     queryKey: ['entitlements'],
     queryFn: () => api.subscription.entitlements(),

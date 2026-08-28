@@ -53,6 +53,8 @@
     "emailPlaceholder": "ornek@eposta.com",
     "password": "Şifre",
     "passwordPlaceholder": "En az 8 karakter",
+    "showPassword": "Şifreyi göster",
+    "hidePassword": "Şifreyi gizle",
     "name": "Adın",
     "namePlaceholder": "Örn. Ayşe",
     "signIn": "Giriş Yap",
