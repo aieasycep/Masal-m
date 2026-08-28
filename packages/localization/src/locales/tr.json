@@ -245,7 +245,8 @@
     "step2SubtitleGeneral": "Hayalî bir kahraman oluştur.",
     "customHeroGeneralTitle": "Hayalî bir kahraman oluştur",
     "customHeroGeneralSub": "İsim ve türü sen belirle",
-    "step5SubtitleGeneral": "Hikâyeyi anlatacak sesi seç."
+    "step5SubtitleGeneral": "Hikâyeyi anlatacak sesi seç.",
+    "ageFromProfile": "Yaş bilgisi profilden alınıyor · {{range}} yaş"
   },
   "generating": {
     "messages": [
@@ -464,7 +465,8 @@
     "generatingSub": "Hikâyen, {{name}} sesiyle hazırlanıyor.",
     "doneTitle": "Seslendirme hazır!",
     "doneSub": "Hikâye artık {{name}} sesiyle anlatılıyor.",
-    "backToStory": "Hikâyeye Dön"
+    "backToStory": "Hikâyeye Dön",
+    "changeVoice": "Sesi Değiştir"
   },
   "illustrate": {
     "title": "Masalını resimlendirelim mi?",

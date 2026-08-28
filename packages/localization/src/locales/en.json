@@ -245,7 +245,8 @@
     "step2SubtitleGeneral": "Create an imaginary hero.",
     "customHeroGeneralTitle": "Create an imaginary hero",
     "customHeroGeneralSub": "You pick the name and type",
-    "step5SubtitleGeneral": "Choose the voice that will narrate the story."
+    "step5SubtitleGeneral": "Choose the voice that will narrate the story.",
+    "ageFromProfile": "Age comes from the profile · ages {{range}}"
   },
   "generating": {
     "messages": [
@@ -464,7 +465,8 @@
     "generatingSub": "Your story is being prepared in {{name}}'s voice.",
     "doneTitle": "The narration is ready!",
     "doneSub": "The story is now told in {{name}}'s voice.",
-    "backToStory": "Back to the Story"
+    "backToStory": "Back to the Story",
+    "changeVoice": "Change Voice"
   },
   "illustrate": {
     "title": "Shall we illustrate your tale?",

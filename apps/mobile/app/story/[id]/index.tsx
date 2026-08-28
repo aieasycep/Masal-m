@@ -15,7 +15,13 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { AIJobStatus, DURATION_TARGETS, NarrationStatus, StoryStatus } from '@masalim/types';
+import {
+  AIJobStatus,
+  DURATION_TARGETS,
+  IllustrationSetStatus,
+  NarrationStatus,
+  StoryStatus,
+} from '@masalim/types';
 import { ApiError, NetworkError } from '@masalim/api-client';
 import { colors, fontFamilies, fontSizes, gradients, radius, spacing } from '@masalim/ui';
 import { api } from '../../../src/lib/api';
@@ -123,6 +129,16 @@ export default function StoryResult() {
   // Real progress for an in-flight narration; no-op when there is none.
   const narrationJob = useJobProgress(processingNarration?.jobId ?? undefined);
 
+  // V2 "Kitap Yap" prerequisite: a book needs READY illustrations first.
+  const illustrationSetsQuery = useQuery({
+    queryKey: ['illustrations', id],
+    queryFn: () => api.illustrations.list(id),
+    enabled: id != null && id.length > 0,
+  });
+  const hasReadyIllustrations = (illustrationSetsQuery.data ?? []).some(
+    (set) => set.status === IllustrationSetStatus.READY,
+  );
+
   // When the in-flight narration finishes, refresh so the listen CTA appears.
   useEffect(() => {
     if (
@@ -200,10 +216,19 @@ export default function StoryResult() {
   };
   const openEdit = () => router.push(`/story/${story.id}/edit` as never);
   const openIllustrate = () => router.push(`/story/${story.id}/illustrate` as never);
-  /** Kitap Yap: reuse the story's existing book, else create one, then open the builder. */
+  /**
+   * Kitap Yap (V2 prerequisites): without READY illustrations the book flow
+   * has nothing to lay out — route to the illustration style picker first.
+   * With illustrations, reuse the story's existing book (or create one) and
+   * open the builder.
+   */
   const openBookBuilder = async () => {
     if (bookLoading) return;
     setActionError(null);
+    if (!hasReadyIllustrations) {
+      openIllustrate();
+      return;
+    }
     setBookLoading(true);
     try {
       await openBookBuilderForStory(queryClient, story.id);
@@ -232,7 +257,13 @@ export default function StoryResult() {
   // Düzenle moved last).
   const actions = [
     { key: 'read', emoji: '📖', label: t('storyResult.read'), onPress: openReader },
-    { key: 'narrate', emoji: '🎙', label: t('narrate.create'), onPress: openNarrate },
+    {
+      key: 'narrate',
+      emoji: '🎙',
+      // V2 wording: an existing narration makes this a change, not a first pick.
+      label: narrations.length > 0 ? t('narrate.changeVoice') : t('narrate.create'),
+      onPress: openNarrate,
+    },
     {
       key: 'illustrate',
       emoji: '🎨',

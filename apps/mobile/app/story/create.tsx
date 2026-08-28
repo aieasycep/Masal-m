@@ -569,28 +569,39 @@ export default function CreateStory() {
       </Text>
       <Text style={styles.stepSubtitle}>{t('wizard.step4Subtitle')}</Text>
       <Text style={styles.sectionLabel}>{t('wizard.ageGroupLabel').toLocaleUpperCase('tr')}</Text>
-      <View style={styles.ageGrid}>
-        {AGE_RANGES.map((range) => {
-          const selected = ageRange === range;
-          return (
-            <SelectableCard
-              key={range}
-              selected={selected}
-              onPress={() => setAgeRange(range)}
-              showCheck={false}
-              style={styles.ageTile}
-              accessibilityLabel={`${AGE_RANGE_LABELS[range]} ${t('wizard.ageUnit')}`}
-            >
-              <View style={styles.ageTileInner}>
-                <Text style={[styles.ageValue, selected && styles.ageValueSelected]}>
-                  {AGE_RANGE_LABELS[range]}
-                </Text>
-                <Text style={styles.ageUnit}>{t('wizard.ageUnit')}</Text>
-              </View>
-            </SelectableCard>
-          );
-        })}
-      </View>
+      {selectedChild != null ? (
+        // V2: a registered child's age is known — never ask again. The bucket
+        // is already synced from the profile (birthDate-derived server-side).
+        <View style={styles.ageFromProfileRow}>
+          <Text style={styles.ageFromProfileEmoji}>👶</Text>
+          <Text style={styles.ageFromProfileText}>
+            {t('wizard.ageFromProfile', { range: AGE_RANGE_LABELS[ageRange] })}
+          </Text>
+        </View>
+      ) : (
+        <View style={styles.ageGrid}>
+          {AGE_RANGES.map((range) => {
+            const selected = ageRange === range;
+            return (
+              <SelectableCard
+                key={range}
+                selected={selected}
+                onPress={() => setAgeRange(range)}
+                showCheck={false}
+                style={styles.ageTile}
+                accessibilityLabel={`${AGE_RANGE_LABELS[range]} ${t('wizard.ageUnit')}`}
+              >
+                <View style={styles.ageTileInner}>
+                  <Text style={[styles.ageValue, selected && styles.ageValueSelected]}>
+                    {AGE_RANGE_LABELS[range]}
+                  </Text>
+                  <Text style={styles.ageUnit}>{t('wizard.ageUnit')}</Text>
+                </View>
+              </SelectableCard>
+            );
+          })}
+        </View>
+      )}
       <Text style={styles.sectionLabel}>{t('wizard.durationLabel').toLocaleUpperCase('tr')}</Text>
       <View style={styles.cardList}>
         {DURATIONS.map(({ duration, emoji }) => {
@@ -925,6 +936,23 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   ageGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, marginBottom: spacing.xl },
+  ageFromProfileRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: colors.secondary,
+    borderRadius: radius.base,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 14,
+    marginBottom: spacing.xl,
+  },
+  ageFromProfileEmoji: { fontSize: 18 },
+  ageFromProfileText: {
+    flex: 1,
+    fontFamily: fontFamilies.bodySemiBold,
+    fontSize: fontSizes.base,
+    color: colors.secondaryForeground,
+  },
   ageTile: { width: '48%', paddingVertical: 14, paddingHorizontal: 14 },
   ageTileInner: { flex: 1, alignItems: 'center' },
   ageValue: { fontFamily: fontFamilies.display, fontSize: fontSizes.h4, color: colors.foreground },

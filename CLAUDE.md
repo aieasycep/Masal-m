@@ -221,6 +221,36 @@ Local `.env` = `.env.example` + generated JWT secrets (already present, gitignor
   create→generating→result→narrate as ?voiceId= preselect; library child chips
   (childId param existed server-side). New i18n key library.allChildren (727).
 
+- **UI/UX REVIEW BRANCH (`uiux-review`)** — controlled review experiment, NOT
+  merged to main. Stable checkpoint: branch `stable-before-uiux-review` +
+  local tag `before-uiux-review` @ 7ba9dc1. Side-by-side review APK: package
+  `com.masalim.app.uiuxreview`, name "Kendi Hikayem — UI/UX Review", identity
+  applied ONLY in the runner (uiux-review-apk.yml mutates app.json at build;
+  git-tracked identity untouched); emulator smoke is a second job of the same
+  workflow (standalone dispatch-only workflows off-main are NOT dispatchable —
+  GitHub only registers default-branch workflows). V1 pass (KendiHikayem_UIUX_
+  Fixed.zip): tokens/contrast (coral/accent #B94F35 + coralOnDark for night,
+  mutedForeground #71655B, night.muted #91A1B8, sageText/dustyBlueText,
+  destructiveDeep), fontSizes.xxs 10→11 + ≥44pt targets + reduced-motion
+  (reanimated ReduceMotion.System default — documented in src/lib/motion.ts),
+  password show/hide, cold-start onboarding gate, BirthMonthPicker →
+  Child.birthDate (no migration; preferences.ageYears still written for
+  stable-app compat), voice studio (45s floor via shared VOICE_RECORDING
+  constant — client enforces now, API tightens on merge; LOCAL take playback
+  in review via preview-player file URI; consent rewrite + child-clone
+  notice; level meter), wizard guest-child ("Başka bir çocuk" in-wizard name)
+  + general branch, StoryResult 5 tiles 3-per-row, checkout single flow
+  configure→address→review (3-label StepBar), paywall copy (no "Sınırsız"),
+  settings/audio.tsx (rate 0.8–1.5x + autoFollowPage in app-prefs, player
+  seeded). V2 pass (KendiHikayem_UIUX_V2_Delta.zip): entry-point child
+  continuity (hero CTA resets stale different-child drafts), recommendation
+  cards seed themes+idea via applySuggestion pre-initialize, step-4 age
+  hidden for registered children ("Yaş bilgisi profilden alınıyor"), result
+  narrate tile "Sesi Değiştir" when narrations exist, Kitap Yap routes to
+  illustrate when no READY set, suggestions-header "Tümü" removed. PR #4
+  draft "[DO NOT MERGE]" exists only for CI. NO merge without the user's
+  explicit "Yeni UI'yı onaylıyorum, production'a al."
+
 ## Environment gotchas
 
 - ⚠ NestJS runs via `pnpm dev` (nest start) — NEVER tsx (esbuild drops

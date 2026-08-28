@@ -6,7 +6,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StoryTheme, SubscriptionPlan } from '@masalim/types';
-import type { StorySummary } from '@masalim/validation';
+import type { Recommendation, StorySummary } from '@masalim/validation';
 import { colors, fontFamilies, fontSizes, gradients, radius, shadows, spacing } from '@masalim/ui';
 import { Avatar } from '../../src/components/Avatar';
 import { ChildSwitcherSheet, childAvatarEmoji } from '../../src/components/ChildSwitcherSheet';
@@ -31,6 +31,10 @@ const CATEGORIES = [
   { key: 'friendship', emoji: '🤝', theme: StoryTheme.FRIENDSHIP },
   { key: 'imagination', emoji: '✨', theme: StoryTheme.IMAGINATION },
 ] as const;
+
+function isStoryTheme(value: unknown): value is StoryTheme {
+  return typeof value === 'string' && (Object.values(StoryTheme) as string[]).includes(value);
+}
 
 function greetingKey(): string {
   const hour = new Date().getHours();
@@ -113,12 +117,29 @@ export default function Home() {
   const showEmptyState = storiesQuery.isSuccess && stories.length === 0;
   const hasError = meQuery.isError || childrenQuery.isError;
 
-  const goCreate = () => router.push('/story/create' as never);
+  // V2 context continuity: a stale in-session draft for a DIFFERENT child must
+  // not hijack the entry (Ada selected → wizard must not reopen Ege's draft);
+  // a draft for the same child continues where the user left off.
+  const goCreate = () => {
+    const draft = useWizardStore.getState();
+    if (draft.initialized && draft.childId !== (selectedChild?.id ?? null)) {
+      draft.reset();
+    }
+    router.push('/story/create' as never);
+  };
   // Category tiles start a FRESH draft so the tapped theme always lands in the
   // wizard (its one-time prefill would otherwise skip an in-session draft).
   const goCreateWithTheme = (theme: StoryTheme) => {
     useWizardStore.getState().reset();
     router.push(`/story/create?theme=${theme}` as never);
+  };
+  // Recommendation cards carry child + themes + story idea into the wizard so
+  // none of it is asked again (child arrives via the fresh draft's prefill).
+  const openSuggestion = (rec: Recommendation) => {
+    const store = useWizardStore.getState();
+    store.reset();
+    store.applySuggestion(rec.themes.filter(isStoryTheme), rec.promptSeed);
+    router.push('/story/create' as never);
   };
   const openStory = (storyId: string) => router.push(`/story/${storyId}` as never);
 
@@ -229,17 +250,15 @@ export default function Home() {
       {/* AI suggestions */}
       {selectedChild != null && recommendations.length > 0 ? (
         <View style={styles.section}>
-          <SectionHeader
-            title={t('home.suggestionsTitle', { name: selectedChild.name })}
-            onSeeAll={() => router.push('/(tabs)/library' as never)}
-          />
+          {/* V2 semantics: no "Tümü" here — recommendations aren't the library. */}
+          <SectionHeader title={t('home.suggestionsTitle', { name: selectedChild.name })} />
           <View style={styles.suggestionList}>
             {recommendations.map((suggestion) => {
               const firstTheme = suggestion.themes[0];
               return (
                 <Pressable
                   key={suggestion.promptSeed}
-                  onPress={goCreate}
+                  onPress={() => openSuggestion(suggestion)}
                   accessibilityRole="button"
                   accessibilityLabel={suggestion.title}
                   style={({ pressed }) => [
