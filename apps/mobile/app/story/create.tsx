@@ -257,7 +257,9 @@ export default function CreateStory() {
       const story = await api.stories.create(input);
       const { jobId } = await api.stories.generate(story.id);
       await queryClient.invalidateQueries({ queryKey: ['stories'] });
-      router.replace(`/story/generating/${jobId}?storyId=${story.id}` as never);
+      // Step-5 narrator rides along so the narration screen preselects it.
+      const voiceParam = voiceId != null ? `&voiceId=${voiceId}` : '';
+      router.replace(`/story/generating/${jobId}?storyId=${story.id}${voiceParam}` as never);
       useWizardStore.getState().reset();
     } catch (err) {
       if (err instanceof ApiError) {

@@ -26,8 +26,8 @@ interface WizardDraft {
   ageRange: AgeRange;
   durationTarget: StoryDuration;
   /**
-   * Narrator choice (system voice id). Stored for the narration phase only —
-   * story generation does not consume it yet.
+   * Narrator choice (system voice id). Carried through generating → result →
+   * narrate as the preselected narrator once the story is ready.
    */
   voiceId: string | null;
   /** One-time prefill (selected child from app prefs + route theme) applied. */
@@ -83,6 +83,9 @@ export const useWizardStore = create<WizardState>()((set) => ({
       if (state.initialized) return {};
       return {
         initialized: true,
+        // A prefilled child already answers step 1 — start at the hero step.
+        // Step 1 stays reachable via the back button for switching children.
+        step: child != null ? 2 : state.step,
         childId: child?.id ?? null,
         heroMode: child == null ? 'custom' : ('child' as const),
         heroName: child?.name ?? '',

@@ -8,7 +8,7 @@ import type { StoryGenerationInput } from './types';
 
 const AGE_GUIDANCE: Record<AgeRange, string> = {
   AGE_0_2:
-    'Yaş grubu 0–2: Çok kısa ve basit cümleler (3–6 kelime). Tekrarlayan, ritmik ifadeler ve sesler (örn. "pat pat", "vın vın"). Somut, tanıdık nesneler ve rutinler. Hiç korku öğesi olmasın. Olay örgüsü çok basit, tek bir küçük olay.',
+    'Yaş grubu 0–2: Çok kısa ve basit cümleler (3–6 kelime). Tekrarlayan, ritmik ifadeler kullan; sahneye uygun ses taklitleri üretebilirsin ama sesleri bu hikâyeye özgü seç, başka masallarda sık geçen kalıp sesleri tekrarlama. Somut, tanıdık nesneler ve rutinler. Hiç korku öğesi olmasın. Olay örgüsü çok basit, tek bir küçük olay.',
   AGE_3_5:
     'Yaş grubu 3–5: Kısa cümleler (5–9 kelime). Basit, günlük kelimeler; arada bir yeni kelime tanıtılabilir. Net ve doğrusal olay örgüsü. Korku yok; en fazla çok hafif, hemen çözülen bir merak anı. Bolca sıcaklık ve güven duygusu.',
   AGE_6_8:
@@ -59,7 +59,9 @@ export function buildUserPrompt(input: StoryGenerationInput): string {
   if (input.child) {
     lines.push(`Hikâye şu çocuk için yazılıyor: ${input.child.name}`);
     if (input.child.interests.length > 0) {
-      lines.push(`Çocuğun ilgi alanları: ${input.child.interests.join(', ')}`);
+      lines.push(
+        `Çocuğun ilgi alanları: ${input.child.interests.join(', ')}. Bunlardan en fazla birini, seçilen temayla doğal biçimde örtüşüyorsa ince bir dokunuş olarak kullan; hepsini sayma ve aynı ilgi alanını her hikâyenin merkezine koyma. Temayla örtüşen yoksa hiçbirini kullanmaman daha iyidir.`,
+      );
     }
   }
   lines.push(`Temalar: ${input.themes.join(', ')}`);
@@ -81,6 +83,28 @@ export function buildUserPrompt(input: StoryGenerationInput): string {
     lines.push('');
     lines.push(`Ebeveynin hikâye fikri: "${input.customPrompt}"`);
     lines.push('Bu fikri çocuğa uygun şekilde hikâyenin merkezine al.');
+  }
+  lines.push('');
+  lines.push('ÇEŞİTLİLİK KURALLARI:');
+  lines.push(
+    '- Bu çocuk uygulamadan birçok masal dinliyor; her yeni hikâye öncekilerden belirgin biçimde farklı hissettirmeli.',
+  );
+  lines.push(
+    '- Basmakalıp açılışlardan kaçın; hikâyeye özgü, taze bir açılış cümlesi kur.',
+  );
+  lines.push(
+    '- Ses taklidi veya yinelenen ifade kullanacaksan bu hikâyeye özgü üret; masallarda sık geçen hazır kalıpları tekrarlama.',
+  );
+  lines.push('- Anlatım tekniğini, mekânı ve yan karakterleri hikâyeden hikâyeye değiştir.');
+  if (input.recentStories != null && input.recentStories.length > 0) {
+    lines.push('');
+    lines.push('Bu çocuk için daha önce yazılan hikâyeler:');
+    for (const prev of input.recentStories) {
+      lines.push(`- ${prev.title}${prev.summary ? ` — ${prev.summary}` : ''}`);
+    }
+    lines.push(
+      'Yeni hikâye bunların hiçbirini andırmamalı: aynı açılışları, motifleri, ses taklitlerini ve olay örgüsünü tekrarlama.',
+    );
   }
   lines.push('');
   lines.push(

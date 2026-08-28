@@ -92,6 +92,21 @@ export class StoryGenerationProcessor implements OnModuleInit, OnApplicationShut
     await this.jobs.markRunning(aiJob.id, 10);
 
     try {
+      // Variety guard: the prompt shows the child's latest stories so the model
+      // diverges from them instead of reusing the same openings and motifs.
+      const recentStories = await this.prisma.story.findMany({
+        where: {
+          userId: story.userId,
+          id: { not: story.id },
+          status: StoryStatus.READY,
+          deletedAt: null,
+          ...(story.childId != null ? { childId: story.childId } : {}),
+        },
+        orderBy: { createdAt: 'desc' },
+        take: 4,
+        select: { title: true, summary: true },
+      });
+
       const input: StoryGenerationInput = {
         child: story.child
           ? {
@@ -109,6 +124,7 @@ export class StoryGenerationProcessor implements OnModuleInit, OnApplicationShut
         educationalGoal: story.educationalGoal ?? undefined,
         advanced: (story.advanced ?? {}) as StoryGenerationInput['advanced'],
         language: story.language as 'tr' | 'en',
+        recentStories,
       };
 
       const result = await this.storyAi.generateStory(input);

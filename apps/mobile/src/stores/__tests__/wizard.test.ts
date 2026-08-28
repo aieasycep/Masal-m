@@ -15,6 +15,8 @@ describe('wizard store', () => {
     expect(state.ageRange).toBe(AgeRange.AGE_6_8);
     expect(state.themes).toContain(StoryTheme.SLEEP);
     expect(state.initialized).toBe(true);
+    // A prefilled child answers step 1, so the wizard starts at the hero step.
+    expect(state.step).toBe(2);
 
     // A second initialize must not clobber user edits.
     useWizardStore.getState().toggleTheme(StoryTheme.SPACE);
@@ -23,6 +25,11 @@ describe('wizard store', () => {
       .initialize({ child: { ...child, id: 'child-2' }, theme: StoryTheme.ANIMALS });
     expect(useWizardStore.getState().childId).toBe('child-1');
     expect(useWizardStore.getState().themes).not.toContain(StoryTheme.ANIMALS);
+  });
+
+  it('starts at step 1 when no child could be prefilled', () => {
+    useWizardStore.getState().initialize({ child: null, theme: null });
+    expect(useWizardStore.getState().step).toBe(1);
   });
 
   it('caps theme selection at MAX_THEMES but always allows deselect', () => {

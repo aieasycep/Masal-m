@@ -63,7 +63,11 @@ export default function StoryGenerating() {
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
-  const { jobId, storyId } = useLocalSearchParams<{ jobId: string; storyId?: string }>();
+  const { jobId, storyId, voiceId } = useLocalSearchParams<{
+    jobId: string;
+    storyId?: string;
+    voiceId?: string;
+  }>();
 
   const { status, progress, errorCode } = useJobProgress(jobId);
   const inProgress =
@@ -138,7 +142,10 @@ export default function StoryGenerating() {
       timer = setTimeout(() => {
         if (cancelled) return;
         if (target != null) {
-          router.replace(`/story/${target}` as never);
+          // Wizard narrator choice travels on to the result screen.
+          const voiceParam =
+            voiceId != null && voiceId.length > 0 ? `?voiceId=${voiceId}` : '';
+          router.replace(`/story/${target}${voiceParam}` as never);
         } else {
           router.back();
         }
@@ -150,7 +157,7 @@ export default function StoryGenerating() {
       cancelled = true;
       if (timer != null) clearTimeout(timer);
     };
-  }, [status, storyId, jobId, queryClient]);
+  }, [status, storyId, jobId, voiceId, queryClient]);
 
   // Retry after failure: re-queue generation and swap in the new job id.
   const [retryError, setRetryError] = useState<string | null>(null);

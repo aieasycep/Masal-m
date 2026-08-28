@@ -5,7 +5,7 @@ import { router } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { SubscriptionPlan } from '@masalim/types';
+import { StoryTheme, SubscriptionPlan } from '@masalim/types';
 import type { StorySummary } from '@masalim/validation';
 import { colors, fontFamilies, fontSizes, gradients, radius, shadows, spacing } from '@masalim/ui';
 import { Avatar } from '../../src/components/Avatar';
@@ -18,17 +18,18 @@ import { ChevronRightIcon } from '../../src/components/icons';
 import { EmptyState, ErrorState } from '../../src/components/states';
 import { api } from '../../src/lib/api';
 import { useAppPrefs } from '../../src/stores/app-prefs';
+import { useWizardStore } from '../../src/stores/wizard';
 
 /** Soft lavender wash behind the header — rgba stops derive from colors.lavender (#B09CE0). */
 const HEADER_WASH = ['rgba(176,156,224,0.15)', 'rgba(176,156,224,0)'] as const;
 
 const CATEGORIES = [
-  { key: 'sleep', emoji: '🌙' },
-  { key: 'adventure', emoji: '⚔️' },
-  { key: 'educational', emoji: '📚' },
-  { key: 'emotions', emoji: '💛' },
-  { key: 'friendship', emoji: '🤝' },
-  { key: 'imagination', emoji: '✨' },
+  { key: 'sleep', emoji: '🌙', theme: StoryTheme.SLEEP },
+  { key: 'adventure', emoji: '⚔️', theme: StoryTheme.ADVENTURE },
+  { key: 'educational', emoji: '📚', theme: StoryTheme.EDUCATIONAL },
+  { key: 'emotions', emoji: '💛', theme: StoryTheme.EMOTIONS },
+  { key: 'friendship', emoji: '🤝', theme: StoryTheme.FRIENDSHIP },
+  { key: 'imagination', emoji: '✨', theme: StoryTheme.IMAGINATION },
 ] as const;
 
 function greetingKey(): string {
@@ -103,6 +104,12 @@ export default function Home() {
   const hasError = meQuery.isError || childrenQuery.isError;
 
   const goCreate = () => router.push('/story/create' as never);
+  // Category tiles start a FRESH draft so the tapped theme always lands in the
+  // wizard (its one-time prefill would otherwise skip an in-session draft).
+  const goCreateWithTheme = (theme: StoryTheme) => {
+    useWizardStore.getState().reset();
+    router.push(`/story/create?theme=${theme}` as never);
+  };
   const openStory = (storyId: string) => router.push(`/story/${storyId}` as never);
 
   const retry = () => {
@@ -306,7 +313,7 @@ export default function Home() {
           {CATEGORIES.map((category) => (
             <Pressable
               key={category.key}
-              onPress={goCreate}
+              onPress={() => goCreateWithTheme(category.theme)}
               accessibilityRole="button"
               accessibilityLabel={t(`home.categories.${category.key}`)}
               style={({ pressed }) => [

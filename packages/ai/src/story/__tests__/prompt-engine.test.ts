@@ -49,4 +49,34 @@ describe('prompt engine (§16)', () => {
     const en = buildSystemPrompt({ ...baseInput, language: 'en' });
     expect(tr).not.toEqual(en);
   });
+
+  it('never ships copyable example onomatopoeia (models echo them into every story)', () => {
+    const toddler = buildUserPrompt({ ...baseInput, ageRange: AgeRange.AGE_0_2 });
+    expect(toddler).not.toContain('vın vın');
+    expect(toddler).not.toContain('pat pat');
+  });
+
+  it('tells the model to use at most one interest, not all of them', () => {
+    const user = buildUserPrompt(baseInput);
+    expect(user).toContain('en fazla birini');
+  });
+
+  it('always includes the variety rules block', () => {
+    expect(buildUserPrompt(baseInput)).toContain('ÇEŞİTLİLİK KURALLARI');
+  });
+
+  it('lists recent stories and demands divergence when provided', () => {
+    const user = buildUserPrompt({
+      ...baseInput,
+      recentStories: [
+        { title: 'İrem’in Uzay Yolculuğu', summary: 'İrem uzaya çıkar.' },
+        { title: 'Kayıp Yıldız', summary: null },
+      ],
+    });
+    expect(user).toContain('İrem’in Uzay Yolculuğu');
+    expect(user).toContain('Kayıp Yıldız');
+    expect(user).toContain('daha önce yazılan hikâyeler');
+    // Without the field the block is absent.
+    expect(buildUserPrompt(baseInput)).not.toContain('daha önce yazılan hikâyeler');
+  });
 });

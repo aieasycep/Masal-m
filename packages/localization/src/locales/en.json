@@ -279,6 +279,7 @@
     "title": "My Stories",
     "subtitle": "{{storyCount}} stories · {{childCount}} children",
     "searchPlaceholder": "Search stories…",
+    "allChildren": "All children",
     "filters": {
       "all": "All",
       "audio": "Audio",
