@@ -21,6 +21,8 @@ export interface StoryGenerationInput {
     fantasyLevel?: 'grounded' | 'balanced' | 'high';
   };
   language: 'tr' | 'en';
+  /** Recent stories written for the same child — the model is told to diverge from them. */
+  recentStories?: { title: string; summary: string | null }[];
 }
 
 export interface AIUsage {
