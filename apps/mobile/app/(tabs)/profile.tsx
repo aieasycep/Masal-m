@@ -340,7 +340,7 @@ const styles = StyleSheet.create({
   planPillEmoji: { fontSize: 12 },
   planPillText: {
     fontFamily: fontFamilies.bodyBold,
-    fontSize: fontSizes.xs,
+    fontSize: fontSizes.sm,
     color: colors.primaryForeground,
   },
   childrenSection: {

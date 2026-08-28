@@ -233,10 +233,14 @@ export default function Paywall() {
    * a non-₺ store locale (RevenueCat) shows the label as-is.
    */
   const yearlyTotalLine = (offering: Offering): string => {
-    if (offering.priceLabel.startsWith('₺')) {
-      return t('subscription.pricePerYear', { price: offering.priceLabel.slice(1).trim() });
-    }
-    return offering.priceLabel;
+    const base = offering.priceLabel.startsWith('₺')
+      ? t('subscription.pricePerYear', { price: offering.priceLabel.slice(1).trim() })
+      : offering.priceLabel;
+    // QA copy fix: the old "2 ay ücretsiz" claim contradicted the computed
+    // discount — state the real advantage instead.
+    return showDiscount
+      ? `${base} · ${t('subscription.yearlyAdvantage', { percent: discountPercent })}`
+      : base;
   };
 
   const invalidateAll = async () => {

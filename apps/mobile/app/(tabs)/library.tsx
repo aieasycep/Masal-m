@@ -482,7 +482,7 @@ const styles = StyleSheet.create({
   },
   rowThemes: {
     fontFamily: fontFamilies.body,
-    fontSize: fontSizes.xs,
+    fontSize: fontSizes.sm,
     color: colors.mutedForeground,
     opacity: 0.7,
     marginBottom: spacing.xs,
@@ -491,7 +491,7 @@ const styles = StyleSheet.create({
   rowRight: { alignItems: 'flex-end', justifyContent: 'space-between' },
   rowDate: {
     fontFamily: fontFamilies.body,
-    fontSize: fontSizes.xs,
+    fontSize: fontSizes.sm,
     color: colors.mutedForeground,
   },
   rowRightBottom: { flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 44 },

@@ -13,6 +13,7 @@ import { ScreenHeader } from '../../src/components/ScreenHeader';
 import { ChevronRightIcon } from '../../src/components/icons';
 import { api } from '../../src/lib/api';
 import { unregisterPush } from '../../src/lib/push';
+import { useAppPrefs } from '../../src/stores/app-prefs';
 import { useAuthStore } from '../../src/stores/auth';
 
 /** Labeled section card from `Settings/01-Main`: uppercase eyebrow + white r18 card. */
@@ -82,6 +83,8 @@ export default function SettingsIndex() {
   ).length;
 
   const languageCode = i18n.language === 'en' ? 'en' : 'tr';
+  const defaultPlaybackRate = useAppPrefs((state) => state.defaultPlaybackRate);
+  const rateLabel = `${defaultPlaybackRate}x`.replace('.', ',');
   const version = Constants.expoConfig?.version ?? '0.1.0';
 
   const signOut = async () => {
@@ -140,6 +143,12 @@ export default function SettingsIndex() {
           label={t('settings.language')}
           sub={t(`settings.languages.${languageCode}`)}
           onPress={() => router.push('/settings/language' as never)}
+        />
+        <ListRow
+          icon="🔊"
+          label={t('settings.audio')}
+          sub={t('settings.audioSub', { rate: rateLabel })}
+          onPress={() => router.push('/settings/audio' as never)}
           showDivider={false}
         />
       </SectionCard>

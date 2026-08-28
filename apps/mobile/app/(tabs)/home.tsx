@@ -229,7 +229,10 @@ export default function Home() {
       {/* AI suggestions */}
       {selectedChild != null && recommendations.length > 0 ? (
         <View style={styles.section}>
-          <SectionHeader title={t('home.suggestionsTitle', { name: selectedChild.name })} />
+          <SectionHeader
+            title={t('home.suggestionsTitle', { name: selectedChild.name })}
+            onSeeAll={() => router.push('/(tabs)/library' as never)}
+          />
           <View style={styles.suggestionList}>
             {recommendations.map((suggestion) => {
               const firstTheme = suggestion.themes[0];
@@ -385,7 +388,7 @@ const styles = StyleSheet.create({
   },
   childChipName: {
     fontFamily: fontFamilies.bodyBold,
-    fontSize: fontSizes.xs,
+    fontSize: fontSizes.sm,
     color: colors.primary,
   },
   section: { paddingHorizontal: spacing.pageX, marginBottom: spacing.xl },

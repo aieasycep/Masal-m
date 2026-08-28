@@ -711,7 +711,7 @@
       "tr": "Türkçe",
       "en": "English"
     },
-    "audio": "Audio",
+    "audio": "Audio & Playback",
     "voiceData": "My Voice Data",
     "voiceDataBody": "Manage, listen to, or delete your saved voices.",
     "privacy": "Privacy Policy",
@@ -762,25 +762,30 @@
     "voiceDataInfo": "Your voice recordings are used only to create the content you approve. You can delete them at any time.",
     "voiceDeleteTitle": "Delete the voice {{name}}?",
     "voiceDeleteBody": "Once deleted, this voice profile can no longer be used in new stories. Existing narrated stories are not affected.",
-    "voiceDeleteConfirm": "Delete My Voice"
+    "voiceDeleteConfirm": "Delete My Voice",
+    "audioSub": "Default speed: {{rate}}",
+    "audioSpeedSection": "Playback Speed",
+    "audioPlayerSection": "Story Player",
+    "autoAdvance": "Auto-advance to the next page",
+    "autoAdvanceSub": "Follow the book page as the narration progresses"
   },
   "subscription": {
     "title": "Masalım Premium",
-    "subtitle": "Unlock a world of unlimited tales.",
+    "subtitle": "Open the doors to your child's own world of tales.",
     "monthly": "Monthly",
     "yearly": "Yearly",
     "bestValue": "Best Value",
     "pricePerMonth": "₺{{price}} / month",
     "pricePerYear": "₺{{price}} / year",
     "features": {
-      "stories": "More stories",
+      "stories": "More Premium story credits",
       "parentVoices": "Mom & dad voices",
       "premiumVoices": "Premium narrator voices",
       "illustrations": "More AI images",
       "hdExport": "HD book images",
-      "library": "Unlimited library storage",
+      "library": "A rich story library",
       "audiobook": "Audiobook mode",
-      "print": "Physical book printing"
+      "print": "Turn a story into a physical book"
     },
     "freePlan": "Free",
     "premiumPlan": "Premium",
@@ -790,7 +795,7 @@
     "voiceCloneGate": "Creating mom & dad voices is a Premium feature.",
     "quotaReachedStories": "You've used this month's story quota. Create more with Premium.",
     "quotaReachedIllustrations": "You've used this month's image quota. Create more with Premium.",
-    "heroTitle": "Unlimited tales, unlimited magic ✨",
+    "heroTitle": "More tales, more special memories ✨",
     "heroSubtitle": "Fill your child's magical world with stars.",
     "featuresLabel": "Premium Features",
     "discountBadge": "{{percent}}% Off",
@@ -803,8 +808,9 @@
     "startCta": "Start Premium — {{price}}",
     "legal": "Cancel anytime. Your subscription renews automatically.",
     "quotaTitle": "You've used your {{limit}} stories this month!",
-    "quotaSubtitle": "Create unlimited stories with Masalım Premium and craft endless adventures for your child.",
-    "later": "Later"
+    "quotaSubtitle": "Create more stories with Masalım Premium and use the voice and illustration features.",
+    "later": "Later",
+    "yearlyAdvantage": "%{{percent}} better value than monthly"
   },
   "notificationsScreen": {
     "title": "Notifications",
@@ -866,11 +872,10 @@
     "retry": "Error — try again"
   },
   "premiumSheet": {
-    "badge": "Premium",
     "title": "This feature is Premium-only.",
     "bodyFallback": "upgrade to Premium to use this feature.",
     "perkParentVoice": "Narration in mom and dad’s voice",
-    "perkUnlimitedStories": "Create more stories",
+    "perkUnlimitedStories": "Monthly Premium story credits",
     "perkIllustrations": "AI illustrations",
     "cta": "Explore Premium",
     "dismiss": "Not Now"

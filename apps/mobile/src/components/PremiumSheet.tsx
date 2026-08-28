@@ -44,9 +44,6 @@ export function PremiumSheet({
         >
           <Text style={styles.crownEmoji}>👑</Text>
         </LinearGradient>
-        <View style={styles.chip}>
-          <Text style={styles.chipText}>{t('premiumSheet.badge')}</Text>
-        </View>
         <Text style={styles.title}>{t('premiumSheet.title')}</Text>
         <Text style={styles.body}>
           <Text style={styles.bodyStrong}>{featureName}</Text>
@@ -90,19 +87,6 @@ const styles = StyleSheet.create({
     elevation: 6,
   },
   crownEmoji: { fontSize: 30 },
-  chip: {
-    backgroundColor: 'rgba(240, 165, 110, 0.15)',
-    borderRadius: radius.sm,
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-  },
-  chipText: {
-    fontFamily: fontFamilies.bodyExtraBold,
-    fontSize: fontSizes.xxs,
-    color: premiumGold.text,
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-  },
   title: {
     fontFamily: fontFamilies.display,
     fontSize: fontSizes.h3,

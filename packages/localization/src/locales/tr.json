@@ -711,7 +711,7 @@
       "tr": "Türkçe",
       "en": "English"
     },
-    "audio": "Ses",
+    "audio": "Ses ve Oynatma",
     "voiceData": "Ses Verilerim",
     "voiceDataBody": "Kayıtlı seslerini yönetebilir, dinleyebilir veya silebilirsin.",
     "privacy": "Gizlilik Politikası",
@@ -762,25 +762,30 @@
     "voiceDataInfo": "Ses kayıtların yalnızca izin verdiğin içerikleri oluşturmak için kullanılır. İstediğin zaman silebilirsin.",
     "voiceDeleteTitle": "{{name}} sesini sil?",
     "voiceDeleteBody": "Bu ses profilini sildiğinde yeni hikâyelerde kullanılamaz. Mevcut seslendirilmiş hikâyeler etkilenmez.",
-    "voiceDeleteConfirm": "Sesimi Sil"
+    "voiceDeleteConfirm": "Sesimi Sil",
+    "audioSub": "Varsayılan hız: {{rate}}",
+    "audioSpeedSection": "Oynatma Hızı",
+    "audioPlayerSection": "Hikâye Oynatıcı",
+    "autoAdvance": "Sonraki sayfaya otomatik geç",
+    "autoAdvanceSub": "Seslendirme ilerledikçe kitap sayfasını takip et"
   },
   "subscription": {
     "title": "Masalım Premium",
-    "subtitle": "Sınırsız masal dünyasının kapılarını aç.",
+    "subtitle": "Çocuğuna özel masal dünyasının kapılarını aç.",
     "monthly": "Aylık",
     "yearly": "Yıllık",
     "bestValue": "En Avantajlı",
     "pricePerMonth": "₺{{price}} / ay",
     "pricePerYear": "₺{{price}} / yıl",
     "features": {
-      "stories": "Daha fazla hikâye",
+      "stories": "Daha fazla Premium hikâye hakkı",
       "parentVoices": "Anne & baba sesleri",
       "premiumVoices": "Premium anlatıcı sesleri",
       "illustrations": "Daha fazla AI görsel",
       "hdExport": "HD kitap görselleri",
-      "library": "Sınırsız kütüphane depolama",
+      "library": "Geniş hikâye kütüphanesi",
       "audiobook": "Sesli kitap modu",
-      "print": "Fiziksel kitap baskısı"
+      "print": "Hikâyeyi fiziksel kitaba dönüştürme"
     },
     "freePlan": "Ücretsiz",
     "premiumPlan": "Premium",
@@ -790,7 +795,7 @@
     "voiceCloneGate": "Anne & baba sesi oluşturmak Premium'a özel.",
     "quotaReachedStories": "Bu ayki hikâye hakkın doldu. Premium ile daha fazlasını oluşturabilirsin.",
     "quotaReachedIllustrations": "Bu ayki görsel hakkın doldu. Premium ile daha fazlasını oluşturabilirsin.",
-    "heroTitle": "Sınırsız masal, sınırsız büyü ✨",
+    "heroTitle": "Daha fazla masal, daha özel anılar ✨",
     "heroSubtitle": "Çocuğunun büyülü dünyasını yıldızlarla doldur.",
     "featuresLabel": "Premium Özellikler",
     "discountBadge": "%{{percent}} İndirim",
@@ -803,8 +808,9 @@
     "startCta": "Premium'a Başla — {{price}}",
     "legal": "İstediğin zaman iptal edebilirsin. Abonelik otomatik yenilenir.",
     "quotaTitle": "Bu ay {{limit}} hikâye hakkın doldu!",
-    "quotaSubtitle": "Masalım Premium ile sınırsız hikâye oluştur, çocuğun için sonsuz macera yarat.",
-    "later": "Daha Sonra"
+    "quotaSubtitle": "Masalım Premium ile daha fazla hikâye oluştur, ses ve illüstrasyon özelliklerinden yararlan.",
+    "later": "Daha Sonra",
+    "yearlyAdvantage": "aylığa göre %{{percent}} avantajlı"
   },
   "notificationsScreen": {
     "title": "Bildirimler",
@@ -866,11 +872,10 @@
     "retry": "Hata — tekrar dene"
   },
   "premiumSheet": {
-    "badge": "Premium",
     "title": "Bu özellik Premium'a özel.",
     "bodyFallback": "özelliğini kullanmak için Premium'a geçebilirsin.",
     "perkParentVoice": "Anne ve baba sesiyle anlatım",
-    "perkUnlimitedStories": "Daha fazla hikâye oluşturma",
+    "perkUnlimitedStories": "Aylık Premium hikâye hakları",
     "perkIllustrations": "AI illüstrasyon",
     "cta": "Premium'u İncele",
     "dismiss": "Şimdilik Değil"
