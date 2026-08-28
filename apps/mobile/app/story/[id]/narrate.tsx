@@ -443,7 +443,10 @@ export default function NarrateStory() {
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, voiceId: preselectVoiceId } = useLocalSearchParams<{
+    id: string;
+    voiceId?: string;
+  }>();
   const preview = usePreviewPlayer();
 
   const [selected, setSelected] = useState<VoiceSelection | null>(null);
@@ -489,6 +492,25 @@ export default function NarrateStory() {
   const story = storyQuery.data ?? null;
 
   const job = useJobProgress(activeJob?.jobId);
+
+  // Preselect the narrator chosen in the wizard (route param) once the system
+  // voices load — only when the user hasn't tapped a voice yet and the choice
+  // is actually selectable under the current entitlements.
+  useEffect(() => {
+    if (
+      selected != null ||
+      preselectVoiceId == null ||
+      preselectVoiceId.length === 0 ||
+      systemVoicesQuery.data == null ||
+      entitlementsQuery.data == null
+    ) {
+      return;
+    }
+    const match = systemVoicesQuery.data.find((voice) => voice.id === preselectVoiceId);
+    if (match != null && (!match.premiumOnly || canUsePremiumVoices)) {
+      setSelected({ type: 'system', id: match.id });
+    }
+  }, [selected, preselectVoiceId, systemVoicesQuery.data, entitlementsQuery.data, canUsePremiumVoices]);
 
   // Resolve the CTA-created job: success → done view (explicit CTA into the
   // player replaces the old auto-redirect); failure → inline error.
