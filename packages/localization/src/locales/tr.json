@@ -551,7 +551,8 @@
     "backCoverPageLabel": "Arka Kapak",
     "pageLabel": "Sayfa {{number}}",
     "backQuote": "Her çocuk kendi hikâyesinin kahramanıdır.",
-    "backToEdit": "Düzenlemeye Dön"
+    "backToEdit": "Düzenlemeye Dön",
+    "previewBookCta": "Kitabı Önizle"
   },
   "checkout": {
     "configTitle": "Kitap Seçenekleri",
@@ -577,7 +578,7 @@
     "district": "İlçe",
     "postalCode": "Posta kodu",
     "saveAddress": "Adresi kaydet",
-    "reviewTitle": "Sipariş Özeti",
+    "reviewTitle": "Sipariş ve Ödeme",
     "product": "Ürün",
     "shippingLabel": "Kargo",
     "shippingFree": "Ücretsiz",
@@ -606,8 +607,7 @@
     "steps": {
       "book": "Kitap",
       "address": "Adres",
-      "summary": "Özet",
-      "payment": "Ödeme"
+      "summary": "Özet"
     },
     "neighborhood": "Mahalle",
     "street": "Cadde / Sokak",
@@ -623,7 +623,13 @@
       "street": "Gül Sokak No:12",
       "buildingInfo": "Kat 3, Daire 7",
       "postalCode": "34710"
-    }
+    },
+    "toAddress": "Teslimat Adresine Geç →",
+    "deliveryLabel": "Teslimat",
+    "changeAddress": "Değiştir",
+    "securePaymentTitle": "Güvenli ödeme",
+    "securePaymentBody": "Ödeme sağlayıcısının güvenli ekranında tamamlanır.",
+    "payFootnote": "Ödemeyi tamamladığında siparişin baskı sürecine alınır. Teslimat ve kargo güncellemelerini uygulamadan takip edebilirsin."
   },
   "orders": {
     "title": "Siparişlerim",

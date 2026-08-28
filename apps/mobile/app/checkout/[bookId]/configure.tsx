@@ -49,7 +49,7 @@ function useDebouncedValue<T>(value: T, delayMs: number): T {
   return debounced;
 }
 
-/** Shared labeled step bar — configure is the "Özet" step (index 2 of 4). */
+/** Shared labeled step bar — configure is the "Kitap" step (index 0 of 3). */
 function ConfigureStepBar() {
   const { t } = useTranslation();
   return (
@@ -59,9 +59,8 @@ function ConfigureStepBar() {
           t('checkout.steps.book'),
           t('checkout.steps.address'),
           t('checkout.steps.summary'),
-          t('checkout.steps.payment'),
         ]}
-        activeIndex={2}
+        activeIndex={0}
       />
     </View>
   );
@@ -335,8 +334,8 @@ export default function CheckoutConfigure() {
           </View>
 
           <Button
-            label={t('checkout.continue')}
-            onPress={() => router.push(`/checkout/${bookId}/review` as never)}
+            label={t('checkout.toAddress')}
+            onPress={() => router.push(`/checkout/${bookId}/address` as never)}
             disabled={quote == null}
             style={styles.cta}
           />

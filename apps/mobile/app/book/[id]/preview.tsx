@@ -487,7 +487,7 @@ export default function BookPreview() {
       {/* CTA stack. */}
       <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 16) + spacing.xs }]}>
         <Pressable
-          onPress={() => router.push(`/checkout/${book.id}/address` as never)}
+          onPress={() => router.push(`/checkout/${book.id}/configure` as never)}
           accessibilityRole="button"
           style={({ pressed }) => [
             styles.printCta,
@@ -519,9 +519,9 @@ const styles = StyleSheet.create({
 
   headerRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: spacing.md },
   backCircle: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     backgroundColor: 'rgba(255,255,255,0.1)',
     alignItems: 'center',
     justifyContent: 'center',
@@ -614,9 +614,9 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: '50%',
     marginTop: -20,
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     backgroundColor: 'rgba(255,255,255,0.12)',
     alignItems: 'center',
     justifyContent: 'center',

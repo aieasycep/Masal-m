@@ -551,7 +551,8 @@
     "backCoverPageLabel": "Back Cover",
     "pageLabel": "Page {{number}}",
     "backQuote": "Every child is the hero of their own story.",
-    "backToEdit": "Back to Editing"
+    "backToEdit": "Back to Editing",
+    "previewBookCta": "Preview the Book"
   },
   "checkout": {
     "configTitle": "Book Options",
@@ -577,7 +578,7 @@
     "district": "District",
     "postalCode": "Postal code",
     "saveAddress": "Save address",
-    "reviewTitle": "Order Summary",
+    "reviewTitle": "Order & Payment",
     "product": "Product",
     "shippingLabel": "Shipping",
     "shippingFree": "Free",
@@ -606,8 +607,7 @@
     "steps": {
       "book": "Book",
       "address": "Address",
-      "summary": "Summary",
-      "payment": "Payment"
+      "summary": "Summary"
     },
     "neighborhood": "Neighborhood",
     "street": "Street",
@@ -623,7 +623,13 @@
       "street": "Gül Sokak No:12",
       "buildingInfo": "Floor 3, Apt 7",
       "postalCode": "34710"
-    }
+    },
+    "toAddress": "Continue to Delivery Address →",
+    "deliveryLabel": "Delivery",
+    "changeAddress": "Change",
+    "securePaymentTitle": "Secure payment",
+    "securePaymentBody": "Completed on the payment provider's secure screen.",
+    "payFootnote": "Once you complete the payment, your order goes into production. You can follow delivery and shipping updates in the app."
   },
   "orders": {
     "title": "My Orders",

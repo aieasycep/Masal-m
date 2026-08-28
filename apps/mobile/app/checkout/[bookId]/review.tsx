@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -49,9 +49,8 @@ function ReviewStepBar() {
           t('checkout.steps.book'),
           t('checkout.steps.address'),
           t('checkout.steps.summary'),
-          t('checkout.steps.payment'),
         ]}
-        activeIndex={3}
+        activeIndex={2}
       />
     </View>
   );
@@ -378,9 +377,19 @@ export default function CheckoutReview() {
           {/* Shipping address. */}
           {address != null ? (
             <View style={[styles.card, shadows.cardSubtle]}>
-              <Text style={styles.cardLabel}>
-                {t('checkout.addressTitle').toLocaleUpperCase('tr')}
-              </Text>
+              <View style={styles.cardLabelRow}>
+                <Text style={styles.cardLabel}>
+                  {t('checkout.deliveryLabel').toLocaleUpperCase('tr')}
+                </Text>
+                <Pressable
+                  onPress={() => router.push(`/checkout/${bookId}/address` as never)}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('checkout.changeAddress')}
+                  style={styles.changeLink}
+                >
+                  <Text style={styles.changeLinkText}>{t('checkout.changeAddress')}</Text>
+                </Pressable>
+              </View>
               <Text style={styles.addressName}>{address.fullName}</Text>
               <Text style={styles.addressLine}>{address.addressLine}</Text>
               <Text style={styles.addressMeta}>
@@ -402,6 +411,17 @@ export default function CheckoutReview() {
             </View>
           )}
 
+          {/* QA design: payment reassurance card above the CTA. */}
+          <View style={[styles.card, shadows.cardSubtle]}>
+            <View style={styles.secureRow}>
+              <Text style={styles.secureCheck}>✓</Text>
+              <View style={styles.secureText}>
+                <Text style={styles.secureTitle}>{t('checkout.securePaymentTitle')}</Text>
+                <Text style={styles.secureBody}>{t('checkout.securePaymentBody')}</Text>
+              </View>
+            </View>
+          </View>
+
           {payError != null ? (
             <Text style={styles.payError} accessibilityLiveRegion="polite">
               {payError}
@@ -412,12 +432,13 @@ export default function CheckoutReview() {
             label={
               paying
                 ? t('checkout.paying')
-                : `${t('checkout.payCta')} · ${formatPrice(quote.total)}`
+                : `${formatPrice(quote.total)} · ${t('checkout.payCta')}`
             }
             onPress={() => void startPayment()}
             disabled={!canPay}
             style={styles.cta}
           />
+          <Text style={styles.payFootnote}>{t('checkout.payFootnote')}</Text>
         </>
       )}
     </Screen>
@@ -436,6 +457,44 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
     gap: 4,
+  },
+  cardLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  changeLink: { minHeight: 44, justifyContent: 'center', paddingHorizontal: 4 },
+  changeLinkText: {
+    fontFamily: fontFamilies.bodyBold,
+    fontSize: fontSizes.sm,
+    color: colors.primary,
+  },
+  secureRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
+  secureCheck: {
+    fontFamily: fontFamilies.bodyBold,
+    fontSize: fontSizes.xl,
+    color: colors.sageText,
+  },
+  secureText: { flex: 1, gap: 2 },
+  secureTitle: {
+    fontFamily: fontFamilies.bodyBold,
+    fontSize: fontSizes.base,
+    color: colors.foreground,
+  },
+  secureBody: {
+    fontFamily: fontFamilies.body,
+    fontSize: fontSizes.md,
+    color: colors.mutedForeground,
+    lineHeight: 19,
+  },
+  payFootnote: {
+    fontFamily: fontFamilies.body,
+    fontSize: fontSizes.md,
+    color: colors.mutedForeground,
+    textAlign: 'center',
+    lineHeight: 19,
+    marginTop: spacing.sm,
+    marginBottom: spacing.md,
   },
   cardLabel: {
     fontFamily: fontFamilies.bodyBold,
