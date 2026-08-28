@@ -853,6 +853,9 @@ export default function IllustrateStory() {
             <View style={styles.regenOverlay}>
               <RingSpinner />
               <Text style={styles.regenOverlayText}>{t('illustrate.regeneratingLabel')}</Text>
+              <Text style={styles.regenReassurance}>
+                {t('illustrate.regeneratingReassurance')}
+              </Text>
             </View>
           ) : null}
         </View>
@@ -924,6 +927,8 @@ export default function IllustrateStory() {
         <Text style={styles.altLead}>
           {t('illustrate.alternativesLead', {
             unit: focusedUnit.label,
+            style:
+              readySet != null ? t(`illustrate.styles.${readySet.style}`).toLocaleLowerCase('tr') : '',
             count: focusedUnit.alternatives.length,
           })}
         </Text>
@@ -932,7 +937,9 @@ export default function IllustrateStory() {
             <AltTile
               key={illustration.id}
               illustration={illustration}
-              label={t('illustrate.alternativeOption', { number: index + 1 })}
+              label={t('illustrate.alternativeOption', {
+                letter: String.fromCharCode(65 + index),
+              })}
               highlighted={illustration.id === highlightedId}
               busy={selectingId === illustration.id}
               onPress={() => setAltPick(illustration.id)}
@@ -1291,6 +1298,13 @@ const styles = StyleSheet.create({
     fontFamily: fontFamilies.bodySemiBold,
     fontSize: fontSizes.base,
     color: 'rgba(255,255,255,0.8)',
+  },
+  regenReassurance: {
+    fontFamily: fontFamilies.body,
+    fontSize: fontSizes.md,
+    color: 'rgba(255,255,255,0.64)',
+    textAlign: 'center',
+    paddingHorizontal: spacing.lg,
   },
   ring: {
     width: 56,

@@ -225,7 +225,7 @@
     "humorLevel": "Mizah seviyesi",
     "fantasyLevel": "Fantastik öğe seviyesi",
     "step5Title": "Masalı kim anlatsın?",
-    "step5Subtitle": "Seçtiğin ses her masalda {{childNameAcc}} bekliyor olacak.",
+    "step5Subtitle": "Seçtiğin ses {{childName}} için hazırladığın hikâyeyi anlatacak.",
     "personalBadge": "Kişisel",
     "createMomVoice": "Anne sesini oluştur",
     "createDadVoice": "Baba sesini oluştur",
@@ -237,7 +237,15 @@
     "summaryFallbackTheme": "Masal",
     "summaryFallbackVoice": "Ses",
     "validationHeroName": "Kahramanın adını yazmalısın.",
-    "validationTheme": "En az bir tema seçmelisin."
+    "validationTheme": "En az bir tema seçmelisin.",
+    "anotherChildSub": "Sadece bu hikâye için isim gir",
+    "guestNamePlaceholder": "Çocuğun adı",
+    "guestFallbackName": "Yeni Kahraman",
+    "generalStorySub": "Kayıtlı bir çocuk profili kullanma",
+    "step2SubtitleGeneral": "Hayalî bir kahraman oluştur.",
+    "customHeroGeneralTitle": "Hayalî bir kahraman oluştur",
+    "customHeroGeneralSub": "İsim ve türü sen belirle",
+    "step5SubtitleGeneral": "Hikâyeyi anlatacak sesi seç."
   },
   "generating": {
     "messages": [
@@ -492,11 +500,12 @@
     "regenerateAction": "Yeniden Oluştur",
     "alternatives": "Alternatifler",
     "alternativesTitle": "Alternatif Görseller",
-    "alternativesLead": "«{{unit}}» için {{count}} seçenek",
-    "alternativeOption": "Seçenek {{number}}",
+    "alternativesLead": "«{{unit}}» için aynı {{style}} stilinde {{count}} farklı kompozisyon",
+    "alternativeOption": "Kompozisyon {{letter}}",
     "selectImage": "Bu Görseli Seç",
     "regeneratingLabel": "Yeni görsel oluşturuluyor",
-    "makeBook": "Kitabı Oluştur 📚"
+    "makeBook": "Kitabı Oluştur 📚",
+    "regeneratingReassurance": "Önceki görselin güvende. Yeni bir seçenek hazırlanıyor…"
   },
   "book": {
     "builderTitle": "{{name}} için kitap",

@@ -225,7 +225,7 @@
     "humorLevel": "Humor level",
     "fantasyLevel": "Fantasy level",
     "step5Title": "Who should tell the tale?",
-    "step5Subtitle": "The voice you choose will be waiting for {{childNameAcc}} in every tale.",
+    "step5Subtitle": "The voice you pick will narrate the story you made for {{childName}}.",
     "personalBadge": "Personal",
     "createMomVoice": "Create mom's voice",
     "createDadVoice": "Create dad's voice",
@@ -237,7 +237,15 @@
     "summaryFallbackTheme": "Tale",
     "summaryFallbackVoice": "Voice",
     "validationHeroName": "Please enter the hero's name.",
-    "validationTheme": "Please pick at least one theme."
+    "validationTheme": "Please pick at least one theme.",
+    "anotherChildSub": "Enter a name just for this story",
+    "guestNamePlaceholder": "Child's name",
+    "guestFallbackName": "New Hero",
+    "generalStorySub": "Don't use a saved child profile",
+    "step2SubtitleGeneral": "Create an imaginary hero.",
+    "customHeroGeneralTitle": "Create an imaginary hero",
+    "customHeroGeneralSub": "You pick the name and type",
+    "step5SubtitleGeneral": "Choose the voice that will narrate the story."
   },
   "generating": {
     "messages": [
@@ -492,11 +500,12 @@
     "regenerateAction": "Regenerate",
     "alternatives": "Alternatives",
     "alternativesTitle": "Alternative Images",
-    "alternativesLead": "{{count}} options for “{{unit}}”",
-    "alternativeOption": "Option {{number}}",
+    "alternativesLead": "{{count}} compositions in the same {{style}} style for “{{unit}}”",
+    "alternativeOption": "Composition {{letter}}",
     "selectImage": "Choose This Image",
     "regeneratingLabel": "Creating a new image",
-    "makeBook": "Create the Book 📚"
+    "makeBook": "Create the Book 📚",
+    "regeneratingReassurance": "Your previous image is safe. A new option is being prepared…"
   },
   "book": {
     "builderTitle": "A book for {{name}}",

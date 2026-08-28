@@ -84,11 +84,11 @@ function ConfettiDot({ index }: { index: number }) {
 
 /**
  * Story result — cover hero + actions. With a READY narration the primary CTA
- * is "Dinlemeye Başla" (player); otherwise "Oku" stays primary. The action row
- * is the design's six tiles (Oku/Seslendir/Düzenle/Görselleştir/Kitap Yap/
- * Paylaş); Seslendir is the (re-)narration entry point. Görselleştir routes to
- * the illustration flow; Kitap Yap reuses (or creates) the story's book and
- * opens the builder.
+ * is "Dinlemeye Başla" (player); otherwise "Oku" stays primary. The action grid
+ * is the QA design's five tiles, three per row (Oku/Seslendir/Görselleştir/
+ * Kitap Yap/Düzenle — Paylaş only in the header); Seslendir is the
+ * (re-)narration entry point. Görselleştir routes to the illustration flow;
+ * Kitap Yap reuses (or creates) the story's book and opens the builder.
  */
 export default function StoryResult() {
   const { t } = useTranslation();
@@ -228,11 +228,11 @@ export default function StoryResult() {
     });
   };
 
-  // Single row of 6 tiles, design order (reference design's action grid, StoryResult.tsx).
+  // QA design: 5 tiles, 3 per row (Paylaş lives only in the header now, and
+  // Düzenle moved last).
   const actions = [
     { key: 'read', emoji: '📖', label: t('storyResult.read'), onPress: openReader },
     { key: 'narrate', emoji: '🎙', label: t('narrate.create'), onPress: openNarrate },
-    { key: 'edit', emoji: '✏️', label: t('storyResult.edit'), onPress: openEdit },
     {
       key: 'illustrate',
       emoji: '🎨',
@@ -248,7 +248,7 @@ export default function StoryResult() {
       },
       loading: bookLoading,
     },
-    { key: 'share', emoji: '🔗', label: t('storyResult.share'), onPress: share },
+    { key: 'edit', emoji: '✏️', label: t('storyResult.edit'), onPress: openEdit },
   ];
 
   return (
@@ -478,13 +478,21 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: spacing.sm,
   },
-  actionGrid: { flexDirection: 'row', gap: spacing.xs, marginTop: spacing.md },
+  actionGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.xs,
+    marginTop: spacing.md,
+  },
   actionTile: {
-    flex: 1,
+    flexBasis: '31%',
+    flexGrow: 1,
+    minHeight: 72,
     alignItems: 'center',
+    justifyContent: 'center',
     gap: 6,
     paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.xxs,
+    paddingHorizontal: spacing.sm,
     borderRadius: radius.md,
     backgroundColor: colors.card,
     borderWidth: 1,
@@ -494,7 +502,7 @@ const styles = StyleSheet.create({
   actionEmoji: { fontSize: 20 },
   actionLabel: {
     fontFamily: fontFamilies.bodyBold,
-    fontSize: fontSizes.xxs,
+    fontSize: fontSizes.sm,
     color: colors.mutedForeground,
     textAlign: 'center',
   },
