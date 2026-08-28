@@ -75,6 +75,11 @@ export const orderSchema = z.object({
   paymentStatus: paymentStatusSchema,
   shippingAddress: addressSchema.nullable(),
   trackingNumber: z.string().nullable(),
+  carrier: z.string().nullable(),
+  trackingUrl: z.string().nullable(),
+  estimatedDeliveryDays: z
+    .object({ min: z.number().int(), max: z.number().int() })
+    .nullable(),
   createdAt: z.string(),
   timeline: z.array(
     z.object({ status: orderStatusSchema, at: z.string() }),
@@ -84,8 +89,13 @@ export type Order = z.infer<typeof orderSchema>;
 
 export const initPaymentResponseSchema = z.object({
   provider: z.string(),
-  /** iyzico checkout form URL or token; mock provider returns a fake completion token. */
+  /** Hosted checkout URL (iyzico); null for the mock provider. */
   checkoutUrl: z.string().nullable(),
   paymentId: z.string(),
+  /**
+   * Mock-only completion token for the dev flow (POST /payments/mock/complete).
+   * Real providers verify via their callback — this stays null for them.
+   */
+  providerToken: z.string().nullable(),
 });
 export type InitPaymentResponse = z.infer<typeof initPaymentResponseSchema>;

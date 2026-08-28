@@ -1,0 +1,87 @@
+name: Android Crash Log
+
+# Diagnostic workflow: installs a previously built APK artifact into an
+# Android emulator on the runner, launches the app, and captures logcat so
+# startup crashes can be diagnosed without a physical device.
+
+on:
+  workflow_dispatch:
+    inputs:
+      apk_run_id:
+        description: "APK'nin alınacağı 'Android APK' workflow run ID"
+        required: false
+        default: ""
+
+jobs:
+  crash-log:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      APK_RUN_ID: ${{ inputs.apk_run_id != '' && inputs.apk_run_id || '31727238898' }}
+    steps:
+      - name: Download APK artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: masalim-apk
+          path: apk
+          run-id: ${{ env.APK_RUN_ID }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          repository: ${{ github.repository }}
+
+      - name: Enable KVM for emulator
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Launch app in emulator and capture logcat
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          arch: x86_64
+          target: google_apis
+          disable-animations: true
+          script: |
+            adb install -r apk/app-release.apk
+            adb logcat -c || true
+            adb shell monkey -p com.masalim.app -c android.intent.category.LAUNCHER 1
+            sleep 45
+            adb logcat -d > logcat-full.txt
+            if adb shell pidof com.masalim.app > /dev/null 2>&1; then echo "APP_ALIVE=yes" | tee app-alive.txt; else echo "APP_ALIVE=no (process died)" | tee app-alive.txt; fi
+            adb logcat -c || true
+            adb shell am start -W -a android.intent.action.VIEW -d "masalim://debug/player-smoke" com.masalim.app || echo "deep link start failed"
+            sleep 30
+            adb logcat -d > logcat-smoke.txt
+            if adb shell pidof com.masalim.app > /dev/null 2>&1; then echo "SMOKE_ALIVE=yes" | tee smoke-alive.txt; else echo "SMOKE_ALIVE=no (process died)" | tee smoke-alive.txt; fi
+
+      - name: Upload full logcat
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: crash-logcat
+          path: |
+            logcat-full.txt
+            app-alive.txt
+            logcat-smoke.txt
+            smoke-alive.txt
+          retention-days: 14
+
+      # Keep this step LAST so the distilled crash info sits at the end of the
+      # job log (easy to fetch with a log tail).
+      - name: Extract crash summary
+        if: always()
+        run: |
+          echo "================ APP ALIVE? ================"
+          cat app-alive.txt || true
+          echo "================ FATAL EXCEPTION (startup) ================"
+          grep -n -B 2 -A 120 "FATAL EXCEPTION" logcat-full.txt || echo "no FATAL EXCEPTION found"
+          echo "================ ReactNativeJS errors (startup) ================"
+          grep -n "ReactNativeJS" logcat-full.txt | tail -n 80 || true
+          echo "================ PLAYER SMOKE ALIVE? ================"
+          cat smoke-alive.txt || true
+          echo "================ PLAYER SMOKE markers ================"
+          grep -n "player-smoke" logcat-smoke.txt | tail -n 60 || echo "no player-smoke markers found"
+          echo "================ FATAL EXCEPTION (player smoke) ================"
+          grep -n -B 2 -A 160 "FATAL EXCEPTION" logcat-smoke.txt || echo "no FATAL EXCEPTION found"
+          echo "================ AndroidRuntime lines (player smoke) ================"
+          grep -n "AndroidRuntime" logcat-smoke.txt | tail -n 80 || true

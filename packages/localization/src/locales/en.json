@@ -68,7 +68,15 @@
     "newPassword": "New password",
     "resetPassword": "Reset Password",
     "passwordResetSuccess": "Your password has been reset. You can sign in now.",
-    "termsNotice": "By continuing you accept the Terms of Use and Privacy Policy."
+    "termsNotice": "By continuing you accept the Terms of Use and Privacy Policy.",
+    "welcomeHeadline": "Pick up your fairy tales where you left off.",
+    "welcomeBody": "Create your account to safely keep your stories, voices and child profiles.",
+    "signingIn": "Signing in…",
+    "signingUp": "Creating your account…",
+    "sending": "Sending…",
+    "checkEmailTitle": "Check your e-mail.",
+    "checkEmailBody": "We sent a 6-digit reset code to {{email}}. If it doesn't arrive within a few minutes, check your spam folder.",
+    "resendCode": "Resend Code"
   },
   "childSetup": {
     "title": "Who are we making stories for?",
@@ -97,7 +105,18 @@
       "periler": "Fairies",
       "macera": "Adventure",
       "müzik": "Music"
-    }
+    },
+    "deleteConfirmTitle": "Delete this profile?",
+    "deleteConfirmBody": "{{name}}'s profile will be removed. Stories you created stay in your library.",
+    "ageLabel": "Age",
+    "ageDecrease": "Decrease age",
+    "ageIncrease": "Increase age",
+    "updateChild": "Update Profile",
+    "deleteChild": "Delete Profile",
+    "deleteConfirmBodyPermanent": "This child profile and all of its stories will be deleted. This cannot be undone.",
+    "editTitle": "{{name}}'s Profile",
+    "listEmptyTitle": "No child profiles yet.",
+    "listEmptyBody": "Create a profile to personalize the stories."
   },
   "home": {
     "greetingMorning": "Good morning 👋",
@@ -228,7 +247,13 @@
     "share": "Share",
     "excerptTitle": "A glimpse of the story",
     "narrationPreparing": "Narration is being prepared…",
-    "narrationReady": "Narration ready"
+    "narrationReady": "Narration ready",
+    "editTitleLabel": "Title",
+    "editPageLabel": "Page {{page}}",
+    "editEyebrow": "Edit Story",
+    "editPageTextLabel": "Page {{page}} text",
+    "editCharCount": "{{count}} characters",
+    "editIllustrationCta": "Regenerate"
   },
   "player": {
     "nowPlaying": "Now listening",
@@ -245,7 +270,10 @@
   "reader": {
     "pageOf": "{{current}} / {{total}}",
     "readAloud": "Read Aloud",
-    "theEnd": "The End 🌙"
+    "theEnd": "The End 🌙",
+    "pageLabel": "Page {{current}} / {{total}}",
+    "previous": "Previous",
+    "next": "Next"
   },
   "library": {
     "title": "My Stories",
@@ -264,7 +292,6 @@
     },
     "badgeBookReady": "Book ready",
     "emptyTitle": "Your first tale will live here.",
-    "emptyBody": "No stories in this category yet.",
     "emptyCta": "Create My First Story",
     "dates": {
       "today": "Today",
@@ -280,12 +307,19 @@
       "reVoice": "Narrate with a New Voice",
       "makeBook": "Make a Book",
       "duplicate": "Duplicate",
-      "delete": "Delete"
+      "delete": "Delete",
+      "favorite": "Add to favorites",
+      "unfavorite": "Remove from favorites"
     },
     "deleteConfirmTitle": "Delete this story?",
     "deleteConfirmBody": "This story will be removed from your library.",
     "deleteConfirmBodyWithBook": "A book is linked to this story. Existing orders won't be affected.",
-    "deleted": "Story deleted."
+    "deleted": "Story deleted.",
+    "emptyLibraryBody": "Every story you create will be waiting for you here.",
+    "noFavoritesTitle": "No favorite stories yet.",
+    "noFavoritesBody": "You can add the stories you love to your favorites.",
+    "noResultsTitle": "No results found.",
+    "noResultsBody": "Try a different search or change your filter."
   },
   "voice": {
     "studioTitle": "My Voice Studio",
@@ -370,7 +404,23 @@
     "current": "Current narration",
     "create": "Narrate",
     "creating": "Narration is being prepared…",
-    "done": "Narration ready ✨"
+    "done": "Narration ready ✨",
+    "heading": "Who should tell the story?",
+    "storyMeta": "About {{minutes}} min · For {{name}}",
+    "systemSection": "Storytellers",
+    "statusError": "Error",
+    "voiceProcessingSub": "The voice is being prepared, hang on…",
+    "voiceFailedSub": "Something went wrong while preparing this voice.",
+    "createVoiceSub": "Tell the stories in your own voice.",
+    "parentVoiceFeature": "Narration in Your Own Voice",
+    "parentVoiceFeatureDesc": "Upgrade to Premium to narrate stories in your own voice.",
+    "createWithVoice": "Narrate with {{name}}",
+    "selectVoice": "Pick a voice",
+    "generatingTitle": "Creating the narration…",
+    "generatingSub": "Your story is being prepared in {{name}}'s voice.",
+    "doneTitle": "The narration is ready!",
+    "doneSub": "The story is now told in {{name}}'s voice.",
+    "backToStory": "Back to the Story"
   },
   "illustrate": {
     "title": "Shall we illustrate your tale?",
@@ -385,14 +435,35 @@
     "generate": "Create the Images",
     "progressCover": "Cover",
     "progressPage": "Page {{number}}",
-    "generatingTitle": "Creating the images…",
+    "generatingTitle": "Creating your images…",
     "generatingBody": "We're making sure the hero looks the same on every page.",
     "done": "Your images are ready 🎨",
     "regenerate": "Regenerate Image",
-    "chooseAlternative": "Choose a Different Image"
+    "chooseAlternative": "Choose a Different Image",
+    "eyebrow": "Illustrate Your Tale",
+    "pickerTitle": "Choose an illustration style",
+    "pickerHint": "✨ AI will create a new image for every page. Your hero will look consistent throughout the book.",
+    "styleDescriptions": {
+      "WATERCOLOR": "Soft, flowing colors",
+      "SOFT_3D": "Warm, rounded figures",
+      "CLASSIC_STORYBOOK": "Traditional illustration",
+      "PASTEL": "Light and calming",
+      "HAND_DRAWN": "A warm, personal touch"
+    },
+    "generateCaption": "{{count}} images will be created · may take 1–2 minutes",
+    "generatingStep": "Preparing {{label}}",
+    "readyTitle": "Images Ready ✨",
+    "regenerateAction": "Regenerate",
+    "alternatives": "Alternatives",
+    "alternativesTitle": "Alternative Images",
+    "alternativesLead": "{{count}} options for “{{unit}}”",
+    "alternativeOption": "Option {{number}}",
+    "selectImage": "Choose This Image",
+    "regeneratingLabel": "Creating a new image",
+    "makeBook": "Create the Book 📚"
   },
   "book": {
-    "builderTitle": "{{name}}'s Book",
+    "builderTitle": "A book for {{name}}",
     "builderTitleGeneric": "Your Book",
     "editText": "Edit Text",
     "coverTitle": "Cover design",
@@ -407,19 +478,53 @@
     "autosaved": "Saved",
     "renderPreparing": "Your book is being prepared…",
     "emptyTitle": "Turn a story into a book to treasure for a lifetime.",
-    "emptyCta": "Pick a Story"
+    "emptyCta": "Pick a Story",
+    "layoutOptions": {
+      "IMAGE_TOP": "Image on top",
+      "IMAGE_FULL": "Full-page image",
+      "TEXT_ONLY": "Text only"
+    },
+    "builderEyebrow": "Book Editor",
+    "builderTitlePossessive": "{{name}}'s Book",
+    "previewCta": "Preview",
+    "pageShort": "P{{number}}",
+    "layoutLabel": "Page Layout",
+    "palettes": {
+      "purple": "Purple Magic",
+      "ocean": "Ocean",
+      "forest": "Forest",
+      "sunset": "Sunset",
+      "night": "Night"
+    },
+    "paletteSection": "Cover Color",
+    "coverTitleFallback": "Book Title",
+    "changeCoverSection": "Change Cover Image",
+    "regenerateCover": "Regenerate",
+    "pickFromAlternatives": "Choose from Alternatives",
+    "saveCover": "Save Cover",
+    "frontCoverLabel": "Front Cover",
+    "backCoverPageLabel": "Back Cover",
+    "pageLabel": "Page {{number}}",
+    "backQuote": "Every child is the hero of their own story.",
+    "backToEdit": "Back to Editing"
   },
   "checkout": {
-    "configTitle": "Configure your book",
+    "configTitle": "Book Options",
     "bookSize": "Book size",
-    "sizes": { "SQUARE": "Square", "STANDARD": "Standard" },
+    "sizes": {
+      "SQUARE": "Square",
+      "STANDARD": "Standard"
+    },
     "coverTypeLabel": "Cover",
-    "covers": { "HARDCOVER": "Hardcover", "SOFTCOVER": "Softcover" },
+    "covers": {
+      "HARDCOVER": "Hardcover",
+      "SOFTCOVER": "Softcover"
+    },
     "quantity": "Quantity",
     "price": "Price",
     "estimatedDelivery": "Estimated delivery: {{min}}–{{max}} business days",
     "continue": "Continue",
-    "addressTitle": "Delivery address",
+    "addressTitle": "Delivery Address",
     "fullName": "Full Name",
     "phone": "Phone",
     "addressLine": "Address",
@@ -427,17 +532,53 @@
     "district": "District",
     "postalCode": "Postal code",
     "saveAddress": "Save address",
-    "reviewTitle": "Order summary",
+    "reviewTitle": "Order Summary",
     "product": "Product",
     "shippingLabel": "Shipping",
     "shippingFree": "Free",
     "totalLabel": "Total",
     "payCta": "Complete Payment",
     "paying": "Processing payment…",
-    "successTitle": "{{name}}'s tale is getting ready for its journey 💛",
+    "successTitle": "{{name}}'s storybook is getting ready to ship 💛",
     "successTitleGeneric": "Your tale is getting ready for its journey 💛",
     "orderNumber": "Order number",
-    "trackOrder": "Track My Order"
+    "trackOrder": "Track My Order",
+    "newAddress": "Add a new address",
+    "subtotal": "Subtotal",
+    "eyebrow": "Printed Book",
+    "sizeDims": {
+      "SQUARE": "21 × 21 cm",
+      "STANDARD": "21 × 29.7 cm"
+    },
+    "coverSubs": {
+      "HARDCOVER": "More durable",
+      "SOFTCOVER": "Light and flexible"
+    },
+    "priceLine": "{{qty}} × Book ({{size}} · {{cover}})",
+    "paymentSummary": "Payment Summary",
+    "successSubtitle": "Your order has been received. It will be at your door within 5–7 business days.",
+    "backHome": "Back to Home",
+    "steps": {
+      "book": "Book",
+      "address": "Address",
+      "summary": "Summary",
+      "payment": "Payment"
+    },
+    "neighborhood": "Neighborhood",
+    "street": "Street",
+    "buildingInfo": "Building / Apartment",
+    "fieldRequired": "This field is required.",
+    "saveAddressLater": "Save this address for later",
+    "placeholders": {
+      "fullName": "Ayşe Yılmaz",
+      "phone": "05XX XXX XX XX",
+      "city": "İstanbul",
+      "district": "Kadıköy",
+      "neighborhood": "Bağcılar Mahallesi",
+      "street": "Gül Sokak No:12",
+      "buildingInfo": "Floor 3, Apt 7",
+      "postalCode": "34710"
+    }
   },
   "orders": {
     "title": "My Orders",
@@ -453,7 +594,32 @@
     },
     "trackingNumber": "Tracking number",
     "cancelOrder": "Cancel Order",
-    "cancelConfirm": "Do you want to cancel this order?"
+    "cancelConfirm": "Do you want to cancel this order?",
+    "pills": {
+      "preparing": "Preparing",
+      "printing": "Printing",
+      "shipped": "Shipped",
+      "delivered": "Delivered"
+    },
+    "emptyTitle": "You don't have a book order yet.",
+    "emptyBody": "You can turn the stories you've created into a real printed book.",
+    "emptyCta": "Go to My Stories",
+    "trackingTitle": "Order Tracking",
+    "orderNumberMeta": "Order #{{number}}",
+    "statusTimeline": "Order Status",
+    "steps": {
+      "received": "Order received",
+      "preparing": "Preparing for print",
+      "printed": "Printed",
+      "shipped": "Shipped",
+      "delivered": "Delivered"
+    },
+    "shippingInfo": "Shipping Info",
+    "estimatedDeliveryLabel": "Estimated delivery",
+    "deliveryDays": "{{min}}–{{max}} business days",
+    "carrierLabel": "Carrier",
+    "trackingNoLabel": "Tracking number",
+    "trackShipment": "Track Shipment"
   },
   "profile": {
     "title": "Profile & Family",
@@ -477,7 +643,8 @@
       "privacy": "Privacy & Voice Data",
       "privacySub": "Secure and encrypted",
       "settings": "Settings",
-      "settingsSub": "Language, accessibility"
+      "settingsSub": "Language, accessibility",
+      "subscriptionPremiumNoDate": "Premium member"
     },
     "signOut": "Sign Out",
     "signOutConfirm": "Do you want to sign out?"
@@ -489,7 +656,10 @@
     "notifications": "Notifications",
     "pushEnabled": "Push notifications",
     "language": "Language",
-    "languages": { "tr": "Türkçe", "en": "English" },
+    "languages": {
+      "tr": "Türkçe",
+      "en": "English"
+    },
     "audio": "Audio",
     "voiceData": "My Voice Data",
     "voiceDataBody": "Manage, listen to, or delete your saved voices.",
@@ -504,7 +674,44 @@
     "deleteAccountConfirm": "Delete My Account",
     "deletionPending": "Your account will be deleted on {{date}}.",
     "deletionCancel": "Cancel Deletion",
-    "version": "Version {{version}}"
+    "version": "Version {{version}}",
+    "pushDisabled": "Notifications are off",
+    "pushPermissionDenied": "To allow notifications, open your device settings.",
+    "enablePush": "Enable Notifications",
+    "accountInfo": "Account Details",
+    "childrenSub": "{{count}} child profiles",
+    "voices": "My Voices",
+    "sectionPreferences": "Preferences",
+    "sectionPrivacy": "Privacy",
+    "privacyBody": "Masalım uses details such as your child's name and age range only to create personalised stories. Your voice recordings and data are stored encrypted and are never shared with third parties for marketing. When you delete your account, all of your data is permanently removed.",
+    "termsBody": "By using Masalım you agree that content is provided for personal, non-commercial use. Generated stories and images are for your family; they may not be redistributed or sold. Subscriptions renew each period and can be cancelled at any time.",
+    "saveChanges": "Save Changes",
+    "saved": "Saved",
+    "deleteWarningTitle": "Are you sure you want to delete your account?",
+    "deleteWarningIntro": "This cannot be undone. This will delete:",
+    "deleteBullets": {
+      "stories": "All stories and narrations",
+      "children": "Child profiles",
+      "voices": "Recorded parent voices",
+      "books": "Book data and orders"
+    },
+    "deleteFinalConfirmBody": "This is your final confirmation. This cannot be undone.",
+    "deleteFinalConfirm": "Yes, Delete My Account",
+    "notifSection": "Masalım Notifications",
+    "notifStory": "When my story is ready",
+    "notifStorySub": "When AI generation completes",
+    "notifVoice": "When my voice is ready",
+    "notifVoiceSub": "When voice cloning completes",
+    "notifIllustrations": "Book images ready",
+    "notifIllustrationsSub": "Illustration generation",
+    "notifOrders": "Order updates",
+    "notifOrdersSub": "Shipping and delivery",
+    "notifUpdates": "New features and suggestions",
+    "notifUpdatesSub": "App updates",
+    "voiceDataInfo": "Your voice recordings are used only to create the content you approve. You can delete them at any time.",
+    "voiceDeleteTitle": "Delete the voice {{name}}?",
+    "voiceDeleteBody": "Once deleted, this voice profile can no longer be used in new stories. Existing narrated stories are not affected.",
+    "voiceDeleteConfirm": "Delete My Voice"
   },
   "subscription": {
     "title": "Masalım Premium",
@@ -519,7 +726,10 @@
       "parentVoices": "Mom & dad voices",
       "premiumVoices": "Premium narrator voices",
       "illustrations": "More AI images",
-      "hdExport": "HD book images"
+      "hdExport": "HD book images",
+      "library": "Unlimited library storage",
+      "audiobook": "Audiobook mode",
+      "print": "Physical book printing"
     },
     "freePlan": "Free",
     "premiumPlan": "Premium",
@@ -528,7 +738,22 @@
     "manage": "Manage Subscription",
     "voiceCloneGate": "Creating mom & dad voices is a Premium feature.",
     "quotaReachedStories": "You've used this month's story quota. Create more with Premium.",
-    "quotaReachedIllustrations": "You've used this month's image quota. Create more with Premium."
+    "quotaReachedIllustrations": "You've used this month's image quota. Create more with Premium.",
+    "heroTitle": "Unlimited tales, unlimited magic ✨",
+    "heroSubtitle": "Fill your child's magical world with stars.",
+    "featuresLabel": "Premium Features",
+    "discountBadge": "{{percent}}% Off",
+    "monthlyPlan": "Monthly Plan",
+    "yearlyPlan": "Yearly Plan",
+    "cancelAnytime": "Cancel anytime",
+    "mostPopular": "Most Popular",
+    "perMonth": "/mo",
+    "perYear": "/yr",
+    "startCta": "Start Premium — {{price}}",
+    "legal": "Cancel anytime. Your subscription renews automatically.",
+    "quotaTitle": "You've used your {{limit}} stories this month!",
+    "quotaSubtitle": "Create unlimited stories with Masalım Premium and craft endless adventures for your child.",
+    "later": "Later"
   },
   "notificationsScreen": {
     "title": "Notifications",
@@ -582,5 +807,58 @@
     "PAYMENT_AMOUNT_MISMATCH": "There was a mismatch in the payment amount. Please try again.",
     "ORDER_CREATION_FAILED": "The order couldn't be created. Please try again.",
     "ORDER_NOT_CANCELLABLE": "This order can no longer be cancelled."
+  },
+  "preview": {
+    "play": "Preview",
+    "pause": "Pause",
+    "loading": "Loading…",
+    "retry": "Error — try again"
+  },
+  "premiumSheet": {
+    "badge": "Premium",
+    "title": "This feature is Premium-only.",
+    "bodyFallback": "upgrade to Premium to use this feature.",
+    "perkParentVoice": "Narration in mom and dad’s voice",
+    "perkUnlimitedStories": "Create more stories",
+    "perkIllustrations": "AI illustrations",
+    "cta": "Explore Premium",
+    "dismiss": "Not Now"
+  },
+  "quotaBanner": {
+    "warningPrefix": "This month ",
+    "warningCount": "{{n}} stories",
+    "warningSuffix": " left.",
+    "seePremium": "See Premium",
+    "exhaustedTitle": "You’ve used this month’s free stories.",
+    "exhaustedBody": "Create more stories with Premium.",
+    "explorePremium": "Explore Premium"
+  },
+  "states": {
+    "error": {
+      "network": {
+        "title": "Couldn’t connect.",
+        "body": "Check your internet connection and try again."
+      },
+      "server": {
+        "title": "Something went wrong.",
+        "body": "A temporary server issue occurred. It will be fixed shortly."
+      },
+      "generation": {
+        "title": "The story couldn’t be created.",
+        "body": "Something went wrong while preparing the tale. You can try again."
+      },
+      "payment": {
+        "title": "Payment failed.",
+        "body": "Check your card details and try again."
+      },
+      "voice": {
+        "title": "The voice couldn’t be prepared.",
+        "body": "Something went wrong during voice cloning. Please try again."
+      },
+      "illustration": {
+        "title": "The image couldn’t be created.",
+        "body": "Something went wrong while preparing the illustration. Let’s try again."
+      }
+    }
   }
 }

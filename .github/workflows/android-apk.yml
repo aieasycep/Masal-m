@@ -1,0 +1,70 @@
+name: Android APK
+
+on:
+  workflow_dispatch:
+    inputs:
+      api_url:
+        description: "API adresi (örn. https://masalim-api-z6ry.onrender.com). Boş bırakılırsa canlı test API'si kullanılır."
+        required: false
+        default: ""
+  push:
+    branches: [claude/masalim-implementation-plan-pz1pkl]
+    paths:
+      - ".github/workflows/android-apk.yml"
+      - "apps/mobile/**"
+      - "patches/**"
+      - "packages/**"
+      - "pnpm-lock.yaml"
+      - "package.json"
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      # EXPO_PUBLIC_* values are inlined into the JS bundle at build time.
+      EXPO_PUBLIC_API_URL: ${{ inputs.api_url != '' && inputs.api_url || 'https://masalim-api-z6ry.onrender.com' }}
+      EXPO_PUBLIC_PURCHASES_PROVIDER: mock
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build workspace packages (mobile dependencies)
+        run: pnpm turbo build --filter='@masalim/mobile^...'
+
+      - name: Generate native Android project
+        working-directory: apps/mobile
+        run: npx expo prebuild --platform android --no-install
+
+      - name: Raise Gradle JVM memory (dex merge OOMs at the template's 2g heap)
+        working-directory: apps/mobile/android
+        run: |
+          sed -i 's/^org.gradle.jvmargs=.*/org.gradle.jvmargs=-Xmx6g -XX:MaxMetaspaceSize=1g/' gradle.properties
+          grep '^org.gradle.jvmargs=' gradle.properties
+
+      - name: Build release APK
+        working-directory: apps/mobile/android
+        # Expo's template signs the release build type with the auto-generated
+        # debug keystore — installable for testing, not for Play Store.
+        run: ./gradlew assembleRelease --no-daemon
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: masalim-apk
+          path: apps/mobile/android/app/build/outputs/apk/release/app-release.apk
+          retention-days: 14

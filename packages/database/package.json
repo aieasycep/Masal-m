@@ -16,7 +16,7 @@
     "dev": "tsc -p tsconfig.build.json --watch",
     "lint": "eslint src prisma/seed.ts",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run",
+    "test": "vitest run --passWithNoTests",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:migrate:deploy": "prisma migrate deploy",

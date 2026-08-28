@@ -1,6 +1,23 @@
 import { z } from 'zod';
 import { localeSchema, personNameSchema } from './common';
 
+/**
+ * Per-category push opt-outs keyed by NotificationType. Missing keys mean the
+ * category is enabled — the client only stores explicit choices.
+ */
+export const notificationPrefsSchema = z.record(
+  z.enum([
+    'STORY_READY',
+    'VOICE_READY',
+    'ILLUSTRATIONS_READY',
+    'BOOK_READY',
+    'ORDER_SHIPPED',
+    'GENERIC',
+  ]),
+  z.boolean(),
+);
+export type NotificationPrefs = z.infer<typeof notificationPrefsSchema>;
+
 export const updateMeSchema = z
   .object({
     name: personNameSchema,
@@ -8,6 +25,7 @@ export const updateMeSchema = z
     timezone: z.string().max(64),
     onboardingCompleted: z.boolean(),
     avatarObjectKey: z.string().max(512).nullable(),
+    notificationPrefs: notificationPrefsSchema,
   })
   .partial();
 export type UpdateMeInput = z.infer<typeof updateMeSchema>;
@@ -21,6 +39,7 @@ export const meSchema = z.object({
   timezone: z.string().nullable(),
   onboardingCompleted: z.boolean(),
   subscriptionPlan: z.enum(['FREE', 'PREMIUM']),
+  notificationPrefs: notificationPrefsSchema,
   pendingDeletion: z
     .object({ requestedAt: z.string(), effectiveAt: z.string() })
     .nullable(),

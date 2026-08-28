@@ -14,3 +14,4 @@ export * from './notifications';
 export * from './uploads';
 export * from './analytics';
 export * from './app-config';
+export * from './admin';

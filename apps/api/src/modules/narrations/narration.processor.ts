@@ -1,0 +1,179 @@
+import {
+  Inject,
+  Injectable,
+  Logger,
+  type OnApplicationShutdown,
+  type OnModuleInit,
+} from '@nestjs/common';
+import { UnrecoverableError, Worker, type Job } from 'bullmq';
+import Redis from 'ioredis';
+import { ErrorCode, NarrationStatus, NotificationType } from '@masalim/types';
+import type { TextToSpeechProvider } from '@masalim/ai';
+import type { StorageProvider } from '@masalim/storage';
+import { StorageKeys } from '@masalim/storage';
+import { PushRoutes } from '@masalim/notifications';
+import type { NarrationTiming } from '@masalim/validation';
+import { PrismaService } from '../../prisma/prisma.service';
+import { REDIS } from '../../redis/redis.module';
+import { ENV } from '../../config/config.module';
+import type { Env } from '../../config/env';
+import { STORAGE, TTS } from '../../providers/providers.module';
+import { JobsService } from '../../jobs/jobs.service';
+import { QueueName, type QueueJobData } from '../../jobs/queues';
+import { NotificationsService } from '../notifications/notifications.service';
+import { chunkStoryPages, concatAudioChunks } from '../../audio/audio-pipeline';
+
+/**
+ * Narration worker (§19/§6a): sentence-boundary chunks → TTS per chunk →
+ * ffmpeg concat (single re-encode) → duration + per-chunk timings (drives the
+ * player's "Metni göster" text sync). Progress = real per-chunk milestones.
+ */
+@Injectable()
+export class NarrationProcessor implements OnModuleInit, OnApplicationShutdown {
+  private readonly logger = new Logger(NarrationProcessor.name);
+  private worker: Worker | null = null;
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly jobs: JobsService,
+    private readonly notifications: NotificationsService,
+    @Inject(TTS) private readonly tts: TextToSpeechProvider,
+    @Inject(STORAGE) private readonly storage: StorageProvider,
+    @Inject(REDIS) private readonly redis: Redis,
+    @Inject(ENV) private readonly env: Env,
+  ) {}
+
+  onModuleInit(): void {
+    if (this.env.WORKER_MODE === 'separate') return;
+    this.worker = new Worker<QueueJobData>(QueueName.NARRATION, (job) => this.process(job), {
+      connection: this.redis,
+      concurrency: 2,
+    });
+    this.worker.on('failed', (job, error) => {
+      this.logger.error({ err: error, aiJobId: job?.data.aiJobId }, 'narration attempt failed');
+    });
+  }
+
+  private async process(job: Job<QueueJobData>): Promise<void> {
+    const aiJob = await this.prisma.aIJob.findUnique({ where: { id: job.data.aiJobId } });
+    if (aiJob == null || aiJob.entityId == null) throw new UnrecoverableError('AIJob row missing');
+    const narration = await this.prisma.narration.findUnique({
+      where: { id: aiJob.entityId },
+      include: {
+        story: { include: { pages: { orderBy: { pageNumber: 'asc' } } } },
+        voiceProfile: true,
+        systemVoice: true,
+      },
+    });
+    if (narration == null || narration.story.deletedAt != null) {
+      await this.jobs.fail(aiJob.id, ErrorCode.NOT_FOUND, 'Narration or story missing');
+      throw new UnrecoverableError('Narration missing');
+    }
+    if (narration.status === NarrationStatus.READY) {
+      await this.jobs.complete(aiJob.id, narration.id);
+      return;
+    }
+
+    const providerVoiceId =
+      narration.voiceProfile?.providerVoiceId ?? narration.systemVoice?.providerVoiceId;
+    if (providerVoiceId == null) {
+      await this.finalizeFailure(aiJob.id, narration.id, 'Narrator voice unavailable');
+      return;
+    }
+
+    await this.jobs.markRunning(aiJob.id, 5);
+    await this.prisma.narration.update({
+      where: { id: narration.id },
+      data: { status: NarrationStatus.PROCESSING, provider: this.tts.name },
+    });
+
+    try {
+      const language = narration.story.language === 'en' ? 'en' : 'tr';
+      const chunks = chunkStoryPages(narration.story.pages);
+      if (chunks.length === 0) {
+        await this.finalizeFailure(aiJob.id, narration.id, 'Story has no pages');
+        return;
+      }
+
+      const rendered: Array<{ audio: Buffer; contentType: string }> = [];
+      for (const [index, chunk] of chunks.entries()) {
+        rendered.push(
+          await this.tts.generateSpeech({ text: chunk.text, providerVoiceId, language }),
+        );
+        // 5→80% spread over chunks — every tick is a really synthesized chunk.
+        await this.jobs.setProgress(aiJob.id, 5 + Math.round(((index + 1) / chunks.length) * 75));
+      }
+
+      const concat = await concatAudioChunks(rendered, this.env.FFMPEG_PATH);
+      await this.jobs.setProgress(aiJob.id, 90);
+
+      const timings: NarrationTiming[] = [];
+      let cursor = 0;
+      for (const [index, chunk] of chunks.entries()) {
+        const duration = concat.chunkDurationsSeconds[index] ?? 0;
+        timings.push({
+          pageNumber: chunk.pageNumber,
+          charStart: chunk.charStart,
+          charEnd: chunk.charEnd,
+          startSeconds: round2(cursor),
+          durationSeconds: round2(duration),
+        });
+        cursor += duration;
+      }
+
+      const audioKey = StorageKeys.narrationAudio(
+        narration.story.userId,
+        narration.storyId,
+        narration.id,
+      );
+      await this.storage.putObject(audioKey, concat.audio, concat.contentType);
+      await this.jobs.setProgress(aiJob.id, 97);
+
+      await this.prisma.narration.update({
+        where: { id: narration.id },
+        data: {
+          audioKey,
+          duration: round2(concat.totalDurationSeconds),
+          timings,
+          status: NarrationStatus.READY,
+          error: null,
+        },
+      });
+      await this.jobs.complete(aiJob.id, narration.id);
+      await this.notifications.notify(
+        narration.story.userId,
+        NotificationType.STORY_READY,
+        { storyTitle: narration.story.title },
+        PushRoutes.storyReady(narration.storyId),
+        { storyId: narration.storyId, narrationId: narration.id },
+      );
+    } catch (error) {
+      const isLastAttempt = job.attemptsMade + 1 >= (job.opts.attempts ?? 1);
+      if (isLastAttempt) {
+        await this.finalizeFailure(
+          aiJob.id,
+          narration.id,
+          error instanceof Error ? error.message : 'TTS failed',
+        );
+        return;
+      }
+      throw error;
+    }
+  }
+
+  private async finalizeFailure(aiJobId: string, narrationId: string, message: string): Promise<void> {
+    await this.prisma.narration.update({
+      where: { id: narrationId },
+      data: { status: NarrationStatus.FAILED, error: message.slice(0, 300) },
+    });
+    await this.jobs.fail(aiJobId, ErrorCode.TTS_FAILED, message);
+  }
+
+  async onApplicationShutdown(): Promise<void> {
+    await this.worker?.close().catch(() => undefined);
+  }
+}
+
+function round2(value: number): number {
+  return Math.round(value * 100) / 100;
+}

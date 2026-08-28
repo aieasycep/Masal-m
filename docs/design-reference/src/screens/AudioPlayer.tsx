@@ -2,9 +2,10 @@ import { useState, useEffect, useRef } from "react"
 
 interface Props {
   onBack: () => void
+  onShowText: () => void
 }
 
-export default function AudioPlayer({ onBack }: Props) {
+export default function AudioPlayer({ onBack, onShowText }: Props) {
   const [playing, setPlaying] = useState(false)
   const [progress, setProgress] = useState(0.28)
   const [speed, setSpeed] = useState("1x")
@@ -402,6 +403,7 @@ export default function AudioPlayer({ onBack }: Props) {
       {/* Show text toggle */}
       <div style={{ display: "flex", justifyContent: "center", padding: "20px 0 0", position: "relative", zIndex: 1 }}>
         <button
+          onClick={onShowText}
           style={{
             background: "none",
             border: "none",

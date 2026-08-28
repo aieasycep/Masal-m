@@ -1,5 +1,9 @@
 interface Props {
   onVoiceStudio: () => void
+  onSettings?: () => void
+  onOrders?: () => void
+  onChildProfile?: () => void
+  onSubscription?: () => void
 }
 
 const children = [
@@ -16,7 +20,7 @@ const menuItems = [
   { icon: "⚙️", label: "Ayarlar", sub: "Dil, erişilebilirlik", badge: null },
 ]
 
-export default function Profile({ onVoiceStudio }: Props) {
+export default function Profile({ onVoiceStudio, onSettings, onOrders, onChildProfile, onSubscription }: Props) {
   return (
     <div
       style={{
@@ -102,7 +106,7 @@ export default function Profile({ onVoiceStudio }: Props) {
           <p style={{ fontFamily: "Nunito", fontSize: 12, fontWeight: 700, color: "var(--muted-foreground)", margin: 0, textTransform: "uppercase", letterSpacing: "0.06em" }}>
             Çocuklarım
           </p>
-          <button style={{ background: "none", border: "none", fontFamily: "Nunito", fontSize: 13, fontWeight: 700, color: "var(--primary)", cursor: "pointer" }}>
+          <button onClick={onChildProfile} style={{ background: "none", border: "none", fontFamily: "Nunito", fontSize: 13, fontWeight: 700, color: "var(--primary)", cursor: "pointer" }}>
             + Çocuk Ekle
           </button>
         </div>
@@ -177,7 +181,14 @@ export default function Profile({ onVoiceStudio }: Props) {
           {menuItems.map((item, i) => (
             <div
               key={item.label}
-              onClick={item.label === "Seslerimiz" ? onVoiceStudio : undefined}
+              onClick={
+                item.label === "Seslerimiz" ? onVoiceStudio
+                : item.label === "Siparişlerim" ? onOrders
+                : item.label === "Aboneliğim" ? onSubscription
+                : item.label === "Ayarlar" ? onSettings
+                : item.label === "Gizlilik & Ses Verilerim" ? onSettings
+                : undefined
+              }
               style={{
                 display: "flex",
                 alignItems: "center",

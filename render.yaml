@@ -1,0 +1,81 @@
+# Render.com blueprint — test deployment (mock providers, §75/§95).
+# One-click: Render Dashboard → New → Blueprint → select this repo/branch.
+# After deploy, paste the Supabase Storage S3 values into the masalim-api
+# service's environment (see docs/deploy-testing.md, Turkish walkthrough).
+services:
+  - type: web
+    name: masalim-api
+    runtime: docker
+    plan: free
+    dockerfilePath: apps/api/Dockerfile
+    dockerContext: .
+    healthCheckPath: /health
+    envVars:
+      - key: API_PORT
+        value: "10000"
+      # staging allows mock providers; production refuses them by design (§61).
+      - key: NODE_ENV
+        value: staging
+      - key: DATABASE_URL
+        fromDatabase:
+          name: masalim-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: keyvalue
+          name: masalim-redis
+          property: connectionString
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_REFRESH_SECRET
+        generateValue: true
+      - key: WORKER_MODE
+        value: inline
+      - key: FFMPEG_PATH
+        value: /usr/bin/ffmpeg
+      - key: CHROMIUM_PATH
+        value: /usr/bin/chromium
+      # Public URL of this service — set after the first deploy (Settings → copy URL).
+      - key: API_PUBLIC_URL
+        sync: false
+      # Supabase Storage (S3 protocol) credentials — docs/deploy-testing.md §2.
+      - key: STORAGE_PROVIDER
+        value: s3
+      - key: STORAGE_BUCKET
+        value: masalim-media
+      - key: STORAGE_FORCE_PATH_STYLE
+        value: "true"
+      - key: STORAGE_ENDPOINT
+        sync: false
+      - key: STORAGE_REGION
+        sync: false
+      - key: STORAGE_ACCESS_KEY
+        sync: false
+      - key: STORAGE_SECRET_KEY
+        sync: false
+
+  # Admin backoffice (Next.js) — orders/users/jobs/moderation tracking.
+  - type: web
+    name: masalim-admin
+    runtime: node
+    plan: free
+    buildCommand: corepack enable && pnpm install --frozen-lockfile && pnpm turbo build --filter=@masalim/admin...
+    startCommand: pnpm --filter @masalim/admin exec next start -p $PORT
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      # Inlined into the browser bundle at build time — must be the API's
+      # public URL. Update if the API service is ever recreated.
+      - key: NEXT_PUBLIC_API_URL
+        value: https://masalim-api-z6ry.onrender.com
+
+  - type: keyvalue
+    name: masalim-redis
+    plan: free
+    ipAllowList: []
+
+databases:
+  - name: masalim-db
+    plan: free
+    databaseName: masalim
+    user: masalim

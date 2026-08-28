@@ -1,0 +1,80 @@
+{
+  "name": "@masalim/api",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "build": "nest build",
+    "dev": "nest start --watch",
+    "start": "node dist/main.js",
+    "lint": "eslint src",
+    "typecheck": "tsc --noEmit",
+    "test": "jest --testPathIgnorePatterns=test/integration",
+    "test:integration": "NODE_ENV=test jest --testPathPattern=test/integration --runInBand"
+  },
+  "dependencies": {
+    "@masalim/ai": "workspace:*",
+    "@masalim/analytics": "workspace:*",
+    "@masalim/database": "workspace:*",
+    "@masalim/notifications": "workspace:*",
+    "@masalim/payments": "workspace:*",
+    "@masalim/storage": "workspace:*",
+    "@masalim/types": "workspace:*",
+    "@masalim/validation": "workspace:*",
+    "@nest-lab/throttler-storage-redis": "^1.2.0",
+    "@nestjs/common": "^11.1.29",
+    "@nestjs/core": "^11.1.29",
+    "@nestjs/jwt": "^11.0.2",
+    "@nestjs/platform-express": "^11.1.29",
+    "@nestjs/swagger": "^11.4.6",
+    "@nestjs/throttler": "^6.5.0",
+    "apple-signin-auth": "^2.1.0",
+    "argon2": "^0.45.1",
+    "bullmq": "^6.1.0",
+    "ffmpeg-static": "^5.3.0",
+    "google-auth-library": "^11.0.2",
+    "helmet": "^8.0.0",
+    "ioredis": "^6.0.0",
+    "nestjs-pino": "^4.6.1",
+    "nestjs-zod": "^5.5.0",
+    "pino": "^9.6.0",
+    "pino-http": "^11.0.0",
+    "playwright-core": "^1.62.1",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.1",
+    "sharp": "^0.35.3",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@masalim/config": "workspace:*",
+    "@nestjs/cli": "^11.0.24",
+    "@nestjs/testing": "^11.1.29",
+    "@types/express": "^5.0.0",
+    "@types/jest": "^29.5.14",
+    "@types/node": "^22.10.7",
+    "@types/supertest": "^6.0.2",
+    "eslint": "^9.18.0",
+    "jest": "^29.7.0",
+    "pino-pretty": "^13.0.0",
+    "supertest": "^7.0.0",
+    "ts-jest": "^29.2.5",
+    "typescript": "^5.7.3"
+  },
+  "jest": {
+    "moduleFileExtensions": [
+      "js",
+      "json",
+      "ts"
+    ],
+    "rootDir": ".",
+    "testRegex": ".*\\.spec\\.ts$",
+    "transform": {
+      "^.+\\.ts$": [
+        "ts-jest",
+        {
+          "tsconfig": "tsconfig.spec.json"
+        }
+      ]
+    },
+    "testEnvironment": "node"
+  }
+}
