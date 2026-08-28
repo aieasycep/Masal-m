@@ -1,0 +1,88 @@
+name: UIUX Review APK
+
+# Builds the SIDE-BY-SIDE review build of the app from the uiux-review branch.
+# The review identity (display name + applicationId suffix) is applied to
+# app.json ONLY inside the runner, so the git-tracked identity stays byte-
+# identical to the stable app and can never leak into production via a merge.
+on:
+  workflow_dispatch:
+    inputs:
+      api_url:
+        description: "API adresi (boş = canlı test API'si)"
+        required: false
+        default: ""
+  push:
+    branches: [uiux-review]
+    paths:
+      - ".github/workflows/uiux-review-apk.yml"
+      - "apps/mobile/**"
+      - "patches/**"
+      - "packages/**"
+      - "pnpm-lock.yaml"
+      - "package.json"
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      EXPO_PUBLIC_API_URL: ${{ inputs.api_url != '' && inputs.api_url || 'https://masalim-api-z6ry.onrender.com' }}
+      EXPO_PUBLIC_PURCHASES_PROVIDER: mock
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build workspace packages (mobile dependencies)
+        run: pnpm turbo build --filter='@masalim/mobile^...'
+
+      - name: Apply review identity (runner-only, never committed)
+        working-directory: apps/mobile
+        run: |
+          node -e '
+            const fs = require("fs");
+            const cfg = JSON.parse(fs.readFileSync("app.json", "utf8"));
+            cfg.expo.name = "Kendi Hikayem — UI/UX Review";
+            cfg.expo.android.package = "com.masalim.app.uiuxreview";
+            fs.writeFileSync("app.json", JSON.stringify(cfg, null, 2));
+          '
+          grep -E '"name"|"package"' app.json
+
+      - name: Generate native Android project
+        working-directory: apps/mobile
+        run: npx expo prebuild --platform android --no-install
+
+      - name: Raise Gradle JVM memory (dex merge OOMs at the template's 2g heap)
+        working-directory: apps/mobile/android
+        run: |
+          sed -i 's/^org.gradle.jvmargs=.*/org.gradle.jvmargs=-Xmx6g -XX:MaxMetaspaceSize=1g/' gradle.properties
+          grep '^org.gradle.jvmargs=' gradle.properties
+
+      - name: Build release APK
+        working-directory: apps/mobile/android
+        run: ./gradlew assembleRelease --no-daemon
+
+      - name: Rename APK for review handoff
+        run: |
+          mkdir -p review-out
+          cp apps/mobile/android/app/build/outputs/apk/release/app-release.apk review-out/KendiHikayem-UIUX-Review.apk
+
+      - name: Upload review APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: kendihikayem-uiux-review-apk
+          path: review-out/KendiHikayem-UIUX-Review.apk
+          retention-days: 14
