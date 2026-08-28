@@ -209,6 +209,17 @@ Local `.env` = `.env.example` + generated JWT secrets (already present, gitignor
   figma_reconciliation_additions. Deviations documented: no photo upload
   (native surface frozen), postal code stays required, "Ses ve Oynatma" row
   omitted (no backing feature).
+- **PR #2 (draft): story variety + wizard UX** (Aug 28) — user reported "vın vın"
+  and the dinosaur in EVERY story. Root cause: prompt-engine AGE_0_2 literally
+  quoted example sounds (models copy them) and the full interests list read as
+  mandatory. Fix: no quotable examples, interests capped at one theme-fitting
+  touch, ÇEŞİTLİLİK KURALLARI block, and the worker passes the child's last 4
+  READY stories (StoryGenerationInput.recentStories) with a divergence demand —
+  goes live on Render only after merge. Mobile: wizard starts at step 2 when the
+  child is prefilled; Home category tiles pass ?theme= (with a store reset so the
+  one-shot initialize can't swallow it); step-5 narrator threads
+  create→generating→result→narrate as ?voiceId= preselect; library child chips
+  (childId param existed server-side). New i18n key library.allChildren (727).
 
 ## Environment gotchas
 
