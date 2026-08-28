@@ -148,6 +148,7 @@ export default function CreateStory() {
   const setVoiceId = useWizardStore((state) => state.setVoiceId);
 
   const [heroNameError, setHeroNameError] = useState<string | null>(null);
+  const [childError, setChildError] = useState<string | null>(null);
   const [moderationError, setModerationError] = useState<string | null>(null);
   const [quotaError, setQuotaError] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -271,6 +272,13 @@ export default function CreateStory() {
           // dismissing the screen never leaves a dead end.
           setQuotaError(true);
           router.push('/subscription/quota' as never);
+        } else if (err.code === 'FORBIDDEN_OWNERSHIP' || err.code === 'NOT_FOUND') {
+          // The prefilled child no longer belongs to this account (account
+          // switch left stale cached state) — refetch and re-pick at step 1.
+          void queryClient.invalidateQueries({ queryKey: ['children'] });
+          selectGeneral();
+          setChildError(t('wizard.childGone'));
+          setStep(1);
         } else {
           setSubmitError(t(`errors.${err.code}`, { defaultValue: t('errors.GENERIC') }));
         }
@@ -290,6 +298,7 @@ export default function CreateStory() {
         {t('wizard.step1Title')}
       </Text>
       <Text style={styles.stepSubtitle}>{t('wizard.step1Subtitle')}</Text>
+      {childError != null ? <Text style={styles.submitError}>{childError}</Text> : null}
       {childrenQuery.isError ? (
         <ErrorState
           emoji="🌧️"
@@ -310,9 +319,10 @@ export default function CreateStory() {
               key={child.id}
               glow
               selected={childId === child.id}
-              onPress={() =>
-                selectChild({ id: child.id, name: child.name, ageRange: child.ageRange })
-              }
+              onPress={() => {
+                setChildError(null);
+                selectChild({ id: child.id, name: child.name, ageRange: child.ageRange });
+              }}
               accessibilityLabel={child.name}
             >
               <Avatar emoji={childAvatarEmoji(child.name)} size={48} kind="child" />
