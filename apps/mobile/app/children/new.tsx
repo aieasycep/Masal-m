@@ -9,12 +9,17 @@ import { interestSchema, personNameSchema } from '@masalim/validation';
 import { ApiError, NetworkError } from '@masalim/api-client';
 import { colors, fontFamilies, fontSizes, letterSpacing, spacing } from '@masalim/ui';
 import { api } from '../../src/lib/api';
-import { ageRangeFromYears, DEFAULT_AGE_YEARS } from '../../src/lib/age';
+import {
+  ageFromYearMonth,
+  ageRangeFromYears,
+  birthDateFromYearMonth,
+  defaultBirthYearMonth,
+} from '../../src/lib/age';
 import { CANONICAL_INTERESTS, isCanonicalInterest } from '../../src/lib/interests';
 import { useAppPrefs } from '../../src/stores/app-prefs';
 import { useAuthStore } from '../../src/stores/auth';
-import { AgeStepper } from '../../src/components/AgeStepper';
 import { AvatarEmojiPicker, DEFAULT_AVATAR_EMOJI } from '../../src/components/AvatarEmojiPicker';
+import { BirthMonthPicker } from '../../src/components/BirthMonthPicker';
 import { Button } from '../../src/components/Button';
 import { Chip } from '../../src/components/Chip';
 import { Input } from '../../src/components/Input';
@@ -40,7 +45,8 @@ export default function NewChild() {
   const [name, setName] = useState('');
   const [nameError, setNameError] = useState<string | null>(null);
   const [avatarEmoji, setAvatarEmoji] = useState<string>(DEFAULT_AVATAR_EMOJI);
-  const [ageYears, setAgeYears] = useState(DEFAULT_AGE_YEARS);
+  const [birth, setBirth] = useState(() => defaultBirthYearMonth());
+  const ageYears = ageFromYearMonth(birth);
   const [selectedInterests, setSelectedInterests] = useState<string[]>([]);
   const [customInterests, setCustomInterests] = useState<string[]>([]);
   const [customOpen, setCustomOpen] = useState(false);
@@ -82,8 +88,10 @@ export default function NewChild() {
     try {
       const created = await api.children.create({
         name: parsedName.data,
+        birthDate: birthDateFromYearMonth(birth),
         ageRange: ageRangeFromYears(ageYears),
         interests: [...selectedInterests, ...customInterests],
+        // ageYears kept for back-compat with the stable app's age display.
         preferences: { avatarEmoji, ageYears },
       });
       useAppPrefs.getState().setSelectedChildId(created.id);
@@ -149,15 +157,12 @@ export default function NewChild() {
           </View>
 
           <Text style={styles.sectionLabel}>
-            {t('childSetup.ageLabel').toLocaleUpperCase('tr')}
+            {t('childSetup.birthMonthLabel').toLocaleUpperCase('tr')}
           </Text>
-          <AgeStepper
-            value={ageYears}
-            onChange={setAgeYears}
-            unitLabel={t('wizard.ageUnit')}
-            decrementLabel={t('childSetup.ageDecrease')}
-            incrementLabel={t('childSetup.ageIncrease')}
-          />
+          <BirthMonthPicker value={birth} onChange={setBirth} />
+          <Text style={styles.birthHelper}>
+            {`${t('childSetup.birthMonthHelperAge', { age: ageYears })} ${t('childSetup.birthMonthHelper')}`}
+          </Text>
 
           <Text style={styles.sectionLabel}>
             {t('childSetup.interestsTitle').toLocaleUpperCase('tr')}
@@ -258,6 +263,12 @@ const styles = StyleSheet.create({
     letterSpacing: letterSpacing.eyebrow,
     marginTop: spacing.xl,
     marginBottom: spacing.sm,
+  },
+  birthHelper: {
+    fontFamily: fontFamilies.body,
+    fontSize: fontSizes.md,
+    color: colors.mutedForeground,
+    marginTop: spacing.xs,
   },
   sectionHint: {
     fontFamily: fontFamilies.body,

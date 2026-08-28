@@ -20,7 +20,21 @@
     "age": "age {{count}}",
     "storyCount": "{{count}} stories",
     "offlineBanner": "No internet connection. Some features may be unavailable.",
-    "offlineRetry": "We'll retry automatically once you're back online."
+    "offlineRetry": "We'll retry automatically once you're back online.",
+    "months": [
+      "January",
+      "February",
+      "March",
+      "April",
+      "May",
+      "June",
+      "July",
+      "August",
+      "September",
+      "October",
+      "November",
+      "December"
+    ]
   },
   "tabs": {
     "home": "Home",
@@ -85,6 +99,9 @@
     "subtitle": "Tell us about your child so the tales fit them perfectly.",
     "nameLabel": "Child's name",
     "namePlaceholder": "e.g. Ege",
+    "birthMonthLabel": "Birth month and year",
+    "birthMonthHelperAge": "Currently {{age}} years old.",
+    "birthMonthHelper": "Used to keep their age up to date automatically.",
     "birthDateLabel": "Birth date or age",
     "ageRangeLabel": "Age group",
     "photoLabel": "Profile photo (optional)",
@@ -109,13 +126,9 @@
       "müzik": "Music"
     },
     "deleteConfirmTitle": "Delete this profile?",
-    "deleteConfirmBody": "{{name}}'s profile will be removed. Stories you created stay in your library.",
-    "ageLabel": "Age",
-    "ageDecrease": "Decrease age",
-    "ageIncrease": "Increase age",
+    "deleteConfirmBody": "The child profile is removed; stories and books you created stay in your library.",
     "updateChild": "Update Profile",
     "deleteChild": "Delete Profile",
-    "deleteConfirmBodyPermanent": "This child profile and all of its stories will be deleted. This cannot be undone.",
     "editTitle": "{{name}}'s Profile",
     "listEmptyTitle": "No child profiles yet.",
     "listEmptyBody": "Create a profile to personalize the stories."

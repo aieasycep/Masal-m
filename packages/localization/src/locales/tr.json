@@ -20,7 +20,21 @@
     "age": "{{count}} yaş",
     "storyCount": "{{count}} hikâye",
     "offlineBanner": "İnternet bağlantısı yok. Bazı özellikler kullanılamayabilir.",
-    "offlineRetry": "Bağlantı gelince otomatik deneyeceğiz."
+    "offlineRetry": "Bağlantı gelince otomatik deneyeceğiz.",
+    "months": [
+      "Ocak",
+      "Şubat",
+      "Mart",
+      "Nisan",
+      "Mayıs",
+      "Haziran",
+      "Temmuz",
+      "Ağustos",
+      "Eylül",
+      "Ekim",
+      "Kasım",
+      "Aralık"
+    ]
   },
   "tabs": {
     "home": "Ana Sayfa",
@@ -85,6 +99,9 @@
     "subtitle": "Çocuğunu tanıyalım ki masallar tam ona göre olsun.",
     "nameLabel": "Çocuğun adı",
     "namePlaceholder": "Örn. Ege",
+    "birthMonthLabel": "Doğum ayı ve yılı",
+    "birthMonthHelperAge": "Şu an {{age}} yaşında.",
+    "birthMonthHelper": "Yaşını zamanla otomatik güncellemek için kullanılır.",
     "birthDateLabel": "Doğum tarihi veya yaşı",
     "ageRangeLabel": "Yaş grubu",
     "photoLabel": "Profil fotoğrafı (isteğe bağlı)",
@@ -109,13 +126,9 @@
       "müzik": "Müzik"
     },
     "deleteConfirmTitle": "Profili silmek istiyor musun?",
-    "deleteConfirmBody": "{{name}} için kaydedilen profil silinir. Oluşturulan hikâyeler kitaplığında kalır.",
-    "ageLabel": "Yaşı",
-    "ageDecrease": "Yaşı azalt",
-    "ageIncrease": "Yaşı artır",
+    "deleteConfirmBody": "Çocuk profili silinir; daha önce oluşturduğun hikâyeler ve kitaplar kütüphanende kalır.",
     "updateChild": "Profili Güncelle",
     "deleteChild": "Profili Sil",
-    "deleteConfirmBodyPermanent": "Bu çocuk profili ve tüm hikâyeleri silinecek. Bu işlem geri alınamaz.",
     "editTitle": "{{nameGen}} Profili",
     "listEmptyTitle": "Henüz bir çocuk profili yok.",
     "listEmptyBody": "Masalları kişiselleştirmek için bir profil oluştur."

@@ -7,7 +7,7 @@ import type { Child } from '@masalim/validation';
 import { ApiError } from '@masalim/api-client';
 import { colors, fontFamilies, fontSizes, radius, shadows, spacing } from '@masalim/ui';
 import { api } from '../../src/lib/api';
-import { yearsFromAgeRange } from '../../src/lib/age';
+import { ageFromYearMonth, yearMonthFromBirthDate, yearsFromAgeRange } from '../../src/lib/age';
 import { isCanonicalInterest } from '../../src/lib/interests';
 import { Avatar } from '../../src/components/Avatar';
 import { Button } from '../../src/components/Button';
@@ -17,6 +17,13 @@ import { ScreenHeader } from '../../src/components/ScreenHeader';
 import { DEFAULT_AVATAR_EMOJI } from '../../src/components/AvatarEmojiPicker';
 import { PencilIcon } from '../../src/components/icons';
 import { EmptyState, ErrorState } from '../../src/components/states';
+
+/** Age shown on list cards: birthDate-derived first, legacy fallbacks after. */
+function displayAge(child: Child): number {
+  const birth = yearMonthFromBirthDate(child.birthDate);
+  if (birth != null) return ageFromYearMonth(birth);
+  return child.preferences.ageYears ?? yearsFromAgeRange(child.ageRange);
+}
 
 /** Children list (design Child/03-Children): cards + fixed "+ Çocuk Ekle" CTA. */
 export default function ChildrenList() {
@@ -77,11 +84,7 @@ export default function ChildrenList() {
                       <Text style={styles.name} numberOfLines={1}>
                         {child.name}
                       </Text>
-                      <Text style={styles.age}>
-                        {t('common.age', {
-                          count: child.preferences.ageYears ?? yearsFromAgeRange(child.ageRange),
-                        })}
-                      </Text>
+                      <Text style={styles.age}>{t('common.age', { count: displayAge(child) })}</Text>
                     </View>
                     {child.interests.length > 0 ? (
                       <View style={styles.pillRow}>
