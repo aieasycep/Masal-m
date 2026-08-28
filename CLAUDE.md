@@ -209,17 +209,31 @@ Local `.env` = `.env.example` + generated JWT secrets (already present, gitignor
   figma_reconciliation_additions. Deviations documented: no photo upload
   (native surface frozen), postal code stays required, "Ses ve Oynatma" row
   omitted (no backing feature).
-- **PR #2 (draft): story variety + wizard UX** (Aug 28) — user reported "vın vın"
-  and the dinosaur in EVERY story. Root cause: prompt-engine AGE_0_2 literally
-  quoted example sounds (models copy them) and the full interests list read as
-  mandatory. Fix: no quotable examples, interests capped at one theme-fitting
-  touch, ÇEŞİTLİLİK KURALLARI block, and the worker passes the child's last 4
-  READY stories (StoryGenerationInput.recentStories) with a divergence demand —
-  goes live on Render only after merge. Mobile: wizard starts at step 2 when the
-  child is prefilled; Home category tiles pass ?theme= (with a store reset so the
-  one-shot initialize can't swallow it); step-5 narrator threads
-  create→generating→result→narrate as ?voiceId= preselect; library child chips
-  (childId param existed server-side). New i18n key library.allChildren (727).
+- **PR #2 MERGED + PR #3 MERGED (Aug 28)** — main @ 7ba9dc1. PR #2: story
+  variety + wizard UX — user reported "vın vın" and the dinosaur in EVERY
+  story. Root cause: prompt-engine AGE_0_2 literally quoted example sounds
+  (models copy them) and the full interests list read as mandatory. Fix: no
+  quotable examples, interests capped at one theme-fitting touch, ÇEŞİTLİLİK
+  KURALLARI block, worker passes the child's last 4 READY stories
+  (StoryGenerationInput.recentStories) with a divergence demand — LIVE on
+  Render since merge. Mobile: wizard starts at step 2 when the child is
+  prefilled; Home category tiles pass ?theme= (with store reset); step-5
+  narrator threads create→generating→result→narrate as ?voiceId= preselect;
+  library child chips. PR #3: cross-account state leak — logging into a 2nd
+  account inherited the previous account's persisted query cache +
+  selectedChildId → FORBIDDEN_OWNERSHIP on create ("Bu içeriğe erişim iznin
+  yok") + privacy flash. Fix: src/lib/reset-user-state.ts called from BOTH
+  setSession and clearSession (clears queryClient, masalim.query-cache,
+  selectedChildId; keeps hasSeenOnboarding); wizard recovers from
+  FORBIDDEN/NOT_FOUND on create (refetch children, back to step 1,
+  wizard.childGone). Stable emulator-verified APK for user (main): run
+  33170943745 (e1544b7).
+- **ElevenLabs FREE QUOTA EXHAUSTED (Aug 28 evening)** — 10,000/10,000
+  credits used → ALL narrations fail ("Sorun oluştu") on staging for BOTH
+  apps; a 6-min story ≈ 5-6k chars so free tier ≈ 2 narrations/month.
+  Advice given: Starter $6/mo = 30k credits + unlocks Instant Voice Cloning
+  (also fixes the "Annemin Sesi" paid-plan failures). After upgrade user just
+  taps "Tekrar Dene" — no code change needed. NOT an app bug.
 
 - **UI/UX REVIEW BRANCH (`uiux-review`)** — controlled review experiment, NOT
   merged to main. Stable checkpoint: branch `stable-before-uiux-review` +
@@ -250,6 +264,17 @@ Local `.env` = `.env.example` + generated JWT secrets (already present, gitignor
   illustrate when no READY set, suggestions-header "Tümü" removed. PR #4
   draft "[DO NOT MERGE]" exists only for CI. NO merge without the user's
   explicit "Yeni UI'yı onaylıyorum, production'a al."
+- **REVIEW APK DELIVERED & VERIFIED (Aug 28 18:47)**: run 33183446262
+  (b635ecb, V1+V2) — apk+smoke jobs green, APP_ALIVE=yes SMOKE_ALIVE=yes,
+  zero FATAL; artifact `kendihikayem-uiux-review-apk` /
+  KendiHikayem-UIUX-Review.apk (57.6MB). Final §43 report given; STATUS: NOT
+  MERGED — AWAITING USER REVIEW. QA at handoff: typecheck 27/27, lint 27/27,
+  test 26/26, i18n 771 keys. Artifact downloads need a logged-in GitHub tab
+  (incognito hides the link). No active send_later triggers. NEXT: on "Yeni
+  UI'yı onaylıyorum, production'a al" → merge uiux-review→main via PR #4
+  (review-only workflows uiux-review-apk.yml can come along harmlessly;
+  MIN_DURATION_SECONDS 45 then tightens the API); on rejection → branch stays,
+  stable untouched (checkpoint stable-before-uiux-review @ 7ba9dc1).
 
 ## Environment gotchas
 
