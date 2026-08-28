@@ -494,10 +494,10 @@ const styles = StyleSheet.create({
     fontSize: fontSizes.xs,
     color: colors.mutedForeground,
   },
-  rowRightBottom: { flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 32 },
+  rowRightBottom: { flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 44 },
   playCircle: {
-    width: 32,
-    height: 32,
+    width: 44,
+    height: 44,
     borderRadius: radius.round,
     backgroundColor: colors.secondary,
     alignItems: 'center',

@@ -533,9 +533,9 @@ const styles = StyleSheet.create({
   closeButton: {
     position: 'absolute',
     right: spacing.pageX,
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     backgroundColor: 'rgba(255,255,255,0.15)',
     alignItems: 'center',
     justifyContent: 'center',

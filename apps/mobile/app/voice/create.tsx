@@ -1206,7 +1206,7 @@ const styles = StyleSheet.create({
     letterSpacing: -1,
   },
   recordingStatusRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  recordingDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.coral },
+  recordingDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.coralOnDark },
   recordingStatusText: {
     fontFamily: fontFamilies.bodySemiBold,
     fontSize: fontSizes.md,
@@ -1222,7 +1222,7 @@ const styles = StyleSheet.create({
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: colors.coral,
+    backgroundColor: colors.coralOnDark,
     borderWidth: 4,
     borderColor: 'rgba(240,139,110,0.3)',
     alignItems: 'center',

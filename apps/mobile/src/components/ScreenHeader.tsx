@@ -12,7 +12,7 @@ interface ScreenHeaderProps {
   dark?: boolean;
 }
 
-/** Standard header: 40px circular back button + eyebrow/title. */
+/** Standard header: 44px circular back button (a11y hit area) + eyebrow/title. */
 export function ScreenHeader({ title, eyebrow, onBack, dark = false }: ScreenHeaderProps) {
   return (
     <View style={styles.row}>
@@ -39,9 +39,9 @@ export function ScreenHeader({ title, eyebrow, onBack, dark = false }: ScreenHea
 const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 20 },
   backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
   },

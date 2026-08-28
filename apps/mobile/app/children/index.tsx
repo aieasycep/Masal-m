@@ -166,9 +166,9 @@ const styles = StyleSheet.create({
     color: colors.primary,
   },
   editCircle: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     backgroundColor: colors.muted,
     alignItems: 'center',
     justifyContent: 'center',

@@ -12,8 +12,8 @@ export const colors = {
   secondary: '#EDE8F8',
   secondaryForeground: '#5A4190',
   muted: '#F2EDE6',
-  mutedForeground: '#8A7D72',
-  accent: '#F08B6E',
+  mutedForeground: '#71655B',
+  accent: '#B94F35',
   accentForeground: '#FFFFFF',
   border: '#E8E0D4',
   ring: '#B09CE0',
@@ -21,13 +21,21 @@ export const colors = {
   lavender: '#B09CE0',
   lavenderLight: '#D4C8F0',
   dustyBlue: '#7BA7C9',
+  /** Readable text-on-tint counterpart of dustyBlue (status pills). */
+  dustyBlueText: '#3F6684',
   peach: '#F5C4A8',
   sage: '#8DB89A',
-  coral: '#F08B6E',
+  /** Readable text-on-tint counterpart of sage (status pills). */
+  sageText: '#456E52',
+  coral: '#B94F35',
+  /** Original light coral, kept ONLY for dark/night backgrounds. */
+  coralOnDark: '#F08B6E',
   cream: '#FAF8F4',
   warmWhite: '#FFF9F2',
   gold: '#FFD97D',
   destructive: '#E05454',
+  /** Darker destructive for text/buttons on light surfaces (contrast). */
+  destructiveDeep: '#B42318',
 
   purpleDeep: '#2D1B69',
   purpleDarkest: '#1A0F3C',
@@ -40,7 +48,7 @@ export const night = {
   card: '#162035',
   surface: '#1E2D45',
   text: '#E8E0D4',
-  muted: '#6B7A94',
+  muted: '#91A1B8',
   purple: '#9B7FD4',
   blue: '#4A7FB5',
 } as const;

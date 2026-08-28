@@ -9,6 +9,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 import { colors } from '@masalim/ui';
+import { usePrefersReducedMotion } from '../lib/motion';
 
 interface StarfieldProps {
   /** Number of deterministic star dots (design uses 28). */
@@ -26,8 +27,13 @@ function Star({ index }: StarProps) {
   const top: DimensionValue = `${(index * 37 + 7) % 100}%`;
   const left: DimensionValue = `${(index * 53 + 11) % 100}%`;
   const pulse = useSharedValue(1);
+  const reducedMotion = usePrefersReducedMotion();
 
   useEffect(() => {
+    if (reducedMotion) {
+      pulse.value = 1;
+      return;
+    }
     pulse.value = withDelay(
       (index * 300) % 2000,
       withRepeat(
@@ -39,7 +45,7 @@ function Star({ index }: StarProps) {
         true,
       ),
     );
-  }, [index, pulse]);
+  }, [index, pulse, reducedMotion]);
 
   const pulseStyle = useAnimatedStyle(() => ({ opacity: baseOpacity * pulse.value }));
 
