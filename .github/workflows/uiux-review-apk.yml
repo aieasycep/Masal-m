@@ -86,3 +86,76 @@ jobs:
           name: kendihikayem-uiux-review-apk
           path: review-out/KendiHikayem-UIUX-Review.apk
           retention-days: 14
+
+  # Every review APK is emulator-verified in the same run (APP_ALIVE +
+  # player smoke on the review package) — no separate dispatch needed.
+  smoke:
+    needs: apk
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      PKG: com.masalim.app.uiuxreview
+    steps:
+      - name: Download review APK artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: kendihikayem-uiux-review-apk
+          path: apk
+
+      - name: Enable KVM for emulator
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Launch review app in emulator and capture logcat
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          arch: x86_64
+          target: google_apis
+          disable-animations: true
+          script: |
+            adb install -r apk/KendiHikayem-UIUX-Review.apk
+            adb shell pm list packages | grep uiuxreview || echo "PACKAGE NOT FOUND"
+            adb logcat -c || true
+            adb shell monkey -p $PKG -c android.intent.category.LAUNCHER 1
+            sleep 45
+            adb logcat -d > logcat-full.txt
+            if adb shell pidof $PKG > /dev/null 2>&1; then echo "APP_ALIVE=yes" | tee app-alive.txt; else echo "APP_ALIVE=no (process died)" | tee app-alive.txt; fi
+            adb logcat -c || true
+            adb shell am start -W -a android.intent.action.VIEW -d "masalim://debug/player-smoke" $PKG || echo "deep link start failed"
+            sleep 30
+            adb logcat -d > logcat-smoke.txt
+            if adb shell pidof $PKG > /dev/null 2>&1; then echo "SMOKE_ALIVE=yes" | tee smoke-alive.txt; else echo "SMOKE_ALIVE=no (process died)" | tee smoke-alive.txt; fi
+
+      - name: Upload full logcat
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: review-crash-logcat
+          path: |
+            logcat-full.txt
+            app-alive.txt
+            logcat-smoke.txt
+            smoke-alive.txt
+          retention-days: 14
+
+      # Keep this step LAST so the distilled verdict sits at the end of the log.
+      - name: Extract crash summary
+        if: always()
+        run: |
+          echo "================ APP ALIVE? ================"
+          cat app-alive.txt || true
+          echo "================ FATAL EXCEPTION (startup) ================"
+          grep -n -B 2 -A 120 "FATAL EXCEPTION" logcat-full.txt || echo "no FATAL EXCEPTION found"
+          echo "================ ReactNativeJS errors (startup) ================"
+          grep -n "ReactNativeJS" logcat-full.txt | tail -n 80 || true
+          echo "================ PLAYER SMOKE ALIVE? ================"
+          cat smoke-alive.txt || true
+          echo "================ PLAYER SMOKE markers ================"
+          grep -n "player-smoke" logcat-smoke.txt | tail -n 60 || echo "no player-smoke markers found"
+          echo "================ FATAL EXCEPTION (player smoke) ================"
+          grep -n -B 2 -A 160 "FATAL EXCEPTION" logcat-smoke.txt || echo "no FATAL EXCEPTION found"
+          echo "================ AndroidRuntime lines (player smoke) ================"
+          grep -n "AndroidRuntime" logcat-smoke.txt | tail -n 80 || true
