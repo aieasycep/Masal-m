@@ -1,22 +1,22 @@
-import Anthropic from '@anthropic-ai/sdk';
+import OpenAI from 'openai';
 import { hitsBlocklist } from './blocklist';
 import { CLASSIFIER_SYSTEM, parseVerdict } from './classifier';
 import type { ContentModerator, ModerationVerdict } from './types';
 
-export interface LlmModeratorConfig {
+export interface OpenAIModeratorConfig {
   apiKey: string;
   model?: string;
 }
 
-/** LLM-backed moderation using a fast classification call, layered over the blocklist. */
-export class LlmContentModerator implements ContentModerator {
-  readonly name = 'llm';
-  private readonly client: Anthropic;
+/** OpenAI-backed moderation using a fast classification call, layered over the blocklist. */
+export class OpenAIContentModerator implements ContentModerator {
+  readonly name = 'openai';
+  private readonly client: OpenAI;
   private readonly model: string;
 
-  constructor(config: LlmModeratorConfig) {
-    this.client = new Anthropic({ apiKey: config.apiKey });
-    this.model = config.model ?? 'claude-opus-5';
+  constructor(config: OpenAIModeratorConfig) {
+    this.client = new OpenAI({ apiKey: config.apiKey });
+    this.model = config.model ?? 'gpt-4o-mini';
   }
 
   async checkStoryIdea(idea: string, language: 'tr' | 'en'): Promise<ModerationVerdict> {
@@ -30,19 +30,18 @@ export class LlmContentModerator implements ContentModerator {
   }
 
   private async classify(content: string): Promise<ModerationVerdict> {
-    const response = await this.client.messages.create({
+    const completion = await this.client.chat.completions.create({
       model: this.model,
-      max_tokens: 64,
-      system: CLASSIFIER_SYSTEM,
-      messages: [{ role: 'user', content }],
+      max_completion_tokens: 64,
+      messages: [
+        { role: 'system', content: CLASSIFIER_SYSTEM },
+        { role: 'user', content },
+      ],
     });
-    if (response.stop_reason === 'refusal') {
+    const message = completion.choices[0]?.message;
+    if (message == null || message.refusal != null || message.content == null) {
       return { safe: false, category: 'classifier_refusal' };
     }
-    const text = response.content
-      .filter((block): block is Anthropic.TextBlock => block.type === 'text')
-      .map((block) => block.text)
-      .join('');
-    return parseVerdict(text);
+    return parseVerdict(message.content);
   }
 }

@@ -8,6 +8,7 @@ export { MockStoryProvider } from './story/mock-provider';
 // Moderation
 export * from './moderation/types';
 export { LlmContentModerator } from './moderation/llm-moderator';
+export { OpenAIContentModerator } from './moderation/openai-moderator';
 export { MockContentModerator } from './moderation/mock-moderator';
 export { hitsBlocklist } from './moderation/blocklist';
 

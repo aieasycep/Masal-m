@@ -9,7 +9,7 @@ fast instead of silently mocking.
 | Concern | Env | Real adapter | Mock behavior |
 |---|---|---|---|
 | Story LLM | `AI_PROVIDER=mock\|anthropic\|openai`, `AI_API_KEY`, `AI_MODEL` | Anthropic (`messages.parse` + zod output format, default `claude-opus-5`) / OpenAI (JSON mode + 2 repair retries) | Deterministic Turkish story from theme motifs, ~2s delay |
-| Moderation | `MODERATION_PROVIDER=mock\|llm`, `MODERATION_MODEL` | Blocklist + LLM classifier ("SAFE"/"UNSAFE:<cat>") | Blocklist only |
+| Moderation | `MODERATION_PROVIDER=mock\|llm\|openai`, `MODERATION_MODEL` | Blocklist + LLM classifier ("SAFE"/"UNSAFE:<cat>"): `llm` = Anthropic (default `claude-opus-5`), `openai` = OpenAI chat (default `gpt-4o-mini`); both share `AI_API_KEY` | Blocklist only |
 | TTS | `TTS_PROVIDER=mock\|elevenlabs`, `TTS_API_KEY`, `TTS_MODEL` | ElevenLabs `eleven_multilingual_v2` | Playable WAV melody whose length tracks the text (whole narration pipeline works) |
 | Voice clone | `VOICE_CLONE_PROVIDER=mock\|elevenlabs`, `VOICE_CLONE_API_KEY` | ElevenLabs IVC (`/v1/voices/add`), real `deleteVoice` | Instant clone (rejects empty audio) |
 | Images | `IMAGE_PROVIDER=mock\|openai`, `IMAGE_API_KEY`, `IMAGE_MODEL` | OpenAI gpt-image-1, character-sheet reference via `images.edit` | Style-tinted SVG→PNG via sharp |
@@ -19,6 +19,12 @@ fast instead of silently mocking.
 | Subscriptions | `SUBSCRIPTION_PROVIDER=mock\|revenuecat`, `REVENUECAT_WEBHOOK_SECRET` | RevenueCat webhook (`Authorization` shared secret) → normalized events | `POST /subscription/mock/purchase|expire` drive the same event pipeline |
 | Push | `PUSH_PROVIDER=mock\|expo`, `EXPO_ACCESS_TOKEN` | Expo Push API with dead-token pruning | Logged sends |
 | Mail | `MAIL_PROVIDER=mock\|smtp`, `SMTP_URL` | SMTP-ready service | OTPs logged to console |
+
+Cross-vendor model guard: `AI_MODEL`/`MODERATION_MODEL` values that don't match
+the selected vendor (e.g. a leftover `claude-*` model with `AI_PROVIDER=openai`)
+fall back to the vendor default in `providers.module.ts` instead of failing every
+request. All-OpenAI staging recipe: `AI_PROVIDER=openai`, `AI_MODEL=gpt-4o`,
+`MODERATION_PROVIDER=openai`, `MODERATION_MODEL=gpt-4o-mini`, `AI_API_KEY=<OpenAI key>`.
 
 Mobile-side purchases (`apps/mobile/src/lib/purchases.ts`):
 `EXPO_PUBLIC_PURCHASES_PROVIDER=mock|revenuecat` — mock drives
