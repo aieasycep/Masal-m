@@ -20,6 +20,7 @@ import { colors, fontFamilies, fontSizes, gradients, radius, spacing } from '@ma
 import { api } from '../../../src/lib/api';
 import { useJobProgress } from '../../../src/lib/job-stream';
 import { Button } from '../../../src/components/Button';
+import { KeepScreenAwake } from '../../../src/components/KeepScreenAwake';
 import { Starfield } from '../../../src/components/Starfield';
 
 const MESSAGE_ROTATE_MS = 2_500;
@@ -63,11 +64,7 @@ export default function StoryGenerating() {
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
-  const { jobId, storyId, voiceId } = useLocalSearchParams<{
-    jobId: string;
-    storyId?: string;
-    voiceId?: string;
-  }>();
+  const { jobId, storyId } = useLocalSearchParams<{ jobId: string; storyId?: string }>();
 
   const { status, progress, errorCode } = useJobProgress(jobId);
   const inProgress =
@@ -142,10 +139,7 @@ export default function StoryGenerating() {
       timer = setTimeout(() => {
         if (cancelled) return;
         if (target != null) {
-          // Wizard narrator choice travels on to the result screen.
-          const voiceParam =
-            voiceId != null && voiceId.length > 0 ? `?voiceId=${voiceId}` : '';
-          router.replace(`/story/${target}${voiceParam}` as never);
+          router.replace(`/story/${target}` as never);
         } else {
           router.back();
         }
@@ -157,7 +151,7 @@ export default function StoryGenerating() {
       cancelled = true;
       if (timer != null) clearTimeout(timer);
     };
-  }, [status, storyId, jobId, voiceId, queryClient]);
+  }, [status, storyId, jobId, queryClient]);
 
   // Retry after failure: re-queue generation and swap in the new job id.
   const [retryError, setRetryError] = useState<string | null>(null);
@@ -199,6 +193,7 @@ export default function StoryGenerating() {
 
   return (
     <View style={styles.root}>
+      {inProgress ? <KeepScreenAwake /> : null}
       <LinearGradient
         colors={gradients.nightSky as unknown as [string, string, ...string[]]}
         locations={[0, 0.5, 1]}

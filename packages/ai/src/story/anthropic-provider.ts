@@ -2,7 +2,13 @@ import Anthropic from '@anthropic-ai/sdk';
 import { zodOutputFormat } from '@anthropic-ai/sdk/helpers/zod';
 import { z as z4 } from 'zod/v4';
 import { generatedStorySchema } from '@masalim/validation';
-import { buildSystemPrompt, buildUserPrompt, UNSAFE_SENTINEL } from './prompt-engine';
+import {
+  buildSystemPrompt,
+  buildUserPrompt,
+  countStoryWords,
+  minTotalWords,
+  UNSAFE_SENTINEL,
+} from './prompt-engine';
 import {
   StoryGenerationError,
   type StoryGenerationInput,
@@ -45,13 +51,49 @@ export class AnthropicStoryProvider implements StoryGenerationProvider {
   }
 
   async generateStory(input: StoryGenerationInput): Promise<StoryGenerationResult> {
+    const first = await this.parseOnce(input, buildUserPrompt(input));
+
+    // Length repair: if the model undershot the word budget, one follow-up
+    // request expands the same story. A still-short second attempt is
+    // delivered rather than failed.
+    const words = countStoryWords(first.story.pages);
+    const minWords = minTotalWords(input.durationTarget);
+    if (words >= minWords) return first;
+
+    const expandPrompt = [
+      buildUserPrompt(input),
+      '',
+      `İlk deneme çok kısa kaldı: toplam ${words} kelime, alt sınır ${minWords} kelime. Kısa versiyon şuydu:`,
+      JSON.stringify(first.story),
+      'Aynı hikâyeyi (aynı başlık, olay örgüsü ve sayfa sayısıyla) her sayfayı zenginleştirip genişleterek yeniden üret; kelime bütçesine bu kez tam uy.',
+    ].join('\n');
+    let second: StoryGenerationResult;
+    try {
+      second = await this.parseOnce(input, expandPrompt);
+    } catch {
+      return first;
+    }
+    const usage = {
+      inputTokens: (first.usage?.inputTokens ?? 0) + (second.usage?.inputTokens ?? 0),
+      outputTokens: (first.usage?.outputTokens ?? 0) + (second.usage?.outputTokens ?? 0),
+      model: second.usage?.model ?? this.model,
+    };
+    return countStoryWords(second.story.pages) > words
+      ? { story: second.story, usage }
+      : { ...first, usage };
+  }
+
+  private async parseOnce(
+    input: StoryGenerationInput,
+    userPrompt: string,
+  ): Promise<StoryGenerationResult> {
     let response;
     try {
       response = await this.client.messages.parse({
         model: this.model,
         max_tokens: 16000,
         system: buildSystemPrompt(input),
-        messages: [{ role: 'user', content: buildUserPrompt(input) }],
+        messages: [{ role: 'user', content: userPrompt }],
         output_config: { format: zodOutputFormat(transportStorySchema) },
       });
     } catch (err) {

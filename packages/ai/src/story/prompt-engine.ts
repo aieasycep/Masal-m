@@ -1,4 +1,4 @@
-import { DURATION_TARGETS, type AgeRange } from '@masalim/types';
+import { DURATION_TARGETS, type AgeRange, type StoryDuration } from '@masalim/types';
 import type { StoryGenerationInput } from './types';
 
 /**
@@ -42,7 +42,8 @@ export function buildSystemPrompt(input: StoryGenerationInput): string {
     'YAZIM KURALLARI:',
     '- Akıcı, sıcak, masalsı bir dil kullan. Ders verir gibi değil, hikâye anlatır gibi yaz.',
     '- Kahramanın adını Türkçe ek kurallarına göre doğal biçimde çek (örn. Ege → Ege\'nin, Ada → Ada\'yı).',
-    '- Her sayfa tek başına sesli okunabilecek kısa bir bölüm olsun.',
+    '- Her sayfa tek başına sesli okunabilecek bir bölüm olsun.',
+    '- Sayfa metinlerini dolgun tut: verilen kelime bütçesine uy, bütçenin altına inme. Bir-iki cümlelik cılız sayfalar kabul edilmez.',
     '- Her sayfa için, o sayfanın sahnesini betimleyen İngilizce bir "illustrationPrompt" yaz (çizim yönergesi; karakter görünümünü tutarlı tut).',
     '- Hikâye huzurlu ve güven veren bir sonla bitmeli.',
   ].join('\n');
@@ -65,7 +66,9 @@ export function buildUserPrompt(input: StoryGenerationInput): string {
     }
   }
   lines.push(`Temalar: ${input.themes.join(', ')}`);
-  lines.push(`Hedef uzunluk: yaklaşık ${target.minutes} dakika sesli okuma — ${target.pages} sayfa, sayfa başına yaklaşık ${target.wordsPerPage} kelime.`);
+  lines.push(
+    `Hedef uzunluk: yaklaşık ${target.minutes} dakika sesli okuma. KELİME BÜTÇESİ (kesin kural): tam ${target.pages} sayfa; her sayfa ${target.wordsPerPage - 15}–${target.wordsPerPage + 15} kelime; hikâyenin TOPLAMI EN AZ ${minTotalWords(input.durationTarget)} kelime olmalı. Bu bir alt sınırdır — daha kısa bir hikâye yanlış kabul edilir.`,
+  );
   lines.push('');
   lines.push(AGE_GUIDANCE[input.ageRange]);
   if (input.educationalGoal) {
@@ -115,3 +118,18 @@ export function buildUserPrompt(input: StoryGenerationInput): string {
 
 /** Sentinel the model uses to flag an unsafe request inside a valid schema. */
 export const UNSAFE_SENTINEL = '___UNSAFE___';
+
+/**
+ * Word floor a generated story must reach for its duration (80% of the
+ * pages×wordsPerPage budget). Quoted in the prompt as the hard minimum and
+ * enforced by the providers with an expand-repair round — models (GPT-4o in
+ * particular) otherwise undershoot "yaklaşık N kelime" by 3-4x.
+ */
+export function minTotalWords(duration: StoryDuration): number {
+  const target = DURATION_TARGETS[duration];
+  return Math.round(target.pages * target.wordsPerPage * 0.8);
+}
+
+export function countStoryWords(pages: ReadonlyArray<{ text: string }>): number {
+  return pages.reduce((sum, page) => sum + page.text.split(/\s+/).filter(Boolean).length, 0);
+}
