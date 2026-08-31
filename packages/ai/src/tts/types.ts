@@ -11,6 +11,11 @@ export interface TextToSpeechProvider {
    */
   generateSpeech(input: {
     text: string;
+    /**
+     * Same text annotated with expressive audio tags (e.g. ElevenLabs v3
+     * "[whispers]"). Providers that support tags prefer it; others ignore it.
+     */
+    expressiveText?: string;
     providerVoiceId: string;
     language: 'tr' | 'en';
   }): Promise<SpeechResult>;

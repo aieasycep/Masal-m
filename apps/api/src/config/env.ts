@@ -35,7 +35,7 @@ const envSchema = z
     MODERATION_MODEL: z.string().default('claude-opus-5'),
     TTS_PROVIDER: providerEnum(['mock', 'elevenlabs']).default('mock'),
     TTS_API_KEY: z.string().default(''),
-    TTS_MODEL: z.string().default('eleven_multilingual_v2'),
+    TTS_MODEL: z.string().default('eleven_v3'),
     VOICE_CLONE_PROVIDER: providerEnum(['mock', 'elevenlabs']).default('mock'),
     VOICE_CLONE_API_KEY: z.string().default(''),
     IMAGE_PROVIDER: providerEnum(['mock', 'openai']).default('mock'),

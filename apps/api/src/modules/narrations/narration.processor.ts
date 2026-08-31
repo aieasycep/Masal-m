@@ -8,7 +8,7 @@ import {
 import { UnrecoverableError, Worker, type Job } from 'bullmq';
 import Redis from 'ioredis';
 import { ErrorCode, NarrationStatus, NotificationType } from '@masalim/types';
-import type { TextToSpeechProvider } from '@masalim/ai';
+import type { NarrationDirector, TextToSpeechProvider } from '@masalim/ai';
 import type { StorageProvider } from '@masalim/storage';
 import { StorageKeys } from '@masalim/storage';
 import { PushRoutes } from '@masalim/notifications';
@@ -17,7 +17,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { REDIS } from '../../redis/redis.module';
 import { ENV } from '../../config/config.module';
 import type { Env } from '../../config/env';
-import { STORAGE, TTS } from '../../providers/providers.module';
+import { NARRATION_DIRECTOR, STORAGE, TTS } from '../../providers/providers.module';
 import { JobsService } from '../../jobs/jobs.service';
 import { QueueName, type QueueJobData } from '../../jobs/queues';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -38,6 +38,7 @@ export class NarrationProcessor implements OnModuleInit, OnApplicationShutdown {
     private readonly jobs: JobsService,
     private readonly notifications: NotificationsService,
     @Inject(TTS) private readonly tts: TextToSpeechProvider,
+    @Inject(NARRATION_DIRECTOR) private readonly director: NarrationDirector | null,
     @Inject(STORAGE) private readonly storage: StorageProvider,
     @Inject(REDIS) private readonly redis: Redis,
     @Inject(ENV) private readonly env: Env,
@@ -95,10 +96,24 @@ export class NarrationProcessor implements OnModuleInit, OnApplicationShutdown {
         return;
       }
 
+      // v3 models act on inline audio tags; the director inserts them per chunk
+      // (validated to never alter the story words, degrades to plain text).
+      const director =
+        this.env.TTS_PROVIDER === 'elevenlabs' && this.env.TTS_MODEL.startsWith('eleven_v3')
+          ? this.director
+          : null;
+
       const rendered: Array<{ audio: Buffer; contentType: string }> = [];
       for (const [index, chunk] of chunks.entries()) {
+        const expressiveText =
+          director == null ? undefined : await director.annotate(chunk.text, language);
         rendered.push(
-          await this.tts.generateSpeech({ text: chunk.text, providerVoiceId, language }),
+          await this.tts.generateSpeech({
+            text: chunk.text,
+            expressiveText: expressiveText !== chunk.text ? expressiveText : undefined,
+            providerVoiceId,
+            language,
+          }),
         );
         // 5→80% spread over chunks — every tick is a really synthesized chunk.
         await this.jobs.setProgress(aiJob.id, 5 + Math.round(((index + 1) / chunks.length) * 75));
