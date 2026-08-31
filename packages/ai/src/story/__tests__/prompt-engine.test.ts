@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { AgeRange, DURATION_TARGETS, HeroType, StoryDuration, StoryTheme } from '@masalim/types';
-import { buildSystemPrompt, buildUserPrompt, UNSAFE_SENTINEL } from '../prompt-engine';
+import {
+  buildSystemPrompt,
+  buildUserPrompt,
+  countStoryWords,
+  minTotalWords,
+  UNSAFE_SENTINEL,
+} from '../prompt-engine';
 import type { StoryGenerationInput } from '../types';
 
 const baseInput: StoryGenerationInput = {
@@ -16,15 +22,26 @@ const baseInput: StoryGenerationInput = {
 };
 
 describe('prompt engine (§16)', () => {
-  it('user prompt carries the page/word budget; age changes system guidance', () => {
+  it('user prompt carries the hard page/word budget with a total minimum', () => {
     const user = buildUserPrompt(baseInput);
     const budget = DURATION_TARGETS[StoryDuration.MEDIUM];
-    expect(user).toContain(String(budget.pages));
-    expect(user).toContain(String(budget.wordsPerPage));
+    expect(user).toContain(`tam ${budget.pages} sayfa`);
+    expect(user).toContain(`${budget.wordsPerPage - 15}–${budget.wordsPerPage + 15} kelime`);
+    expect(user).toContain(`EN AZ ${minTotalWords(StoryDuration.MEDIUM)} kelime`);
     // Different age ranges must change the guidance text (lives in the user prompt).
     const toddler = buildUserPrompt({ ...baseInput, ageRange: AgeRange.AGE_0_2 });
     const preteen = buildUserPrompt({ ...baseInput, ageRange: AgeRange.AGE_9_12 });
     expect(toddler).not.toEqual(preteen);
+  });
+
+  it('word helpers: floor is 80% of the budget; counting ignores extra whitespace', () => {
+    const budget = DURATION_TARGETS[StoryDuration.SHORT];
+    expect(minTotalWords(StoryDuration.SHORT)).toBe(
+      Math.round(budget.pages * budget.wordsPerPage * 0.8),
+    );
+    expect(countStoryWords([{ text: 'Bir  varmış\nbir yokmuş.' }, { text: ' Ege uyudu. ' }])).toBe(
+      6,
+    );
   });
 
   it('system prompt instructs the unsafe sentinel for inappropriate requests', () => {

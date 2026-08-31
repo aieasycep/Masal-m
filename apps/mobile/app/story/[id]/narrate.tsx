@@ -35,6 +35,7 @@ import { api } from '../../../src/lib/api';
 import { useJobProgress } from '../../../src/lib/job-stream';
 import { stopPreview, usePreviewPlayer } from '../../../src/lib/preview-player';
 import { AudioPreviewButton } from '../../../src/components/AudioPreviewButton';
+import { KeepScreenAwake } from '../../../src/components/KeepScreenAwake';
 import { Avatar } from '../../../src/components/Avatar';
 import { Badge } from '../../../src/components/Badge';
 import { Button } from '../../../src/components/Button';
@@ -443,10 +444,7 @@ export default function NarrateStory() {
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
-  const { id, voiceId: preselectVoiceId } = useLocalSearchParams<{
-    id: string;
-    voiceId?: string;
-  }>();
+  const { id } = useLocalSearchParams<{ id: string }>();
   const preview = usePreviewPlayer();
 
   const [selected, setSelected] = useState<VoiceSelection | null>(null);
@@ -492,25 +490,6 @@ export default function NarrateStory() {
   const story = storyQuery.data ?? null;
 
   const job = useJobProgress(activeJob?.jobId);
-
-  // Preselect the narrator chosen in the wizard (route param) once the system
-  // voices load — only when the user hasn't tapped a voice yet and the choice
-  // is actually selectable under the current entitlements.
-  useEffect(() => {
-    if (
-      selected != null ||
-      preselectVoiceId == null ||
-      preselectVoiceId.length === 0 ||
-      systemVoicesQuery.data == null ||
-      entitlementsQuery.data == null
-    ) {
-      return;
-    }
-    const match = systemVoicesQuery.data.find((voice) => voice.id === preselectVoiceId);
-    if (match != null && (!match.premiumOnly || canUsePremiumVoices)) {
-      setSelected({ type: 'system', id: match.id });
-    }
-  }, [selected, preselectVoiceId, systemVoicesQuery.data, entitlementsQuery.data, canUsePremiumVoices]);
 
   // Resolve the CTA-created job: success → done view (explicit CTA into the
   // player replaces the old auto-redirect); failure → inline error.
@@ -681,6 +660,7 @@ export default function NarrateStory() {
     const percent = Math.round(Math.min(Math.max(job.progress, 0), 100));
     return (
       <View style={styles.nightRoot}>
+        <KeepScreenAwake />
         <StatusBar style="light" />
         <LinearGradient
           colors={gradients.nightSky as unknown as [string, string, ...string[]]}

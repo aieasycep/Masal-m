@@ -1,6 +1,12 @@
 import OpenAI from 'openai';
 import { generatedStorySchema } from '@masalim/validation';
-import { buildSystemPrompt, buildUserPrompt, UNSAFE_SENTINEL } from './prompt-engine';
+import {
+  buildSystemPrompt,
+  buildUserPrompt,
+  countStoryWords,
+  minTotalWords,
+  UNSAFE_SENTINEL,
+} from './prompt-engine';
 import {
   StoryGenerationError,
   type StoryGenerationInput,
@@ -63,6 +69,19 @@ export class OpenAIStoryProvider implements StoryGenerationProvider {
       if (result.success) {
         if (result.data.title.includes(UNSAFE_SENTINEL)) {
           throw new StoryGenerationError('Model flagged the request as unsafe', 'REFUSED');
+        }
+        // Length repair: models undershoot the word budget; ask once (or until
+        // attempts run out) to expand the SAME story. A still-short final
+        // attempt is delivered rather than failed.
+        const words = countStoryWords(result.data.pages);
+        const minWords = minTotalWords(input.durationTarget);
+        if (words < minWords && attempt < MAX_REPAIR_ATTEMPTS) {
+          messages.push({ role: 'assistant', content: raw });
+          messages.push({
+            role: 'user',
+            content: `Hikâye çok kısa: toplam ${words} kelime, alt sınır ${minWords} kelime. Aynı hikâyeyi (aynı başlık, olay örgüsü ve sayfa sayısıyla) her sayfayı zenginleştirip genişleterek yeniden üret; kelime bütçesine bu kez tam uy.`,
+          });
+          continue;
         }
         return {
           story: result.data,
