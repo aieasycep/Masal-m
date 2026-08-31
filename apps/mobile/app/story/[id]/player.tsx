@@ -32,7 +32,7 @@ import TrackPlayer, { Event, useIsPlaying, useTrackPlayerEvents } from 'react-na
 import type { ReactNode } from 'react';
 import { NarrationStatus } from '@masalim/types';
 import { ApiError } from '@masalim/api-client';
-import type { Narration, NarrationTiming, StoryDetail } from '@masalim/validation';
+import type { Narration, StoryDetail } from '@masalim/validation';
 import {
   colors,
   fontFamilies,
@@ -45,6 +45,7 @@ import {
   spacing,
 } from '@masalim/ui';
 import { api } from '../../../src/lib/api';
+import { activePageNumber } from '../../../src/lib/narration-sync';
 import { useAppPrefs } from '../../../src/stores/app-prefs';
 import {
   jumpBack,
@@ -90,24 +91,6 @@ function formatTime(totalSeconds: number): string {
   return `${minutes}:${String(seconds).padStart(2, '0')}`;
 }
 
-/** Latest timing window at `position` → its pageNumber (containment first). */
-function activePageNumber(timings: readonly NarrationTiming[], position: number): number | null {
-  const containing = timings.find(
-    (timing) =>
-      position >= timing.startSeconds && position < timing.startSeconds + timing.durationSeconds,
-  );
-  if (containing != null) return containing.pageNumber;
-  let latest: NarrationTiming | null = null;
-  for (const timing of timings) {
-    if (
-      timing.startSeconds <= position &&
-      (latest == null || timing.startSeconds > latest.startSeconds)
-    ) {
-      latest = timing;
-    }
-  }
-  return latest?.pageNumber ?? null;
-}
 
 interface AmbientGlowProps {
   id: string;

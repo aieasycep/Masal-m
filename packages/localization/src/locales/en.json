@@ -224,8 +224,6 @@
     "calmEnding": "Calm bedtime ending",
     "humorLevel": "Humor level",
     "fantasyLevel": "Fantasy level",
-    "step5Title": "Who should tell the tale?",
-    "step5Subtitle": "The voice you pick will narrate the story you made for {{childName}}.",
     "personalBadge": "Personal",
     "createMomVoice": "Create mom's voice",
     "createDadVoice": "Create dad's voice",
@@ -235,7 +233,6 @@
     "generateCta": "Create My Tale ✨",
     "generateEta": "It may take about 20–40 seconds.",
     "summaryFallbackTheme": "Tale",
-    "summaryFallbackVoice": "Voice",
     "validationHeroName": "Please enter the hero's name.",
     "validationTheme": "Please pick at least one theme.",
     "anotherChildSub": "Enter a name just for this story",
@@ -245,7 +242,6 @@
     "step2SubtitleGeneral": "Create an imaginary hero.",
     "customHeroGeneralTitle": "Create an imaginary hero",
     "customHeroGeneralSub": "You pick the name and type",
-    "step5SubtitleGeneral": "Choose the voice that will narrate the story.",
     "ageFromProfile": "Age comes from the profile · ages {{range}}"
   },
   "generating": {
@@ -298,7 +294,8 @@
     "theEnd": "The End 🌙",
     "pageLabel": "Page {{current}} / {{total}}",
     "previous": "Previous",
-    "next": "Next"
+    "next": "Next",
+    "autoFollow": "Auto-follow"
   },
   "library": {
     "title": "My Stories",

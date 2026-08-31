@@ -224,8 +224,6 @@
     "calmEnding": "Uyku öncesi sakin son",
     "humorLevel": "Mizah seviyesi",
     "fantasyLevel": "Fantastik öğe seviyesi",
-    "step5Title": "Masalı kim anlatsın?",
-    "step5Subtitle": "Seçtiğin ses {{childName}} için hazırladığın hikâyeyi anlatacak.",
     "personalBadge": "Kişisel",
     "createMomVoice": "Anne sesini oluştur",
     "createDadVoice": "Baba sesini oluştur",
@@ -235,7 +233,6 @@
     "generateCta": "Masalımı Oluştur ✨",
     "generateEta": "Yaklaşık 20–40 saniye sürebilir.",
     "summaryFallbackTheme": "Masal",
-    "summaryFallbackVoice": "Ses",
     "validationHeroName": "Kahramanın adını yazmalısın.",
     "validationTheme": "En az bir tema seçmelisin.",
     "anotherChildSub": "Sadece bu hikâye için isim gir",
@@ -245,7 +242,6 @@
     "step2SubtitleGeneral": "Hayalî bir kahraman oluştur.",
     "customHeroGeneralTitle": "Hayalî bir kahraman oluştur",
     "customHeroGeneralSub": "İsim ve türü sen belirle",
-    "step5SubtitleGeneral": "Hikâyeyi anlatacak sesi seç.",
     "ageFromProfile": "Yaş bilgisi profilden alınıyor · {{range}} yaş"
   },
   "generating": {
@@ -298,7 +294,8 @@
     "theEnd": "Son 🌙",
     "pageLabel": "Sayfa {{current}} / {{total}}",
     "previous": "Önceki",
-    "next": "Sonraki"
+    "next": "Sonraki",
+    "autoFollow": "Otomatik takip"
   },
   "library": {
     "title": "Hikâyelerim",

@@ -44,6 +44,7 @@ import { AudioPreviewButton } from '../../src/components/AudioPreviewButton';
 import { Avatar } from '../../src/components/Avatar';
 import { Badge } from '../../src/components/Badge';
 import { Button } from '../../src/components/Button';
+import { KeepScreenAwake } from '../../src/components/KeepScreenAwake';
 import { ScreenHeader } from '../../src/components/ScreenHeader';
 import { SelectableCard } from '../../src/components/SelectableCard';
 import { Starfield } from '../../src/components/Starfield';
@@ -1025,6 +1026,7 @@ export default function VoiceCreate() {
 
   return (
     <View style={[isNight ? styles.nightRoot : styles.creamRoot]}>
+      {step === 'recording' || step === 'processing' ? <KeepScreenAwake /> : null}
       {isNight ? (
         <>
           <LinearGradient

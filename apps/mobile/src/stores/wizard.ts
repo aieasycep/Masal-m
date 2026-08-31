@@ -30,11 +30,6 @@ interface WizardDraft {
   customPrompt: string;
   ageRange: AgeRange;
   durationTarget: StoryDuration;
-  /**
-   * Narrator choice (system voice id). Carried through generating → result →
-   * narrate as the preselected narrator once the story is ready.
-   */
-  voiceId: string | null;
   /** One-time prefill (selected child from app prefs + route theme) applied. */
   initialized: boolean;
 }
@@ -60,7 +55,6 @@ interface WizardState extends WizardDraft {
   setCustomPrompt: (customPrompt: string) => void;
   setAgeRange: (ageRange: AgeRange) => void;
   setDurationTarget: (durationTarget: StoryDuration) => void;
-  setVoiceId: (voiceId: string | null) => void;
   reset: () => void;
 }
 
@@ -75,7 +69,6 @@ const initialDraft: WizardDraft = {
   customPrompt: '',
   ageRange: AgeRange.AGE_3_5,
   durationTarget: StoryDuration.MEDIUM,
-  voiceId: null,
   initialized: false,
 };
 
@@ -162,6 +155,5 @@ export const useWizardStore = create<WizardState>()((set) => ({
   setCustomPrompt: (customPrompt) => set({ customPrompt }),
   setAgeRange: (ageRange) => set({ ageRange }),
   setDurationTarget: (durationTarget) => set({ durationTarget }),
-  setVoiceId: (voiceId) => set({ voiceId }),
   reset: () => set(initialDraft),
 }));

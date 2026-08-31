@@ -100,7 +100,7 @@ export default function StoryResult() {
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
-  const { id, voiceId } = useLocalSearchParams<{ id: string; voiceId?: string }>();
+  const { id } = useLocalSearchParams<{ id: string }>();
   const coverFloatStyle = useFloatStyle(4000);
   const [bookLoading, setBookLoading] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -209,11 +209,7 @@ export default function StoryResult() {
 
   const openReader = () => router.push(`/story/${story.id}/reader` as never);
   const openPlayer = () => router.push(`/story/${story.id}/player` as never);
-  const openNarrate = () => {
-    // A narrator picked in the wizard preselects itself on the narrate screen.
-    const voiceParam = voiceId != null && voiceId.length > 0 ? `?voiceId=${voiceId}` : '';
-    router.push(`/story/${story.id}/narrate${voiceParam}` as never);
-  };
+  const openNarrate = () => router.push(`/story/${story.id}/narrate` as never);
   const openEdit = () => router.push(`/story/${story.id}/edit` as never);
   const openIllustrate = () => router.push(`/story/${story.id}/illustrate` as never);
   /**

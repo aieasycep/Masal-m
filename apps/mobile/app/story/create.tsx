@@ -22,18 +22,14 @@ import {
   HeroType,
   StoryDuration,
   StoryTheme,
-  type SystemVoiceCategory,
 } from '@masalim/types';
 import type { CreateStoryInput } from '@masalim/validation';
 import { ApiError, NetworkError } from '@masalim/api-client';
 import { colors, fontFamilies, fontSizes, letterSpacing, radius, spacing } from '@masalim/ui';
 import { api } from '../../src/lib/api';
-import { usePreviewPlayer } from '../../src/lib/preview-player';
 import { useAppPrefs } from '../../src/stores/app-prefs';
 import { useWizardStore } from '../../src/stores/wizard';
-import { AudioPreviewButton } from '../../src/components/AudioPreviewButton';
 import { Avatar } from '../../src/components/Avatar';
-import { Badge } from '../../src/components/Badge';
 import { Button } from '../../src/components/Button';
 import { childAvatarEmoji } from '../../src/components/ChildSwitcherSheet';
 import { Chip } from '../../src/components/Chip';
@@ -42,7 +38,7 @@ import { ScreenHeader } from '../../src/components/ScreenHeader';
 import { SelectableCard } from '../../src/components/SelectableCard';
 import { ErrorState } from '../../src/components/states';
 
-const TOTAL_STEPS = 5;
+const TOTAL_STEPS = 4;
 
 const THEME_EMOJIS: Record<StoryTheme, string> = {
   ADVENTURE: '⚔️',
@@ -95,14 +91,6 @@ const DURATIONS: ReadonlyArray<{ duration: StoryDuration; emoji: string }> = [
   { duration: StoryDuration.LONG, emoji: '🌙' },
 ];
 
-/** System voices carry no emoji in the API — derive one from the category. */
-const VOICE_CATEGORY_EMOJIS: Record<SystemVoiceCategory, string> = {
-  CALM: '🌙',
-  CHEERFUL: '⭐',
-  FAIRYTALE: '🧚',
-  ENERGETIC: '⚡',
-};
-
 function isStoryTheme(value: unknown): value is StoryTheme {
   return (
     typeof value === 'string' &&
@@ -110,12 +98,12 @@ function isStoryTheme(value: unknown): value is StoryTheme {
   );
 }
 
-/** 5-step story creation wizard (§ StoryCreation design reference). */
+/** 4-step story creation wizard (§ StoryCreation design reference; the narrator
+ * is chosen on the story screen's Seslendir flow, not here). */
 export default function CreateStory() {
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
-  const preview = usePreviewPlayer();
   const scrollRef = useRef<ScrollView>(null);
   const { theme: themeParam } = useLocalSearchParams<{ theme?: string }>();
   const selectedChildId = useAppPrefs((state) => state.selectedChildId);
@@ -131,7 +119,6 @@ export default function CreateStory() {
   const customPrompt = useWizardStore((state) => state.customPrompt);
   const ageRange = useWizardStore((state) => state.ageRange);
   const durationTarget = useWizardStore((state) => state.durationTarget);
-  const voiceId = useWizardStore((state) => state.voiceId);
 
   const setStep = useWizardStore((state) => state.setStep);
   const selectChild = useWizardStore((state) => state.selectChild);
@@ -147,22 +134,15 @@ export default function CreateStory() {
   const setCustomPrompt = useWizardStore((state) => state.setCustomPrompt);
   const setAgeRange = useWizardStore((state) => state.setAgeRange);
   const setDurationTarget = useWizardStore((state) => state.setDurationTarget);
-  const setVoiceId = useWizardStore((state) => state.setVoiceId);
 
   const [heroNameError, setHeroNameError] = useState<string | null>(null);
   const [childError, setChildError] = useState<string | null>(null);
   const [moderationError, setModerationError] = useState<string | null>(null);
   const [quotaError, setQuotaError] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
-  const [premiumHintVoiceId, setPremiumHintVoiceId] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   const childrenQuery = useQuery({ queryKey: ['children'], queryFn: () => api.children.list() });
-  const voicesQuery = useQuery({ queryKey: ['systemVoices'], queryFn: () => api.voices.system() });
-  const entitlementsQuery = useQuery({
-    queryKey: ['entitlements'],
-    queryFn: () => api.subscription.entitlements(),
-  });
   const recommendationsQuery = useQuery({
     queryKey: ['recommendations', childId],
     queryFn: () =>
@@ -171,10 +151,7 @@ export default function CreateStory() {
   });
 
   const childList = childrenQuery.data;
-  const voices = voicesQuery.data;
   const recommendations = recommendationsQuery.data ?? [];
-  const canUsePremiumVoices =
-    entitlementsQuery.data?.features.premium_system_voices === true;
 
   // One-time prefill: selected child from app prefs (fallback: first child) + route theme.
   useEffect(() => {
@@ -188,17 +165,6 @@ export default function CreateStory() {
       theme: routeTheme,
     });
   }, [initialized, childList, selectedChildId, themeParam]);
-
-  // Default narrator: first voice the user is entitled to.
-  useEffect(() => {
-    if (voiceId != null || voices == null) {
-      return;
-    }
-    const firstSelectable = voices.find((voice) => !voice.premiumOnly || canUsePremiumVoices);
-    if (firstSelectable != null) {
-      useWizardStore.getState().setVoiceId(firstSelectable.id);
-    }
-  }, [voiceId, voices, canUsePremiumVoices]);
 
   // Each step starts at the top.
   useEffect(() => {
@@ -268,9 +234,7 @@ export default function CreateStory() {
       const story = await api.stories.create(input);
       const { jobId } = await api.stories.generate(story.id);
       await queryClient.invalidateQueries({ queryKey: ['stories'] });
-      // Step-5 narrator rides along so the narration screen preselects it.
-      const voiceParam = voiceId != null ? `&voiceId=${voiceId}` : '';
-      router.replace(`/story/generating/${jobId}?storyId=${story.id}${voiceParam}` as never);
+      router.replace(`/story/generating/${jobId}?storyId=${story.id}` as never);
       useWizardStore.getState().reset();
     } catch (err) {
       if (err instanceof ApiError) {
@@ -627,88 +591,6 @@ export default function CreateStory() {
     </>
   );
 
-  const renderStep5 = () => (
-    <>
-      <Text style={styles.stepTitle} accessibilityRole="header">
-        {t('wizard.step5Title')}
-      </Text>
-      <Text style={styles.stepSubtitle}>
-        {heroChildName != null
-          ? t('wizard.step5Subtitle', { childName: heroChildName })
-          : t('wizard.step5SubtitleGeneral')}
-      </Text>
-      {voicesQuery.isError ? (
-        <ErrorState
-          emoji="🌧️"
-          title={t('errors.GENERIC')}
-          ctaLabel={t('common.retry')}
-          onCta={() => void voicesQuery.refetch()}
-        />
-      ) : voices == null ? (
-        <ActivityIndicator
-          color={colors.primary}
-          style={styles.loader}
-          accessibilityLabel={t('common.loading')}
-        />
-      ) : (
-        <View style={styles.cardList}>
-          {voices.map((voice) => {
-            const gated = voice.premiumOnly && !canUsePremiumVoices;
-            return (
-              <View key={voice.id}>
-                <SelectableCard
-                  glow
-                  selected={voiceId === voice.id}
-                  onPress={() => {
-                    if (gated) {
-                      setPremiumHintVoiceId(voice.id);
-                      return;
-                    }
-                    setPremiumHintVoiceId(null);
-                    setVoiceId(voice.id);
-                  }}
-                  accessibilityLabel={voice.displayName}
-                >
-                  <Avatar
-                    emoji={VOICE_CATEGORY_EMOJIS[voice.category]}
-                    size={44}
-                    kind="systemVoice"
-                  />
-                  <View style={styles.cardTextBlock}>
-                    <View style={styles.voiceNameRow}>
-                      <Text style={styles.voiceName}>{voice.displayName}</Text>
-                      {voice.premiumOnly ? (
-                        <Badge label={t('wizard.premiumBadge')} variant="premium" uppercase />
-                      ) : null}
-                    </View>
-                    <Text style={styles.voiceDescription}>{voice.description}</Text>
-                  </View>
-                  <AudioPreviewButton
-                    size="sm"
-                    status={preview.statusFor(voice.id)}
-                    onPress={() =>
-                      preview.toggle(voice.id, () =>
-                        voice.previewUrl != null
-                          ? Promise.resolve(voice.previewUrl)
-                          : api.voices.systemPreview(voice.id).then((r) => r.previewUrl),
-                      )
-                    }
-                  />
-                </SelectableCard>
-                {gated && premiumHintVoiceId === voice.id ? (
-                  <Animated.Text entering={FadeInUp.duration(250)} style={styles.premiumHint}>
-                    {t('errors.ENTITLEMENT_REQUIRED')}
-                  </Animated.Text>
-                ) : null}
-              </View>
-            );
-          })}
-        </View>
-      )}
-    </>
-  );
-
-  const selectedVoice = voices?.find((voice) => voice.id === voiceId) ?? null;
   const summaryThemes =
     themes
       .slice(0, 2)
@@ -721,7 +603,6 @@ export default function CreateStory() {
       icon: '⏱',
       label: t('common.minutesShort', { count: DURATION_TARGETS[durationTarget].minutes }),
     },
-    { icon: '🎙', label: selectedVoice?.displayName ?? t('wizard.summaryFallbackVoice') },
   ];
 
   return (
@@ -758,7 +639,6 @@ export default function CreateStory() {
           {step === 2 ? renderStep2() : null}
           {step === 3 ? renderStep3() : null}
           {step === 4 ? renderStep4() : null}
-          {step === 5 ? renderStep5() : null}
         </Animated.View>
       </ScrollView>
 

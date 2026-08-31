@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -41,8 +41,11 @@ import {
 import { Button } from '../../../src/components/Button';
 import { Starfield } from '../../../src/components/Starfield';
 import { storyThemeEmoji } from '../../../src/components/StorySheet';
+import { useActiveTrack, useIsPlaying } from 'react-native-track-player';
 import { ChevronLeftIcon, ChevronRightIcon } from '../../../src/components/icons';
 import { api } from '../../../src/lib/api';
+import { activePageNumber } from '../../../src/lib/narration-sync';
+import { usePlayerProgress } from '../../../src/lib/player';
 
 type ReaderSlide = { key: string; kind: 'page'; page: StoryPage } | { key: 'end'; kind: 'end' };
 
@@ -175,6 +178,43 @@ export default function Reader() {
   });
   const story = storyQuery.data;
 
+  // ── Auto-follow ("sesli slayt"): while a narration of THIS story is playing,
+  // pages turn with the audio via the narration timings. A manual page change
+  // hands control back to the reader; the chip re-engages it.
+  const narrationsQuery = useQuery({
+    queryKey: ['narrations', id],
+    queryFn: () => api.narrations.list(id),
+    enabled: id != null && id.length > 0,
+  });
+  const [follow, setFollow] = useState(true);
+  const programmaticScroll = useRef(false);
+  const activeTrack = useActiveTrack();
+  const { playing } = useIsPlaying();
+  const { position } = usePlayerProgress(500);
+  const playingNarration = useMemo(() => {
+    const trackId = activeTrack?.id;
+    if (trackId == null) return null;
+    return (
+      (narrationsQuery.data ?? []).find(
+        (item) => item.id === trackId && item.timings != null && item.timings.length > 0,
+      ) ?? null
+    );
+  }, [activeTrack?.id, narrationsQuery.data]);
+  const syncing = playing === true && playingNarration != null;
+
+  useEffect(() => {
+    if (!follow || !syncing || story == null) return;
+    const timings = playingNarration.timings ?? [];
+    const pageNumber = activePageNumber(timings, position);
+    if (pageNumber == null) return;
+    const sorted = [...story.pages].sort((a, b) => a.pageNumber - b.pageNumber);
+    const index = sorted.findIndex((page) => page.pageNumber === pageNumber);
+    if (index < 0 || index === slideIndex) return;
+    programmaticScroll.current = true;
+    listRef.current?.scrollToIndex({ index, animated: true });
+    setSlideIndex(index);
+  }, [follow, syncing, playingNarration, position, story, slideIndex]);
+
   const paddingTop = Math.max(insets.top, 20) + 8;
 
   if (storyQuery.isLoading) {
@@ -243,12 +283,20 @@ export default function Reader() {
 
   const goToSlide = (index: number) => {
     const clamped = Math.min(Math.max(index, 0), slides.length - 1);
+    if (syncing) setFollow(false);
+    programmaticScroll.current = true;
     listRef.current?.scrollToIndex({ index: clamped, animated: true });
     setSlideIndex(clamped);
   };
 
   const onMomentumScrollEnd = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
     const index = Math.round(event.nativeEvent.contentOffset.x / width);
+    if (programmaticScroll.current) {
+      programmaticScroll.current = false;
+    } else if (syncing) {
+      // A hand swipe while the audio drives the pages = the reader takes over.
+      setFollow(false);
+    }
     setSlideIndex(Math.min(Math.max(index, 0), slides.length - 1));
   };
 
@@ -378,6 +426,21 @@ export default function Reader() {
           />
         ))}
       </View>
+      {syncing || (playingNarration != null && !follow) ? (
+        <View style={styles.followRow}>
+          <Pressable
+            onPress={() => setFollow((value) => !value)}
+            accessibilityRole="button"
+            accessibilityState={{ selected: follow }}
+            accessibilityLabel={t('reader.autoFollow')}
+            style={[styles.followChip, follow && styles.followChipOn]}
+          >
+            <Text style={[styles.followChipText, follow && styles.followChipTextOn]}>
+              {`${follow ? '🎵' : '✋'} ${t('reader.autoFollow')}`}
+            </Text>
+          </Pressable>
+        </View>
+      ) : null}
       <FlatList
         ref={listRef}
         data={slides}
@@ -447,6 +510,26 @@ const styles = StyleSheet.create({
     gap: spacing.xs,
     paddingTop: spacing.md,
   },
+  followRow: { alignItems: 'center', paddingTop: spacing.sm },
+  followChip: {
+    minHeight: 44,
+    justifyContent: 'center',
+    paddingHorizontal: spacing.md,
+    borderRadius: radius.round,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.25)',
+    backgroundColor: 'rgba(255,255,255,0.08)',
+  },
+  followChipOn: {
+    borderColor: 'rgba(176,156,224,0.7)',
+    backgroundColor: 'rgba(176,156,224,0.22)',
+  },
+  followChipText: {
+    fontFamily: fontFamilies.bodySemiBold,
+    fontSize: fontSizes.sm,
+    color: 'rgba(255,255,255,0.7)',
+  },
+  followChipTextOn: { color: '#FFFFFF' },
   dot: {
     width: 8,
     height: 8,

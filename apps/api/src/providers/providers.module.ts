@@ -11,6 +11,8 @@ import {
   MockStoryProvider,
   MockTtsProvider,
   MockVoiceCloneProvider,
+  NarrationDirector,
+  OpenAIContentModerator,
   OpenAIImageProvider,
   OpenAIStoryProvider,
   ContentModerator,
@@ -35,10 +37,24 @@ export const PUSH = Symbol('PUSH');
 export const STORY_AI = Symbol('STORY_AI');
 export const MODERATOR = Symbol('MODERATOR');
 export const TTS = Symbol('TTS');
+export const NARRATION_DIRECTOR = Symbol('NARRATION_DIRECTOR');
 export const VOICE_CLONE = Symbol('VOICE_CLONE');
 export const IMAGE_AI = Symbol('IMAGE_AI');
 export const PAYMENT = Symbol('PAYMENT');
 export const PRINT = Symbol('PRINT');
+
+// AI_MODEL/MODERATION_MODEL default to Claude-named models, so a provider switch
+// with a stale model value would send e.g. "claude-opus-5" to OpenAI and fail every
+// request. Cross-vendor values fall back to the vendor's default instead.
+const modelForVendor = (
+  model: string,
+  vendor: 'anthropic' | 'openai',
+  fallback: string,
+): string => {
+  const isClaude = model.startsWith('claude');
+  const matchesVendor = vendor === 'anthropic' ? isClaude : !isClaude;
+  return matchesVendor ? model : fallback;
+};
 
 /**
  * Provider DI wiring — every external service is selected from env config here
@@ -79,9 +95,15 @@ export const PRINT = Symbol('PRINT');
       useFactory: (env: Env): StoryGenerationProvider => {
         switch (env.AI_PROVIDER) {
           case 'anthropic':
-            return new AnthropicStoryProvider({ apiKey: env.AI_API_KEY, model: env.AI_MODEL });
+            return new AnthropicStoryProvider({
+              apiKey: env.AI_API_KEY,
+              model: modelForVendor(env.AI_MODEL, 'anthropic', 'claude-opus-5'),
+            });
           case 'openai':
-            return new OpenAIStoryProvider({ apiKey: env.AI_API_KEY, model: env.AI_MODEL });
+            return new OpenAIStoryProvider({
+              apiKey: env.AI_API_KEY,
+              model: modelForVendor(env.AI_MODEL, 'openai', 'gpt-4o'),
+            });
           case 'mock':
             return new MockStoryProvider();
         }
@@ -90,10 +112,22 @@ export const PRINT = Symbol('PRINT');
     {
       provide: MODERATOR,
       inject: [ENV],
-      useFactory: (env: Env): ContentModerator =>
-        env.MODERATION_PROVIDER === 'llm'
-          ? new LlmContentModerator({ apiKey: env.AI_API_KEY, model: env.MODERATION_MODEL })
-          : new MockContentModerator(),
+      useFactory: (env: Env): ContentModerator => {
+        switch (env.MODERATION_PROVIDER) {
+          case 'llm':
+            return new LlmContentModerator({
+              apiKey: env.AI_API_KEY,
+              model: modelForVendor(env.MODERATION_MODEL, 'anthropic', 'claude-opus-5'),
+            });
+          case 'openai':
+            return new OpenAIContentModerator({
+              apiKey: env.AI_API_KEY,
+              model: modelForVendor(env.MODERATION_MODEL, 'openai', 'gpt-4o-mini'),
+            });
+          case 'mock':
+            return new MockContentModerator();
+        }
+      },
     },
     {
       provide: TTS,
@@ -102,6 +136,16 @@ export const PRINT = Symbol('PRINT');
         env.TTS_PROVIDER === 'elevenlabs'
           ? new ElevenLabsTtsProvider({ apiKey: env.TTS_API_KEY, modelId: env.TTS_MODEL })
           : new MockTtsProvider(),
+    },
+    {
+      // Annotates narration chunks with v3 audio tags before TTS. Null when no
+      // real story-LLM key is configured — narration then runs untagged.
+      provide: NARRATION_DIRECTOR,
+      inject: [ENV],
+      useFactory: (env: Env): NarrationDirector | null =>
+        env.AI_PROVIDER === 'mock' || env.AI_API_KEY === ''
+          ? null
+          : new NarrationDirector({ provider: env.AI_PROVIDER, apiKey: env.AI_API_KEY }),
     },
     {
       provide: VOICE_CLONE,
@@ -147,6 +191,7 @@ export const PRINT = Symbol('PRINT');
     STORY_AI,
     MODERATOR,
     TTS,
+    NARRATION_DIRECTOR,
     VOICE_CLONE,
     IMAGE_AI,
     PAYMENT,

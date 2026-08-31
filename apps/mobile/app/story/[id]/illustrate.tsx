@@ -42,6 +42,7 @@ import { ScreenHeader } from '../../../src/components/ScreenHeader';
 import { SelectableCard } from '../../../src/components/SelectableCard';
 import { storyThemeEmoji } from '../../../src/components/StorySheet';
 import { CheckIcon } from '../../../src/components/icons';
+import { KeepScreenAwake } from '../../../src/components/KeepScreenAwake';
 import { ErrorState } from '../../../src/components/states';
 
 /** Picker order mirrors the design's card order. */
@@ -679,6 +680,7 @@ export default function IllustrateStory() {
 
     return (
       <View style={styles.nightRoot}>
+        <KeepScreenAwake />
         <LinearGradient
           colors={gradients.nightSky as unknown as [string, string, ...string[]]}
           locations={[0, 0.5, 1]}
