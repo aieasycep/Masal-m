@@ -31,7 +31,7 @@ const envSchema = z
     AI_PROVIDER: providerEnum(['mock', 'anthropic', 'openai']).default('mock'),
     AI_API_KEY: z.string().default(''),
     AI_MODEL: z.string().default('claude-opus-5'),
-    MODERATION_PROVIDER: providerEnum(['mock', 'llm']).default('mock'),
+    MODERATION_PROVIDER: providerEnum(['mock', 'llm', 'openai']).default('mock'),
     MODERATION_MODEL: z.string().default('claude-opus-5'),
     TTS_PROVIDER: providerEnum(['mock', 'elevenlabs']).default('mock'),
     TTS_API_KEY: z.string().default(''),
