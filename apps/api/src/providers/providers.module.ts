@@ -11,6 +11,7 @@ import {
   MockStoryProvider,
   MockTtsProvider,
   MockVoiceCloneProvider,
+  NarrationDirector,
   OpenAIContentModerator,
   OpenAIImageProvider,
   OpenAIStoryProvider,
@@ -36,6 +37,7 @@ export const PUSH = Symbol('PUSH');
 export const STORY_AI = Symbol('STORY_AI');
 export const MODERATOR = Symbol('MODERATOR');
 export const TTS = Symbol('TTS');
+export const NARRATION_DIRECTOR = Symbol('NARRATION_DIRECTOR');
 export const VOICE_CLONE = Symbol('VOICE_CLONE');
 export const IMAGE_AI = Symbol('IMAGE_AI');
 export const PAYMENT = Symbol('PAYMENT');
@@ -136,6 +138,16 @@ const modelForVendor = (
           : new MockTtsProvider(),
     },
     {
+      // Annotates narration chunks with v3 audio tags before TTS. Null when no
+      // real story-LLM key is configured — narration then runs untagged.
+      provide: NARRATION_DIRECTOR,
+      inject: [ENV],
+      useFactory: (env: Env): NarrationDirector | null =>
+        env.AI_PROVIDER === 'mock' || env.AI_API_KEY === ''
+          ? null
+          : new NarrationDirector({ provider: env.AI_PROVIDER, apiKey: env.AI_API_KEY }),
+    },
+    {
       provide: VOICE_CLONE,
       inject: [ENV],
       useFactory: (env: Env): VoiceCloneProvider =>
@@ -179,6 +191,7 @@ const modelForVendor = (
     STORY_AI,
     MODERATOR,
     TTS,
+    NARRATION_DIRECTOR,
     VOICE_CLONE,
     IMAGE_AI,
     PAYMENT,

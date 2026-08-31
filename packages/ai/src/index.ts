@@ -16,6 +16,13 @@ export { hitsBlocklist } from './moderation/blocklist';
 export * from './tts/types';
 export { ElevenLabsTtsProvider } from './tts/elevenlabs-provider';
 export { MockTtsProvider } from './tts/mock-provider';
+export {
+  NarrationDirector,
+  applyDirectorOutput,
+  stripAudioTags,
+  tagsPreserveText,
+  type NarrationDirectorConfig,
+} from './tts/emotion-tagger';
 
 // Voice cloning
 export * from './voice-clone/types';
