@@ -272,7 +272,8 @@
     "pageLabel": "Page {{current}} / {{total}}",
     "previous": "Previous",
     "next": "Next",
-    "autoFollow": "Auto-follow"
+    "autoFollowOn": "Auto-follow on",
+    "autoFollowOff": "Auto-follow off"
   },
   "library": {
     "title": "My Stories",
