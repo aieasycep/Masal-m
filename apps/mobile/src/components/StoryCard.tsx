@@ -150,7 +150,7 @@ const styles = StyleSheet.create({
   },
   vMeta: {
     fontFamily: fontFamilies.body,
-    fontSize: fontSizes.xs,
+    fontSize: fontSizes.sm,
     color: colors.mutedForeground,
   },
   wCard: {

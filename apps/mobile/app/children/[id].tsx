@@ -16,11 +16,18 @@ import { ApiError } from '@masalim/api-client';
 import { withSuffix } from '@masalim/localization';
 import { colors, fontFamilies, fontSizes, letterSpacing, radius, spacing } from '@masalim/ui';
 import { api } from '../../src/lib/api';
-import { ageRangeFromYears, DEFAULT_AGE_YEARS, yearsFromAgeRange } from '../../src/lib/age';
+import {
+  ageFromYearMonth,
+  ageRangeFromYears,
+  birthDateFromYearMonth,
+  defaultBirthYearMonth,
+  fallbackBirthYearMonth,
+  yearMonthFromBirthDate,
+} from '../../src/lib/age';
 import { CANONICAL_INTERESTS, isCanonicalInterest } from '../../src/lib/interests';
 import { useAppPrefs } from '../../src/stores/app-prefs';
-import { AgeStepper } from '../../src/components/AgeStepper';
 import { AvatarEmojiPicker, DEFAULT_AVATAR_EMOJI } from '../../src/components/AvatarEmojiPicker';
+import { BirthMonthPicker } from '../../src/components/BirthMonthPicker';
 import { Button } from '../../src/components/Button';
 import { Chip } from '../../src/components/Chip';
 import { ConfirmSheet } from '../../src/components/ConfirmSheet';
@@ -30,9 +37,9 @@ import { ScreenHeader } from '../../src/components/ScreenHeader';
 import { ErrorState } from '../../src/components/states';
 
 /**
- * Child edit (design Child/02-EditProfile): avatar picker, name, exact-age
- * stepper (persisted as preferences.ageYears, bucketed to ageRange for the
- * API), interest chips keyed by raw canonical IDs, destructive delete.
+ * Child edit (design Child/02-EditProfile): avatar picker, name, birth
+ * month/year (stored as Child.birthDate; age derives from it, bucketed to
+ * ageRange), interest chips keyed by raw canonical IDs, destructive delete.
  */
 export default function ChildDetail() {
   const { t } = useTranslation();
@@ -44,7 +51,8 @@ export default function ChildDetail() {
 
   const [name, setName] = useState('');
   const [avatarEmoji, setAvatarEmoji] = useState<string>(DEFAULT_AVATAR_EMOJI);
-  const [ageYears, setAgeYears] = useState(DEFAULT_AGE_YEARS);
+  const [birth, setBirth] = useState(() => defaultBirthYearMonth());
+  const ageYears = ageFromYearMonth(birth);
   const [interests, setInterests] = useState<string[]>([]);
   const [customInterest, setCustomInterest] = useState('');
   const [showCustomInput, setShowCustomInput] = useState(false);
@@ -63,7 +71,10 @@ export default function ChildDetail() {
     if (child != null && prefilledFor !== child.id) {
       setName(child.name);
       setAvatarEmoji(child.preferences.avatarEmoji ?? DEFAULT_AVATAR_EMOJI);
-      setAgeYears(child.preferences.ageYears ?? yearsFromAgeRange(child.ageRange));
+      setBirth(
+        yearMonthFromBirthDate(child.birthDate) ??
+          fallbackBirthYearMonth(child.preferences.ageYears, child.ageRange),
+      );
       setInterests(child.interests);
       setPrefilledFor(child.id);
     }
@@ -123,9 +134,11 @@ export default function ChildDetail() {
     setServerError(null);
     const parsed = updateChildSchema.safeParse({
       name: name.trim(),
+      birthDate: birthDateFromYearMonth(birth),
       ageRange: ageRangeFromYears(ageYears),
       interests,
       // Preserve any other stored preference keys (nickname, notes, …).
+      // ageYears kept for back-compat with the stable app's age display.
       preferences: { ...child.preferences, avatarEmoji, ageYears },
     });
     if (!parsed.success || name.trim().length === 0) {
@@ -190,15 +203,12 @@ export default function ChildDetail() {
           </View>
 
           <Text style={styles.sectionLabel}>
-            {t('childSetup.ageLabel').toLocaleUpperCase('tr')}
+            {t('childSetup.birthMonthLabel').toLocaleUpperCase('tr')}
           </Text>
-          <AgeStepper
-            value={ageYears}
-            onChange={setAgeYears}
-            unitLabel={t('wizard.ageUnit')}
-            decrementLabel={t('childSetup.ageDecrease')}
-            incrementLabel={t('childSetup.ageIncrease')}
-          />
+          <BirthMonthPicker value={birth} onChange={setBirth} />
+          <Text style={styles.birthHelper}>
+            {`${t('childSetup.birthMonthHelperAge', { age: ageYears })} ${t('childSetup.birthMonthHelper')}`}
+          </Text>
 
           <Text style={styles.sectionLabel}>
             {t('childSetup.interestsTitle').toLocaleUpperCase('tr')}
@@ -271,7 +281,7 @@ export default function ChildDetail() {
       <ConfirmSheet
         visible={confirmDelete}
         title={t('childSetup.deleteConfirmTitle')}
-        body={t('childSetup.deleteConfirmBodyPermanent')}
+        body={t('childSetup.deleteConfirmBody', { name: child.name })}
         confirmLabel={t('childSetup.deleteChild')}
         cancelLabel={t('common.cancel')}
         destructive
@@ -290,6 +300,12 @@ const styles = StyleSheet.create({
   flex: { flex: 1 },
   loading: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   nameField: { marginTop: spacing.xl },
+  birthHelper: {
+    fontFamily: fontFamilies.body,
+    fontSize: fontSizes.md,
+    color: colors.mutedForeground,
+    marginTop: spacing.xs,
+  },
   sectionLabel: {
     fontFamily: fontFamilies.bodySemiBold,
     fontSize: fontSizes.md,

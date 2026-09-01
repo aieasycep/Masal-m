@@ -20,7 +20,21 @@
     "age": "age {{count}}",
     "storyCount": "{{count}} stories",
     "offlineBanner": "No internet connection. Some features may be unavailable.",
-    "offlineRetry": "We'll retry automatically once you're back online."
+    "offlineRetry": "We'll retry automatically once you're back online.",
+    "months": [
+      "January",
+      "February",
+      "March",
+      "April",
+      "May",
+      "June",
+      "July",
+      "August",
+      "September",
+      "October",
+      "November",
+      "December"
+    ]
   },
   "tabs": {
     "home": "Home",
@@ -53,6 +67,8 @@
     "emailPlaceholder": "you@example.com",
     "password": "Password",
     "passwordPlaceholder": "At least 8 characters",
+    "showPassword": "Show password",
+    "hidePassword": "Hide password",
     "name": "Your name",
     "namePlaceholder": "e.g. Ayşe",
     "signIn": "Sign In",
@@ -83,6 +99,9 @@
     "subtitle": "Tell us about your child so the tales fit them perfectly.",
     "nameLabel": "Child's name",
     "namePlaceholder": "e.g. Ege",
+    "birthMonthLabel": "Birth month and year",
+    "birthMonthHelperAge": "Currently {{age}} years old.",
+    "birthMonthHelper": "Used to keep their age up to date automatically.",
     "birthDateLabel": "Birth date or age",
     "ageRangeLabel": "Age group",
     "photoLabel": "Profile photo (optional)",
@@ -107,13 +126,9 @@
       "müzik": "Music"
     },
     "deleteConfirmTitle": "Delete this profile?",
-    "deleteConfirmBody": "{{name}}'s profile will be removed. Stories you created stay in your library.",
-    "ageLabel": "Age",
-    "ageDecrease": "Decrease age",
-    "ageIncrease": "Increase age",
+    "deleteConfirmBody": "The child profile is removed; stories and books you created stay in your library.",
     "updateChild": "Update Profile",
     "deleteChild": "Delete Profile",
-    "deleteConfirmBodyPermanent": "This child profile and all of its stories will be deleted. This cannot be undone.",
     "editTitle": "{{name}}'s Profile",
     "listEmptyTitle": "No child profiles yet.",
     "listEmptyBody": "Create a profile to personalize the stories."
@@ -219,7 +234,15 @@
     "generateEta": "It may take about 20–40 seconds.",
     "summaryFallbackTheme": "Tale",
     "validationHeroName": "Please enter the hero's name.",
-    "validationTheme": "Please pick at least one theme."
+    "validationTheme": "Please pick at least one theme.",
+    "anotherChildSub": "Enter a name just for this story",
+    "guestNamePlaceholder": "Child's name",
+    "guestFallbackName": "New Hero",
+    "generalStorySub": "Don't use a saved child profile",
+    "step2SubtitleGeneral": "Create an imaginary hero.",
+    "customHeroGeneralTitle": "Create an imaginary hero",
+    "customHeroGeneralSub": "You pick the name and type",
+    "ageFromProfile": "Age comes from the profile · ages {{range}}"
   },
   "generating": {
     "messages": [
@@ -325,14 +348,14 @@
   "voice": {
     "studioTitle": "My Voice Studio",
     "heroTitle": "A voice from your family,\nwith them in every tale.",
-    "heroSubtitle": "Saved voices can be used in all of your stories.",
+    "heroSubtitle": "Record family voices once and use them in every story.",
     "familyVoices": "Family Voices",
     "statusReady": "Ready",
     "statusProcessing": "Preparing",
     "statusFailed": "Something went wrong",
-    "addVoiceSection": "Add New Voice",
-    "addVoiceCta": "Create Voice Recording",
-    "addVoiceSub": "About 60 seconds · Once is enough",
+    "addVoiceSection": "New Voice",
+    "addVoiceCta": "Create My Voice",
+    "addVoiceSub": "About 60–90 seconds · Once is enough",
     "emptyTitle": "The tales don't know your voice yet.",
     "emptyCta": "Create My Voice",
     "menu": {
@@ -347,7 +370,7 @@
     "renameTitle": "Give the voice a new name",
     "introTitle": "Bring your voice to the tales",
     "introBody": "Read a short text aloud to create your own narrator voice.",
-    "introDuration": "About 60 seconds",
+    "introDuration": "About 60–90 seconds",
     "introTip": "We recommend recording in a quiet environment.",
     "introPremiumNote": "This feature is exclusive to Premium members.",
     "ownerTitle": "Whose voice is this?",
@@ -366,12 +389,12 @@
       "GRANDFATHER": "Grandpa's Voice",
       "OTHER": "My Family's Voice"
     },
-    "consentTitle": "Let's get your consent first",
-    "consentBody": "We'll use your voice sample only to narrate the content you create.",
+    "consentTitle": "Permission to use your voice",
+    "consentBody": "Your recorded voice sample is used only to narrate the tales you allow. You can delete your voice profile anytime from Settings → My Voice Data.",
     "consentCheckbox": "This voice belongs to me, or I have explicit permission to use it.",
     "consentDeleteNote": "I can delete my recording and voice data at any time.",
     "micTestTitle": "Checking your microphone.",
-    "micTestGood": "Great, it sounds quiet around you.",
+    "micTestGood": "Great, the environment looks suitable.",
     "micTestNoisy": "We're picking up some background noise.",
     "micTestDenied": "We can't record without microphone permission. You can allow it in Settings.",
     "micTestOpenSettings": "Open Settings",
@@ -384,20 +407,39 @@
     "restartRecording": "Start Over",
     "tooShort": "The recording is a bit short. You need to read for at least {{seconds}} seconds.",
     "silenceHint": "Still there? We can't hear your voice.",
-    "reviewTitle": "Listen to your recording",
-    "reviewBody": "If everything sounds right, let's start preparing your voice.",
+    "reviewTitle": "Check your recording",
+    "reviewBody": "Listen to your recording before creating the voice profile.",
     "useRecording": "Use This Recording",
     "reRecord": "Record Again",
     "processingTitle": "Your voice is being prepared…",
-    "processingBody": "We'll let you know when it's ready.",
+    "processingBody": "You can keep using the app in the meantime. We'll let you know when it's ready.",
     "successTitle": "{{name}} is ready!",
-    "successBody": "Your voice is ready. Now you can tell the tales yourself.",
+    "successBody": "You can now narrate stories with this voice.",
     "playSample": "Play voice sample",
     "useVoice": "Use This Voice",
-    "recreateVoice": "Create Again",
-    "errorSafeTitle": "Your recording is safe.",
-    "errorSafeBody": "We ran into a problem while creating the voice.",
-    "uploadFailed": "The recording couldn't be uploaded. Check your connection and try again."
+    "recreateVoice": "Record Again",
+    "errorSafeTitle": "Something went wrong while creating the voice.",
+    "errorSafeBody": "Your recording is safe. You can retry without reading again.",
+    "uploadFailed": "The recording couldn't be uploaded. Check your connection and try again.",
+    "consentSubtitle": "We want you to know exactly how your voice data is used.",
+    "consentCardTitle": "You stay in control.",
+    "consentNoChildVoices": "Cloning children's voices is not supported in this version.",
+    "consentCta": "Check the Microphone",
+    "micTestHold": "Hold the phone about a hand-span away and read in your natural tone.",
+    "micLevelLabel": "Sound level",
+    "micLevelOk": "Good",
+    "micTestCta": "Start Recording Step",
+    "startRecording": "Start Recording",
+    "resumeRecording": "Resume Recording",
+    "minCoaching": "Record a sample of at least {{seconds}} seconds",
+    "lengthOk": "The recording is long enough",
+    "reviewListen": "Play Recording",
+    "reviewPause": "Pause Recording",
+    "reviewDuration": "{{duration}} recording",
+    "reviewSafeNote": "The recording is safe on your device. Voice creation does not start until you tap \"Use This Recording\".",
+    "successSampleTitle": "Short voice sample",
+    "successSampleSub": "Listen to check the result",
+    "processingBack": "Back to Voice Studio"
   },
   "narrate": {
     "title": "Narrate the Story",
@@ -421,7 +463,8 @@
     "generatingSub": "Your story is being prepared in {{name}}'s voice.",
     "doneTitle": "The narration is ready!",
     "doneSub": "The story is now told in {{name}}'s voice.",
-    "backToStory": "Back to the Story"
+    "backToStory": "Back to the Story",
+    "changeVoice": "Change Voice"
   },
   "illustrate": {
     "title": "Shall we illustrate your tale?",
@@ -457,11 +500,12 @@
     "regenerateAction": "Regenerate",
     "alternatives": "Alternatives",
     "alternativesTitle": "Alternative Images",
-    "alternativesLead": "{{count}} options for “{{unit}}”",
-    "alternativeOption": "Option {{number}}",
+    "alternativesLead": "{{count}} compositions in the same {{style}} style for “{{unit}}”",
+    "alternativeOption": "Composition {{letter}}",
     "selectImage": "Choose This Image",
     "regeneratingLabel": "Creating a new image",
-    "makeBook": "Create the Book 📚"
+    "makeBook": "Create the Book 📚",
+    "regeneratingReassurance": "Your previous image is safe. A new option is being prepared…"
   },
   "book": {
     "builderTitle": "A book for {{name}}",
@@ -507,7 +551,8 @@
     "backCoverPageLabel": "Back Cover",
     "pageLabel": "Page {{number}}",
     "backQuote": "Every child is the hero of their own story.",
-    "backToEdit": "Back to Editing"
+    "backToEdit": "Back to Editing",
+    "previewBookCta": "Preview the Book"
   },
   "checkout": {
     "configTitle": "Book Options",
@@ -533,7 +578,7 @@
     "district": "District",
     "postalCode": "Postal code",
     "saveAddress": "Save address",
-    "reviewTitle": "Order Summary",
+    "reviewTitle": "Order & Payment",
     "product": "Product",
     "shippingLabel": "Shipping",
     "shippingFree": "Free",
@@ -562,8 +607,7 @@
     "steps": {
       "book": "Book",
       "address": "Address",
-      "summary": "Summary",
-      "payment": "Payment"
+      "summary": "Summary"
     },
     "neighborhood": "Neighborhood",
     "street": "Street",
@@ -579,7 +623,13 @@
       "street": "Gül Sokak No:12",
       "buildingInfo": "Floor 3, Apt 7",
       "postalCode": "34710"
-    }
+    },
+    "toAddress": "Continue to Delivery Address →",
+    "deliveryLabel": "Delivery",
+    "changeAddress": "Change",
+    "securePaymentTitle": "Secure payment",
+    "securePaymentBody": "Completed on the payment provider's secure screen.",
+    "payFootnote": "Once you complete the payment, your order goes into production. You can follow delivery and shipping updates in the app."
   },
   "orders": {
     "title": "My Orders",
@@ -661,7 +711,7 @@
       "tr": "Türkçe",
       "en": "English"
     },
-    "audio": "Audio",
+    "audio": "Audio & Playback",
     "voiceData": "My Voice Data",
     "voiceDataBody": "Manage, listen to, or delete your saved voices.",
     "privacy": "Privacy Policy",
@@ -712,25 +762,30 @@
     "voiceDataInfo": "Your voice recordings are used only to create the content you approve. You can delete them at any time.",
     "voiceDeleteTitle": "Delete the voice {{name}}?",
     "voiceDeleteBody": "Once deleted, this voice profile can no longer be used in new stories. Existing narrated stories are not affected.",
-    "voiceDeleteConfirm": "Delete My Voice"
+    "voiceDeleteConfirm": "Delete My Voice",
+    "audioSub": "Default speed: {{rate}}",
+    "audioSpeedSection": "Playback Speed",
+    "audioPlayerSection": "Story Player",
+    "autoAdvance": "Auto-advance to the next page",
+    "autoAdvanceSub": "Follow the book page as the narration progresses"
   },
   "subscription": {
     "title": "Masalım Premium",
-    "subtitle": "Unlock a world of unlimited tales.",
+    "subtitle": "Open the doors to your child's own world of tales.",
     "monthly": "Monthly",
     "yearly": "Yearly",
     "bestValue": "Best Value",
     "pricePerMonth": "₺{{price}} / month",
     "pricePerYear": "₺{{price}} / year",
     "features": {
-      "stories": "More stories",
+      "stories": "More Premium story credits",
       "parentVoices": "Mom & dad voices",
       "premiumVoices": "Premium narrator voices",
       "illustrations": "More AI images",
       "hdExport": "HD book images",
-      "library": "Unlimited library storage",
+      "library": "A rich story library",
       "audiobook": "Audiobook mode",
-      "print": "Physical book printing"
+      "print": "Turn a story into a physical book"
     },
     "freePlan": "Free",
     "premiumPlan": "Premium",
@@ -740,7 +795,7 @@
     "voiceCloneGate": "Creating mom & dad voices is a Premium feature.",
     "quotaReachedStories": "You've used this month's story quota. Create more with Premium.",
     "quotaReachedIllustrations": "You've used this month's image quota. Create more with Premium.",
-    "heroTitle": "Unlimited tales, unlimited magic ✨",
+    "heroTitle": "More tales, more special memories ✨",
     "heroSubtitle": "Fill your child's magical world with stars.",
     "featuresLabel": "Premium Features",
     "discountBadge": "{{percent}}% Off",
@@ -753,8 +808,9 @@
     "startCta": "Start Premium — {{price}}",
     "legal": "Cancel anytime. Your subscription renews automatically.",
     "quotaTitle": "You've used your {{limit}} stories this month!",
-    "quotaSubtitle": "Create unlimited stories with Masalım Premium and craft endless adventures for your child.",
-    "later": "Later"
+    "quotaSubtitle": "Create more stories with Masalım Premium and use the voice and illustration features.",
+    "later": "Later",
+    "yearlyAdvantage": "%{{percent}} better value than monthly"
   },
   "notificationsScreen": {
     "title": "Notifications",
@@ -816,11 +872,10 @@
     "retry": "Error — try again"
   },
   "premiumSheet": {
-    "badge": "Premium",
     "title": "This feature is Premium-only.",
     "bodyFallback": "upgrade to Premium to use this feature.",
     "perkParentVoice": "Narration in mom and dad’s voice",
-    "perkUnlimitedStories": "Create more stories",
+    "perkUnlimitedStories": "Monthly Premium story credits",
     "perkIllustrations": "AI illustrations",
     "cta": "Explore Premium",
     "dismiss": "Not Now"

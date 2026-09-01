@@ -15,8 +15,13 @@ export interface WizardChild {
 
 interface WizardDraft {
   step: number;
-  /** null = "general story" (no child attached). */
+  /** null = no profile child attached (guest-named child or general story). */
   childId: string | null;
+  /**
+   * QA design "Başka bir çocuk": a name used ONLY for this story, without
+   * creating a profile. null = not in guest mode; '' = guest mode, no name yet.
+   */
+  guestName: string | null;
   heroMode: HeroMode;
   heroName: string;
   heroType: HeroType;
@@ -36,6 +41,9 @@ interface WizardState extends WizardDraft {
   selectChild: (child: WizardChild) => void;
   /** "General story" — no child; hero must be custom. */
   selectGeneral: () => void;
+  /** "Başka bir çocuk" — story-only named child, no profile created. */
+  selectGuest: () => void;
+  setGuestName: (name: string) => void;
   setHeroMode: (heroMode: HeroMode) => void;
   setHeroName: (heroName: string) => void;
   setHeroType: (heroType: HeroType) => void;
@@ -53,6 +61,7 @@ interface WizardState extends WizardDraft {
 const initialDraft: WizardDraft = {
   step: 1,
   childId: null,
+  guestName: null,
   heroMode: 'child',
   heroName: '',
   heroType: HeroType.CHILD,
@@ -90,6 +99,7 @@ export const useWizardStore = create<WizardState>()((set) => ({
   selectChild: (child) =>
     set((state) => ({
       childId: child.id,
+      guestName: null,
       ageRange: child.ageRange,
       // Child-as-hero keeps hero fields in sync with the selected child.
       ...(state.heroMode === 'child'
@@ -99,9 +109,24 @@ export const useWizardStore = create<WizardState>()((set) => ({
   selectGeneral: () =>
     set((state) => ({
       childId: null,
+      guestName: null,
       heroMode: 'custom',
       // Drop a hero name inherited from child-as-hero mode.
       heroName: state.heroMode === 'child' ? '' : state.heroName,
+    })),
+  selectGuest: () =>
+    set({
+      childId: null,
+      guestName: '',
+      heroMode: 'child',
+      heroName: '',
+      heroType: HeroType.CHILD,
+    }),
+  setGuestName: (name) =>
+    set((state) => ({
+      guestName: name,
+      // The guest child doubles as the hero while child-as-hero is active.
+      ...(state.heroMode === 'child' ? { heroName: name, heroType: HeroType.CHILD } : {}),
     })),
   setHeroMode: (heroMode) => set({ heroMode }),
   setHeroName: (heroName) => set({ heroName }),

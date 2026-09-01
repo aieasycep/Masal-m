@@ -16,8 +16,9 @@ interface AudioPreviewButtonProps {
  */
 export function AudioPreviewButton({ status, onPress, size = 'md' }: AudioPreviewButtonProps) {
   const { t } = useTranslation();
-  const dim = size === 'md' ? 40 : 32;
-  const icon = size === 'md' ? 16 : 12;
+  // QA a11y pass: real ≥44pt touch targets (was 40/32).
+  const dim = size === 'md' ? 48 : 44;
+  const icon = size === 'md' ? 17 : 14;
   const disabled = status === 'disabled';
   const playing = status === 'playing';
 

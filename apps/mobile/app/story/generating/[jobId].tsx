@@ -346,7 +346,7 @@ const styles = StyleSheet.create({
   retryError: {
     fontFamily: fontFamilies.bodySemiBold,
     fontSize: fontSizes.md,
-    color: colors.coral,
+    color: colors.coralOnDark,
     textAlign: 'center',
     marginBottom: spacing.md,
   },

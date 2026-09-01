@@ -46,6 +46,7 @@ import {
 } from '@masalim/ui';
 import { api } from '../../../src/lib/api';
 import { activePageNumber } from '../../../src/lib/narration-sync';
+import { useAppPrefs } from '../../../src/stores/app-prefs';
 import {
   jumpBack,
   jumpForward,
@@ -72,7 +73,7 @@ import {
   Skip15Icon,
 } from '../../../src/components/icons';
 
-const RATES = [0.8, 1, 1.2] as const;
+const RATES = [0.8, 1, 1.2, 1.5] as const;
 const SLEEP_MINUTE_OPTIONS = [5, 10, 15, 30] as const;
 const FADE_STEPS = 10;
 const FADE_STEP_MS = 300;
@@ -296,8 +297,14 @@ export default function StoryPlayer() {
     [story],
   );
 
-  const [rate, setRateState] = useState<number>(1);
-  const rateRef = useRef(1);
+  // Seed from the "Ses ve Oynatma" default; in-session changes stay local.
+  const defaultPlaybackRate = useAppPrefs((state) => state.defaultPlaybackRate);
+  const autoFollowPage = useAppPrefs((state) => state.autoFollowPage);
+  const initialRate = (RATES as readonly number[]).includes(defaultPlaybackRate)
+    ? defaultPlaybackRate
+    : 1;
+  const [rate, setRateState] = useState<number>(initialRate);
+  const rateRef = useRef(initialRate);
   const [showText, setShowText] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [timerSheetOpen, setTimerSheetOpen] = useState(false);
@@ -437,12 +444,13 @@ export default function StoryPlayer() {
   }, [narration, position]);
 
   useEffect(() => {
-    if (!showText || activePage == null) return;
+    // "Sonraki sayfaya otomatik geç" pref gates the follow-along scroll.
+    if (!showText || !autoFollowPage || activePage == null) return;
     const y = paragraphYRef.current[activePage];
     if (y != null) {
       textScrollRef.current?.scrollTo({ y: Math.max(0, y - 32), animated: true });
     }
-  }, [showText, activePage]);
+  }, [showText, autoFollowPage, activePage]);
 
   const selectRate = (value: number) => {
     setRateState(value);

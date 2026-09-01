@@ -14,9 +14,12 @@ export const fontFamilies = {
   bodyExtraBold: 'Nunito_800ExtraBold',
 } as const;
 
-/** Size scale actually used by the design (see design-reference). */
+/**
+ * Size scale actually used by the design (see design-reference).
+ * UI/UX QA pass bans user-facing text at 10px and below — xxs is now 11.
+ */
 export const fontSizes = {
-  xxs: 10,
+  xxs: 11,
   xs: 11,
   sm: 12,
   md: 13,

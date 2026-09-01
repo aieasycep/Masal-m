@@ -180,7 +180,7 @@ export default function CheckoutAddress() {
     onSuccess: async (created: Address) => {
       await queryClient.invalidateQueries({ queryKey: ['addresses'] });
       setAddressId(created.id);
-      router.push(`/checkout/${bookId}/configure` as never);
+      router.push(`/checkout/${bookId}/review` as never);
     },
     onError: (error) => setServerError(mapError(error)),
   });
@@ -238,7 +238,7 @@ export default function CheckoutAddress() {
       return;
     }
     if (addressId == null) return;
-    router.push(`/checkout/${bookId}/configure` as never);
+    router.push(`/checkout/${bookId}/review` as never);
   };
 
   const canContinue = formOpen || addressId != null;
@@ -256,7 +256,6 @@ export default function CheckoutAddress() {
               t('checkout.steps.book'),
               t('checkout.steps.address'),
               t('checkout.steps.summary'),
-              t('checkout.steps.payment'),
             ]}
             activeIndex={1}
           />

@@ -1197,7 +1197,7 @@ const pillTones = StyleSheet.create({
 });
 
 const pillTextTones = StyleSheet.create({
-  ready: { color: colors.sage },
-  processing: { color: colors.dustyBlue },
+  ready: { color: colors.sageText },
+  processing: { color: colors.dustyBlueText },
   error: { color: colors.destructive },
 });

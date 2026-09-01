@@ -15,7 +15,13 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { AIJobStatus, DURATION_TARGETS, NarrationStatus, StoryStatus } from '@masalim/types';
+import {
+  AIJobStatus,
+  DURATION_TARGETS,
+  IllustrationSetStatus,
+  NarrationStatus,
+  StoryStatus,
+} from '@masalim/types';
 import { ApiError, NetworkError } from '@masalim/api-client';
 import { colors, fontFamilies, fontSizes, gradients, radius, spacing } from '@masalim/ui';
 import { api } from '../../../src/lib/api';
@@ -84,11 +90,11 @@ function ConfettiDot({ index }: { index: number }) {
 
 /**
  * Story result — cover hero + actions. With a READY narration the primary CTA
- * is "Dinlemeye Başla" (player); otherwise "Oku" stays primary. The action row
- * is the design's six tiles (Oku/Seslendir/Düzenle/Görselleştir/Kitap Yap/
- * Paylaş); Seslendir is the (re-)narration entry point. Görselleştir routes to
- * the illustration flow; Kitap Yap reuses (or creates) the story's book and
- * opens the builder.
+ * is "Dinlemeye Başla" (player); otherwise "Oku" stays primary. The action grid
+ * is the QA design's five tiles, three per row (Oku/Seslendir/Görselleştir/
+ * Kitap Yap/Düzenle — Paylaş only in the header); Seslendir is the
+ * (re-)narration entry point. Görselleştir routes to the illustration flow;
+ * Kitap Yap reuses (or creates) the story's book and opens the builder.
  */
 export default function StoryResult() {
   const { t } = useTranslation();
@@ -122,6 +128,16 @@ export default function StoryResult() {
     ) ?? null;
   // Real progress for an in-flight narration; no-op when there is none.
   const narrationJob = useJobProgress(processingNarration?.jobId ?? undefined);
+
+  // V2 "Kitap Yap" prerequisite: a book needs READY illustrations first.
+  const illustrationSetsQuery = useQuery({
+    queryKey: ['illustrations', id],
+    queryFn: () => api.illustrations.list(id),
+    enabled: id != null && id.length > 0,
+  });
+  const hasReadyIllustrations = (illustrationSetsQuery.data ?? []).some(
+    (set) => set.status === IllustrationSetStatus.READY,
+  );
 
   // When the in-flight narration finishes, refresh so the listen CTA appears.
   useEffect(() => {
@@ -196,10 +212,19 @@ export default function StoryResult() {
   const openNarrate = () => router.push(`/story/${story.id}/narrate` as never);
   const openEdit = () => router.push(`/story/${story.id}/edit` as never);
   const openIllustrate = () => router.push(`/story/${story.id}/illustrate` as never);
-  /** Kitap Yap: reuse the story's existing book, else create one, then open the builder. */
+  /**
+   * Kitap Yap (V2 prerequisites): without READY illustrations the book flow
+   * has nothing to lay out — route to the illustration style picker first.
+   * With illustrations, reuse the story's existing book (or create one) and
+   * open the builder.
+   */
   const openBookBuilder = async () => {
     if (bookLoading) return;
     setActionError(null);
+    if (!hasReadyIllustrations) {
+      openIllustrate();
+      return;
+    }
     setBookLoading(true);
     try {
       await openBookBuilderForStory(queryClient, story.id);
@@ -224,11 +249,17 @@ export default function StoryResult() {
     });
   };
 
-  // Single row of 6 tiles, design order (reference design's action grid, StoryResult.tsx).
+  // QA design: 5 tiles, 3 per row (Paylaş lives only in the header now, and
+  // Düzenle moved last).
   const actions = [
     { key: 'read', emoji: '📖', label: t('storyResult.read'), onPress: openReader },
-    { key: 'narrate', emoji: '🎙', label: t('narrate.create'), onPress: openNarrate },
-    { key: 'edit', emoji: '✏️', label: t('storyResult.edit'), onPress: openEdit },
+    {
+      key: 'narrate',
+      emoji: '🎙',
+      // V2 wording: an existing narration makes this a change, not a first pick.
+      label: narrations.length > 0 ? t('narrate.changeVoice') : t('narrate.create'),
+      onPress: openNarrate,
+    },
     {
       key: 'illustrate',
       emoji: '🎨',
@@ -244,7 +275,7 @@ export default function StoryResult() {
       },
       loading: bookLoading,
     },
-    { key: 'share', emoji: '🔗', label: t('storyResult.share'), onPress: share },
+    { key: 'edit', emoji: '✏️', label: t('storyResult.edit'), onPress: openEdit },
   ];
 
   return (
@@ -474,13 +505,21 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: spacing.sm,
   },
-  actionGrid: { flexDirection: 'row', gap: spacing.xs, marginTop: spacing.md },
+  actionGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.xs,
+    marginTop: spacing.md,
+  },
   actionTile: {
-    flex: 1,
+    flexBasis: '31%',
+    flexGrow: 1,
+    minHeight: 72,
     alignItems: 'center',
+    justifyContent: 'center',
     gap: 6,
     paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.xxs,
+    paddingHorizontal: spacing.sm,
     borderRadius: radius.md,
     backgroundColor: colors.card,
     borderWidth: 1,
@@ -490,7 +529,7 @@ const styles = StyleSheet.create({
   actionEmoji: { fontSize: 20 },
   actionLabel: {
     fontFamily: fontFamilies.bodyBold,
-    fontSize: fontSizes.xxs,
+    fontSize: fontSizes.sm,
     color: colors.mutedForeground,
     textAlign: 'center',
   },

@@ -20,7 +20,21 @@
     "age": "{{count}} yaş",
     "storyCount": "{{count}} hikâye",
     "offlineBanner": "İnternet bağlantısı yok. Bazı özellikler kullanılamayabilir.",
-    "offlineRetry": "Bağlantı gelince otomatik deneyeceğiz."
+    "offlineRetry": "Bağlantı gelince otomatik deneyeceğiz.",
+    "months": [
+      "Ocak",
+      "Şubat",
+      "Mart",
+      "Nisan",
+      "Mayıs",
+      "Haziran",
+      "Temmuz",
+      "Ağustos",
+      "Eylül",
+      "Ekim",
+      "Kasım",
+      "Aralık"
+    ]
   },
   "tabs": {
     "home": "Ana Sayfa",
@@ -53,6 +67,8 @@
     "emailPlaceholder": "ornek@eposta.com",
     "password": "Şifre",
     "passwordPlaceholder": "En az 8 karakter",
+    "showPassword": "Şifreyi göster",
+    "hidePassword": "Şifreyi gizle",
     "name": "Adın",
     "namePlaceholder": "Örn. Ayşe",
     "signIn": "Giriş Yap",
@@ -83,6 +99,9 @@
     "subtitle": "Çocuğunu tanıyalım ki masallar tam ona göre olsun.",
     "nameLabel": "Çocuğun adı",
     "namePlaceholder": "Örn. Ege",
+    "birthMonthLabel": "Doğum ayı ve yılı",
+    "birthMonthHelperAge": "Şu an {{age}} yaşında.",
+    "birthMonthHelper": "Yaşını zamanla otomatik güncellemek için kullanılır.",
     "birthDateLabel": "Doğum tarihi veya yaşı",
     "ageRangeLabel": "Yaş grubu",
     "photoLabel": "Profil fotoğrafı (isteğe bağlı)",
@@ -107,13 +126,9 @@
       "müzik": "Müzik"
     },
     "deleteConfirmTitle": "Profili silmek istiyor musun?",
-    "deleteConfirmBody": "{{name}} için kaydedilen profil silinir. Oluşturulan hikâyeler kitaplığında kalır.",
-    "ageLabel": "Yaşı",
-    "ageDecrease": "Yaşı azalt",
-    "ageIncrease": "Yaşı artır",
+    "deleteConfirmBody": "Çocuk profili silinir; daha önce oluşturduğun hikâyeler ve kitaplar kütüphanende kalır.",
     "updateChild": "Profili Güncelle",
     "deleteChild": "Profili Sil",
-    "deleteConfirmBodyPermanent": "Bu çocuk profili ve tüm hikâyeleri silinecek. Bu işlem geri alınamaz.",
     "editTitle": "{{nameGen}} Profili",
     "listEmptyTitle": "Henüz bir çocuk profili yok.",
     "listEmptyBody": "Masalları kişiselleştirmek için bir profil oluştur."
@@ -219,7 +234,15 @@
     "generateEta": "Yaklaşık 20–40 saniye sürebilir.",
     "summaryFallbackTheme": "Masal",
     "validationHeroName": "Kahramanın adını yazmalısın.",
-    "validationTheme": "En az bir tema seçmelisin."
+    "validationTheme": "En az bir tema seçmelisin.",
+    "anotherChildSub": "Sadece bu hikâye için isim gir",
+    "guestNamePlaceholder": "Çocuğun adı",
+    "guestFallbackName": "Yeni Kahraman",
+    "generalStorySub": "Kayıtlı bir çocuk profili kullanma",
+    "step2SubtitleGeneral": "Hayalî bir kahraman oluştur.",
+    "customHeroGeneralTitle": "Hayalî bir kahraman oluştur",
+    "customHeroGeneralSub": "İsim ve türü sen belirle",
+    "ageFromProfile": "Yaş bilgisi profilden alınıyor · {{range}} yaş"
   },
   "generating": {
     "messages": [
@@ -325,14 +348,14 @@
   "voice": {
     "studioTitle": "Ses Stüdyom",
     "heroTitle": "Ailenden bir ses,\nher masalda yanında.",
-    "heroSubtitle": "Kayıtlı sesler tüm hikâyelerinde kullanılabilir.",
+    "heroSubtitle": "Kayıtlı sesleri bir kez oluşturup tüm hikâyelerinde kullanabilirsin.",
     "familyVoices": "Aile Sesleri",
     "statusReady": "Hazır",
     "statusProcessing": "Hazırlanıyor",
     "statusFailed": "Sorun oluştu",
-    "addVoiceSection": "Yeni Ses Ekle",
-    "addVoiceCta": "Ses Kaydı Oluştur",
-    "addVoiceSub": "Yaklaşık 60 saniye · Bir kez yeter",
+    "addVoiceSection": "Yeni Ses",
+    "addVoiceCta": "Sesimi Oluştur",
+    "addVoiceSub": "Yaklaşık 60–90 saniye · Bir kez yeter",
     "emptyTitle": "Masallar henüz senin sesini tanımıyor.",
     "emptyCta": "Sesimi Oluştur",
     "menu": {
@@ -347,7 +370,7 @@
     "renameTitle": "Sese yeni bir ad ver",
     "introTitle": "Sesini masallara taşı",
     "introBody": "Kısa bir metni sesli okuyarak sana özel bir anlatıcı sesi oluşturabilirsin.",
-    "introDuration": "Yaklaşık 60 saniye",
+    "introDuration": "Yaklaşık 60–90 saniye",
     "introTip": "Sessiz bir ortamda kayıt yapmanı öneriyoruz.",
     "introPremiumNote": "Bu özellik Premium üyelere özeldir.",
     "ownerTitle": "Bu ses kime ait?",
@@ -366,12 +389,12 @@
       "GRANDFATHER": "Büyükbabamın Sesi",
       "OTHER": "Ailemin Sesi"
     },
-    "consentTitle": "Önce iznini alalım",
-    "consentBody": "Kaydettiğin ses örneğini, yalnızca oluşturduğun içerikleri seslendirmek için kullanacağız.",
+    "consentTitle": "Ses kullanımı için izin",
+    "consentBody": "Kaydettiğin ses örneği, yalnızca izin verdiğin masalları seslendirmek için kullanılır. Ses profilini istediğin zaman Ayarlar → Ses Verilerim bölümünden silebilirsin.",
     "consentCheckbox": "Bu ses bana aittir veya bu sesi kullanmak için açık iznim vardır.",
     "consentDeleteNote": "Kayıt ve ses verilerimi istediğim zaman silebilirim.",
     "micTestTitle": "Mikrofonunu kontrol ediyoruz.",
-    "micTestGood": "Harika, ortam sessiz görünüyor.",
+    "micTestGood": "Harika, ortam uygun görünüyor.",
     "micTestNoisy": "Biraz arka plan sesi duyuyoruz.",
     "micTestDenied": "Mikrofon izni olmadan kayıt yapamayız. Ayarlardan izin verebilirsin.",
     "micTestOpenSettings": "Ayarları Aç",
@@ -384,20 +407,39 @@
     "restartRecording": "Baştan Al",
     "tooShort": "Kayıt biraz kısa oldu. En az {{seconds}} saniye okuman gerekiyor.",
     "silenceHint": "Devam ediyor musun? Sesini duyamıyoruz.",
-    "reviewTitle": "Kaydını dinle",
-    "reviewBody": "Her şey yolundaysa sesini hazırlamaya başlayalım.",
+    "reviewTitle": "Kaydı kontrol et",
+    "reviewBody": "Ses profilini oluşturmadan önce kaydını dinle.",
     "useRecording": "Bu Kaydı Kullan",
     "reRecord": "Tekrar Kaydet",
     "processingTitle": "Sesin hazırlanıyor…",
-    "processingBody": "Hazır olduğunda sana haber vereceğiz.",
+    "processingBody": "Bu sırada uygulamayı kullanmaya devam edebilirsin. Hazır olduğunda sana haber vereceğiz.",
     "successTitle": "{{name}} hazır!",
-    "successBody": "Sesin hazır. Artık masalları sen anlatabilirsin.",
+    "successBody": "Artık hikâyeleri bu sesle anlatabilirsin.",
     "playSample": "Ses örneği dinle",
     "useVoice": "Bu Sesi Kullan",
-    "recreateVoice": "Yeniden Oluştur",
-    "errorSafeTitle": "Kaydın güvende.",
-    "errorSafeBody": "Ses oluşturulurken bir sorun yaşadık.",
-    "uploadFailed": "Kayıt yüklenemedi. Bağlantını kontrol edip tekrar deneyebilirsin."
+    "recreateVoice": "Yeniden Kaydet",
+    "errorSafeTitle": "Ses oluşturulurken bir sorun yaşadık.",
+    "errorSafeBody": "Kaydın güvende. Tekrar okumadan işlemi yeniden deneyebilirsin.",
+    "uploadFailed": "Kayıt yüklenemedi. Bağlantını kontrol edip tekrar deneyebilirsin.",
+    "consentSubtitle": "Ses verisinin nasıl kullanılacağını açıkça bilmeni istiyoruz.",
+    "consentCardTitle": "Kontrol her zaman sende.",
+    "consentNoChildVoices": "Çocuk seslerinin klonlanması bu sürümde desteklenmez.",
+    "consentCta": "Mikrofonu Kontrol Et",
+    "micTestHold": "Telefonu yaklaşık bir karış uzakta tut ve doğal ses tonunla oku.",
+    "micLevelLabel": "Ses seviyesi",
+    "micLevelOk": "Uygun",
+    "micTestCta": "Kayda Geç",
+    "startRecording": "Kaydı Başlat",
+    "resumeRecording": "Kayda Devam Et",
+    "minCoaching": "En az {{seconds}} saniyelik örnek kaydet",
+    "lengthOk": "Kayıt yeterli uzunlukta",
+    "reviewListen": "Kaydı Dinle",
+    "reviewPause": "Kaydı Duraklat",
+    "reviewDuration": "{{duration}} kayıt",
+    "reviewSafeNote": "Kayıt yerel olarak güvende. \"Bu Kaydı Kullan\" demeden ses oluşturma işlemi başlamaz.",
+    "successSampleTitle": "Kısa ses örneği",
+    "successSampleSub": "Sonucu kontrol etmek için dinle",
+    "processingBack": "Ses Stüdyosuna Dön"
   },
   "narrate": {
     "title": "Hikâyeyi Seslendir",
@@ -421,7 +463,8 @@
     "generatingSub": "Hikâyen, {{name}} sesiyle hazırlanıyor.",
     "doneTitle": "Seslendirme hazır!",
     "doneSub": "Hikâye artık {{name}} sesiyle anlatılıyor.",
-    "backToStory": "Hikâyeye Dön"
+    "backToStory": "Hikâyeye Dön",
+    "changeVoice": "Sesi Değiştir"
   },
   "illustrate": {
     "title": "Masalını resimlendirelim mi?",
@@ -457,11 +500,12 @@
     "regenerateAction": "Yeniden Oluştur",
     "alternatives": "Alternatifler",
     "alternativesTitle": "Alternatif Görseller",
-    "alternativesLead": "«{{unit}}» için {{count}} seçenek",
-    "alternativeOption": "Seçenek {{number}}",
+    "alternativesLead": "«{{unit}}» için aynı {{style}} stilinde {{count}} farklı kompozisyon",
+    "alternativeOption": "Kompozisyon {{letter}}",
     "selectImage": "Bu Görseli Seç",
     "regeneratingLabel": "Yeni görsel oluşturuluyor",
-    "makeBook": "Kitabı Oluştur 📚"
+    "makeBook": "Kitabı Oluştur 📚",
+    "regeneratingReassurance": "Önceki görselin güvende. Yeni bir seçenek hazırlanıyor…"
   },
   "book": {
     "builderTitle": "{{name}} için kitap",
@@ -507,7 +551,8 @@
     "backCoverPageLabel": "Arka Kapak",
     "pageLabel": "Sayfa {{number}}",
     "backQuote": "Her çocuk kendi hikâyesinin kahramanıdır.",
-    "backToEdit": "Düzenlemeye Dön"
+    "backToEdit": "Düzenlemeye Dön",
+    "previewBookCta": "Kitabı Önizle"
   },
   "checkout": {
     "configTitle": "Kitap Seçenekleri",
@@ -533,7 +578,7 @@
     "district": "İlçe",
     "postalCode": "Posta kodu",
     "saveAddress": "Adresi kaydet",
-    "reviewTitle": "Sipariş Özeti",
+    "reviewTitle": "Sipariş ve Ödeme",
     "product": "Ürün",
     "shippingLabel": "Kargo",
     "shippingFree": "Ücretsiz",
@@ -562,8 +607,7 @@
     "steps": {
       "book": "Kitap",
       "address": "Adres",
-      "summary": "Özet",
-      "payment": "Ödeme"
+      "summary": "Özet"
     },
     "neighborhood": "Mahalle",
     "street": "Cadde / Sokak",
@@ -579,7 +623,13 @@
       "street": "Gül Sokak No:12",
       "buildingInfo": "Kat 3, Daire 7",
       "postalCode": "34710"
-    }
+    },
+    "toAddress": "Teslimat Adresine Geç →",
+    "deliveryLabel": "Teslimat",
+    "changeAddress": "Değiştir",
+    "securePaymentTitle": "Güvenli ödeme",
+    "securePaymentBody": "Ödeme sağlayıcısının güvenli ekranında tamamlanır.",
+    "payFootnote": "Ödemeyi tamamladığında siparişin baskı sürecine alınır. Teslimat ve kargo güncellemelerini uygulamadan takip edebilirsin."
   },
   "orders": {
     "title": "Siparişlerim",
@@ -661,7 +711,7 @@
       "tr": "Türkçe",
       "en": "English"
     },
-    "audio": "Ses",
+    "audio": "Ses ve Oynatma",
     "voiceData": "Ses Verilerim",
     "voiceDataBody": "Kayıtlı seslerini yönetebilir, dinleyebilir veya silebilirsin.",
     "privacy": "Gizlilik Politikası",
@@ -712,25 +762,30 @@
     "voiceDataInfo": "Ses kayıtların yalnızca izin verdiğin içerikleri oluşturmak için kullanılır. İstediğin zaman silebilirsin.",
     "voiceDeleteTitle": "{{name}} sesini sil?",
     "voiceDeleteBody": "Bu ses profilini sildiğinde yeni hikâyelerde kullanılamaz. Mevcut seslendirilmiş hikâyeler etkilenmez.",
-    "voiceDeleteConfirm": "Sesimi Sil"
+    "voiceDeleteConfirm": "Sesimi Sil",
+    "audioSub": "Varsayılan hız: {{rate}}",
+    "audioSpeedSection": "Oynatma Hızı",
+    "audioPlayerSection": "Hikâye Oynatıcı",
+    "autoAdvance": "Sonraki sayfaya otomatik geç",
+    "autoAdvanceSub": "Seslendirme ilerledikçe kitap sayfasını takip et"
   },
   "subscription": {
     "title": "Masalım Premium",
-    "subtitle": "Sınırsız masal dünyasının kapılarını aç.",
+    "subtitle": "Çocuğuna özel masal dünyasının kapılarını aç.",
     "monthly": "Aylık",
     "yearly": "Yıllık",
     "bestValue": "En Avantajlı",
     "pricePerMonth": "₺{{price}} / ay",
     "pricePerYear": "₺{{price}} / yıl",
     "features": {
-      "stories": "Daha fazla hikâye",
+      "stories": "Daha fazla Premium hikâye hakkı",
       "parentVoices": "Anne & baba sesleri",
       "premiumVoices": "Premium anlatıcı sesleri",
       "illustrations": "Daha fazla AI görsel",
       "hdExport": "HD kitap görselleri",
-      "library": "Sınırsız kütüphane depolama",
+      "library": "Geniş hikâye kütüphanesi",
       "audiobook": "Sesli kitap modu",
-      "print": "Fiziksel kitap baskısı"
+      "print": "Hikâyeyi fiziksel kitaba dönüştürme"
     },
     "freePlan": "Ücretsiz",
     "premiumPlan": "Premium",
@@ -740,7 +795,7 @@
     "voiceCloneGate": "Anne & baba sesi oluşturmak Premium'a özel.",
     "quotaReachedStories": "Bu ayki hikâye hakkın doldu. Premium ile daha fazlasını oluşturabilirsin.",
     "quotaReachedIllustrations": "Bu ayki görsel hakkın doldu. Premium ile daha fazlasını oluşturabilirsin.",
-    "heroTitle": "Sınırsız masal, sınırsız büyü ✨",
+    "heroTitle": "Daha fazla masal, daha özel anılar ✨",
     "heroSubtitle": "Çocuğunun büyülü dünyasını yıldızlarla doldur.",
     "featuresLabel": "Premium Özellikler",
     "discountBadge": "%{{percent}} İndirim",
@@ -753,8 +808,9 @@
     "startCta": "Premium'a Başla — {{price}}",
     "legal": "İstediğin zaman iptal edebilirsin. Abonelik otomatik yenilenir.",
     "quotaTitle": "Bu ay {{limit}} hikâye hakkın doldu!",
-    "quotaSubtitle": "Masalım Premium ile sınırsız hikâye oluştur, çocuğun için sonsuz macera yarat.",
-    "later": "Daha Sonra"
+    "quotaSubtitle": "Masalım Premium ile daha fazla hikâye oluştur, ses ve illüstrasyon özelliklerinden yararlan.",
+    "later": "Daha Sonra",
+    "yearlyAdvantage": "aylığa göre %{{percent}} avantajlı"
   },
   "notificationsScreen": {
     "title": "Bildirimler",
@@ -816,11 +872,10 @@
     "retry": "Hata — tekrar dene"
   },
   "premiumSheet": {
-    "badge": "Premium",
     "title": "Bu özellik Premium'a özel.",
     "bodyFallback": "özelliğini kullanmak için Premium'a geçebilirsin.",
     "perkParentVoice": "Anne ve baba sesiyle anlatım",
-    "perkUnlimitedStories": "Daha fazla hikâye oluşturma",
+    "perkUnlimitedStories": "Aylık Premium hikâye hakları",
     "perkIllustrations": "AI illüstrasyon",
     "cta": "Premium'u İncele",
     "dismiss": "Şimdilik Değil"

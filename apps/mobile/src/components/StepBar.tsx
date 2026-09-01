@@ -2,13 +2,13 @@ import { StyleSheet, Text, View } from 'react-native';
 import { colors, fontFamilies } from '@masalim/ui';
 
 interface StepBarProps {
-  /** Ordered step captions (final design: Kitap · Adres · Özet · Ödeme). */
+  /** Ordered step captions (final design: 3 segments — Kitap · Adres · Özet). */
   labels: string[];
   /** Zero-based index of the active step; earlier steps render as done. */
   activeIndex: number;
 }
 
-/** Shared checkout progress bar from `Checkout/02-Address` (4 labeled segments). */
+/** Shared checkout progress bar (labeled segments). */
 export function StepBar({ labels, activeIndex }: StepBarProps) {
   return (
     <View style={styles.root} accessibilityRole="progressbar">
@@ -42,7 +42,7 @@ const styles = StyleSheet.create({
   barReached: { backgroundColor: colors.primary },
   caption: {
     fontFamily: fontFamilies.bodyBold,
-    fontSize: 9,
+    fontSize: 11,
     color: colors.mutedForeground,
     textTransform: 'uppercase',
     letterSpacing: 0.5,

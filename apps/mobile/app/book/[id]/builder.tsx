@@ -634,7 +634,7 @@ export default function BookBuilder() {
           </View>
 
           <Button
-            label={t('book.printCta')}
+            label={t('book.previewBookCta')}
             leading={<Text style={styles.ctaEmoji}>📦</Text>}
             onPress={openPreview}
           />
@@ -702,10 +702,10 @@ const styles = StyleSheet.create({
   },
 
   strip: { gap: spacing.xs, paddingBottom: spacing.sm, alignItems: 'flex-start' },
-  thumbColumn: { alignItems: 'center', gap: 4, width: 52 },
+  thumbColumn: { alignItems: 'center', gap: 4, width: 56 },
   thumb: {
-    width: 52,
-    height: 68,
+    width: 56,
+    height: 72,
     borderRadius: radius.sm,
     borderWidth: 2,
     overflow: 'hidden',

@@ -22,7 +22,7 @@ export function Badge({ label, variant = 'primary', uppercase = false }: BadgePr
 
 const styles = StyleSheet.create({
   badge: { borderRadius: radius.xs, paddingVertical: 2, paddingHorizontal: 8, alignSelf: 'flex-start' },
-  text: { fontFamily: fontFamilies.bodyBold, fontSize: 10, letterSpacing: 0.4 },
+  text: { fontFamily: fontFamilies.bodyBold, fontSize: 11, letterSpacing: 0.4 },
 });
 
 const containerStyles = StyleSheet.create({
@@ -35,6 +35,6 @@ const containerStyles = StyleSheet.create({
 const textStyles = StyleSheet.create({
   personal: { color: colors.coral },
   primary: { color: colors.primary },
-  success: { color: colors.sage },
+  success: { color: colors.sageText },
   premium: { color: '#A67C00' },
 });

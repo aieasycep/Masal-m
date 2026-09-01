@@ -111,6 +111,7 @@ export default function CreateStory() {
   const step = useWizardStore((state) => state.step);
   const initialized = useWizardStore((state) => state.initialized);
   const childId = useWizardStore((state) => state.childId);
+  const guestName = useWizardStore((state) => state.guestName);
   const heroMode = useWizardStore((state) => state.heroMode);
   const heroName = useWizardStore((state) => state.heroName);
   const heroType = useWizardStore((state) => state.heroType);
@@ -122,6 +123,8 @@ export default function CreateStory() {
   const setStep = useWizardStore((state) => state.setStep);
   const selectChild = useWizardStore((state) => state.selectChild);
   const selectGeneral = useWizardStore((state) => state.selectGeneral);
+  const selectGuest = useWizardStore((state) => state.selectGuest);
+  const setGuestName = useWizardStore((state) => state.setGuestName);
   const setHeroMode = useWizardStore((state) => state.setHeroMode);
   const setHeroName = useWizardStore((state) => state.setHeroName);
   const setHeroType = useWizardStore((state) => state.setHeroType);
@@ -169,7 +172,11 @@ export default function CreateStory() {
   }, [step]);
 
   const selectedChild = childList?.find((child) => child.id === childId) ?? null;
-  const heroDisplayName = selectedChild?.name ?? heroName.trim();
+  // Profile child OR the QA design's story-only guest child ("Başka bir çocuk").
+  const heroChildName =
+    selectedChild?.name ??
+    (guestName != null && guestName.trim().length > 0 ? guestName.trim() : null);
+  const heroDisplayName = heroChildName ?? heroName.trim();
 
   const goBack = () => {
     if (step > 1) {
@@ -180,15 +187,19 @@ export default function CreateStory() {
   };
 
   const goNext = () => {
+    if (step === 1 && guestName != null && guestName.trim().length === 0) {
+      // Guest mode with no name typed — design falls back to "Yeni Kahraman".
+      setGuestName(t('wizard.guestFallbackName'));
+    }
     if (step === 2) {
-      const isCustomHero = heroMode === 'custom' || selectedChild == null;
+      const isCustomHero = heroMode === 'custom' || heroChildName == null;
       if (isCustomHero && heroName.trim().length === 0) {
         setHeroNameError(t('wizard.validationHeroName'));
         return;
       }
       setHeroNameError(null);
-      if (!isCustomHero && selectedChild != null) {
-        setHeroName(selectedChild.name);
+      if (!isCustomHero && heroChildName != null) {
+        setHeroName(heroChildName);
         setHeroType(HeroType.CHILD);
       }
     }
@@ -299,24 +310,42 @@ export default function CreateStory() {
           ))}
           <SelectableCard
             glow
-            selected={childId == null}
+            selected={guestName != null}
+            onPress={() => {
+              setChildError(null);
+              selectGuest();
+            }}
+            accessibilityLabel={t('wizard.anotherChild')}
+          >
+            <Avatar emoji="🧒" size={48} kind="child" />
+            <View style={styles.cardTextBlock}>
+              <Text style={styles.childName}>{t('wizard.anotherChild')}</Text>
+              <Text style={styles.childAge}>{t('wizard.anotherChildSub')}</Text>
+            </View>
+          </SelectableCard>
+          {guestName != null ? (
+            <Animated.View entering={FadeInUp.duration(250)} style={styles.guestNameBlock}>
+              <Input
+                placeholder={t('wizard.guestNamePlaceholder')}
+                value={guestName}
+                onChangeText={setGuestName}
+                autoCapitalize="words"
+                maxLength={60}
+              />
+            </Animated.View>
+          ) : null}
+          <SelectableCard
+            glow
+            selected={childId == null && guestName == null}
             onPress={selectGeneral}
             accessibilityLabel={t('wizard.generalStory')}
           >
-            <Avatar emoji="🌟" size={48} kind="child" />
-            <Text style={styles.childName}>{t('wizard.generalStory')}</Text>
-          </SelectableCard>
-          <Pressable
-            onPress={() => router.push('/children/new' as never)}
-            accessibilityRole="button"
-            accessibilityLabel={t('wizard.anotherChild')}
-            style={({ pressed }) => [styles.addChildCard, { opacity: pressed ? 0.8 : 1 }]}
-          >
-            <View style={styles.addChildCircle}>
-              <Text style={styles.addChildPlus}>+</Text>
+            <Avatar emoji="✨" size={48} kind="child" />
+            <View style={styles.cardTextBlock}>
+              <Text style={styles.childName}>{t('wizard.generalStory')}</Text>
+              <Text style={styles.childAge}>{t('wizard.generalStorySub')}</Text>
             </View>
-            <Text style={styles.addChildLabel}>{t('wizard.anotherChild')}</Text>
-          </Pressable>
+          </SelectableCard>
         </View>
       )}
     </>
@@ -327,32 +356,32 @@ export default function CreateStory() {
       <Text style={styles.stepTitle} accessibilityRole="header">
         {t('wizard.step2Title')}
       </Text>
-      {selectedChild != null ? (
+      {heroChildName != null ? (
         <Text style={styles.stepSubtitle}>
-          {t('wizard.step2Subtitle', { childNameNom: selectedChild.name })}
+          {t('wizard.step2Subtitle', { childNameNom: heroChildName })}
         </Text>
       ) : (
-        <Text style={styles.stepSubtitle}>{t('wizard.customHeroSub')}</Text>
+        <Text style={styles.stepSubtitle}>{t('wizard.step2SubtitleGeneral')}</Text>
       )}
       <View style={styles.cardList}>
-        {selectedChild != null ? (
+        {heroChildName != null ? (
           <SelectableCard
             selected={heroMode === 'child'}
             onPress={() => {
               setHeroMode('child');
-              setHeroName(selectedChild.name);
+              setHeroName(heroChildName);
               setHeroType(HeroType.CHILD);
               setHeroNameError(null);
             }}
-            accessibilityLabel={t('wizard.childAsHero', { name: selectedChild.name })}
+            accessibilityLabel={t('wizard.childAsHero', { name: heroChildName })}
           >
             <Text style={styles.heroEmoji}>🧒</Text>
             <View style={styles.cardTextBlock}>
               <Text style={styles.heroCardTitle}>
-                {t('wizard.childAsHero', { name: selectedChild.name })}
+                {t('wizard.childAsHero', { name: heroChildName })}
               </Text>
               <Text style={styles.heroCardSub}>
-                {t('wizard.childAsHeroSub', { name: selectedChild.name })}
+                {t('wizard.childAsHeroSub', { name: heroChildName })}
               </Text>
             </View>
           </SelectableCard>
@@ -369,8 +398,16 @@ export default function CreateStory() {
         >
           <Text style={styles.heroEmoji}>✨</Text>
           <View style={styles.cardTextBlock}>
-            <Text style={styles.heroCardTitle}>{t('wizard.customHero')}</Text>
-            <Text style={styles.heroCardSub}>{t('wizard.customHeroSub')}</Text>
+            <Text style={styles.heroCardTitle}>
+              {heroChildName != null
+                ? t('wizard.customHero')
+                : t('wizard.customHeroGeneralTitle')}
+            </Text>
+            <Text style={styles.heroCardSub}>
+              {heroChildName != null
+                ? t('wizard.customHeroSub')
+                : t('wizard.customHeroGeneralSub')}
+            </Text>
           </View>
         </SelectableCard>
       </View>
@@ -496,28 +533,39 @@ export default function CreateStory() {
       </Text>
       <Text style={styles.stepSubtitle}>{t('wizard.step4Subtitle')}</Text>
       <Text style={styles.sectionLabel}>{t('wizard.ageGroupLabel').toLocaleUpperCase('tr')}</Text>
-      <View style={styles.ageGrid}>
-        {AGE_RANGES.map((range) => {
-          const selected = ageRange === range;
-          return (
-            <SelectableCard
-              key={range}
-              selected={selected}
-              onPress={() => setAgeRange(range)}
-              showCheck={false}
-              style={styles.ageTile}
-              accessibilityLabel={`${AGE_RANGE_LABELS[range]} ${t('wizard.ageUnit')}`}
-            >
-              <View style={styles.ageTileInner}>
-                <Text style={[styles.ageValue, selected && styles.ageValueSelected]}>
-                  {AGE_RANGE_LABELS[range]}
-                </Text>
-                <Text style={styles.ageUnit}>{t('wizard.ageUnit')}</Text>
-              </View>
-            </SelectableCard>
-          );
-        })}
-      </View>
+      {selectedChild != null ? (
+        // V2: a registered child's age is known — never ask again. The bucket
+        // is already synced from the profile (birthDate-derived server-side).
+        <View style={styles.ageFromProfileRow}>
+          <Text style={styles.ageFromProfileEmoji}>👶</Text>
+          <Text style={styles.ageFromProfileText}>
+            {t('wizard.ageFromProfile', { range: AGE_RANGE_LABELS[ageRange] })}
+          </Text>
+        </View>
+      ) : (
+        <View style={styles.ageGrid}>
+          {AGE_RANGES.map((range) => {
+            const selected = ageRange === range;
+            return (
+              <SelectableCard
+                key={range}
+                selected={selected}
+                onPress={() => setAgeRange(range)}
+                showCheck={false}
+                style={styles.ageTile}
+                accessibilityLabel={`${AGE_RANGE_LABELS[range]} ${t('wizard.ageUnit')}`}
+              >
+                <View style={styles.ageTileInner}>
+                  <Text style={[styles.ageValue, selected && styles.ageValueSelected]}>
+                    {AGE_RANGE_LABELS[range]}
+                  </Text>
+                  <Text style={styles.ageUnit}>{t('wizard.ageUnit')}</Text>
+                </View>
+              </SelectableCard>
+            );
+          })}
+        </View>
+      )}
       <Text style={styles.sectionLabel}>{t('wizard.durationLabel').toLocaleUpperCase('tr')}</Text>
       <View style={styles.cardList}>
         {DURATIONS.map(({ duration, emoji }) => {
@@ -670,6 +718,7 @@ const styles = StyleSheet.create({
   },
   loader: { marginVertical: spacing.xxxl },
   cardList: { gap: 10 },
+  guestNameBlock: { marginTop: -2 },
   childName: {
     fontFamily: fontFamilies.display,
     fontSize: fontSizes.h4,
@@ -679,31 +728,6 @@ const styles = StyleSheet.create({
   childAge: {
     fontFamily: fontFamilies.body,
     fontSize: fontSizes.md,
-    color: colors.mutedForeground,
-  },
-  addChildCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 14,
-    paddingVertical: 16,
-    paddingHorizontal: 18,
-    borderRadius: radius.card,
-    borderWidth: 2,
-    borderStyle: 'dashed',
-    borderColor: colors.border,
-  },
-  addChildCircle: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: colors.muted,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  addChildPlus: { fontSize: 22, color: colors.mutedForeground, fontFamily: fontFamilies.bodySemiBold },
-  addChildLabel: {
-    fontFamily: fontFamilies.bodySemiBold,
-    fontSize: fontSizes.lg,
     color: colors.mutedForeground,
   },
   heroEmoji: { fontSize: 28 },
@@ -751,8 +775,10 @@ const styles = StyleSheet.create({
   suggestionChip: {
     backgroundColor: colors.secondary,
     borderRadius: radius.sm,
+    minHeight: 44,
+    justifyContent: 'center',
     paddingVertical: 4,
-    paddingHorizontal: 10,
+    paddingHorizontal: 12,
   },
   suggestionChipText: {
     fontFamily: fontFamilies.bodySemiBold,
@@ -790,6 +816,23 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   ageGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, marginBottom: spacing.xl },
+  ageFromProfileRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: colors.secondary,
+    borderRadius: radius.base,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 14,
+    marginBottom: spacing.xl,
+  },
+  ageFromProfileEmoji: { fontSize: 18 },
+  ageFromProfileText: {
+    flex: 1,
+    fontFamily: fontFamilies.bodySemiBold,
+    fontSize: fontSizes.base,
+    color: colors.secondaryForeground,
+  },
   ageTile: { width: '48%', paddingVertical: 14, paddingHorizontal: 14 },
   ageTileInner: { flex: 1, alignItems: 'center' },
   ageValue: { fontFamily: fontFamilies.display, fontSize: fontSizes.h4, color: colors.foreground },
