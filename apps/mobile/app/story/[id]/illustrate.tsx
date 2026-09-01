@@ -394,7 +394,7 @@ export default function IllustrateStory() {
 
   const applyRequestError = (err: unknown) => {
     if (err instanceof ApiError) {
-      if (err.code === ErrorCode.QUOTA_EXCEEDED) {
+      if (err.code === ErrorCode.QUOTA_EXCEEDED || err.code === ErrorCode.INSUFFICIENT_CREDITS) {
         setQuotaHit(true);
         return;
       }
@@ -462,7 +462,10 @@ export default function IllustrateStory() {
       const { jobId } = await api.illustrations.regenerate(illustration.id);
       setRegen({ jobId, rowKey, target: illustration });
     } catch (err) {
-      if (err instanceof ApiError && err.code === ErrorCode.QUOTA_EXCEEDED) {
+      if (
+        err instanceof ApiError &&
+        (err.code === ErrorCode.QUOTA_EXCEEDED || err.code === ErrorCode.INSUFFICIENT_CREDITS)
+      ) {
         setQuotaHit(true);
         return;
       }

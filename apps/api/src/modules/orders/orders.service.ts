@@ -48,8 +48,26 @@ export class OrdersService {
     @Inject(STORAGE) private readonly storage: StorageProvider,
   ) {}
 
+  /**
+   * Launch gate ("Yakında"): print ordering is closed until the physical_books
+   * feature flag is switched on (admin panel) — server-enforced so an old app
+   * build cannot order either. The digital book/preview experience stays open.
+   */
+  private async assertPrintOrderingEnabled(): Promise<void> {
+    const flag = await this.prisma.featureFlag.findUnique({ where: { key: 'physical_books' } });
+    if (flag == null || !flag.enabled) {
+      throw new AppException(
+        ErrorCode.FEATURE_DISABLED,
+        'Physical book ordering is not available yet',
+        HttpStatus.FORBIDDEN,
+        { key: 'physical_books' },
+      );
+    }
+  }
+
   /** Review-screen price — always recomputed server-side (§82). */
   async quote(userId: string, input: OrderConfiguration): Promise<OrderQuote> {
+    await this.assertPrintOrderingEnabled();
     await this.books.findOwned(userId, input.bookId);
     return this.pricing.quote(input);
   }
@@ -60,6 +78,7 @@ export class OrdersService {
    * the immutable orders/{id}/ prefix.
    */
   async create(userId: string, input: CreateOrderInput, idempotencyKey: string): Promise<OrderDto> {
+    await this.assertPrintOrderingEnabled();
     if (!idempotencyKey || idempotencyKey.length < 8 || idempotencyKey.length > 128) {
       throw AppException.validation('Idempotency-Key header is required');
     }

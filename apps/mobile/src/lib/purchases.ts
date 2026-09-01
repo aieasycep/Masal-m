@@ -7,22 +7,15 @@ import { queryClient } from './query';
  * PurchasesGateway (§37, plan §8.1) — the single store-purchases seam.
  *
  * Selected by `EXPO_PUBLIC_PURCHASES_PROVIDER` ('mock' default | 'revenuecat').
- * Entitlement truth ALWAYS stays server-side: the mock gateway drives the same
- * normalized backend pipeline as the RevenueCat webhook, and after any
- * purchase/restore both gateways invalidate ['entitlements'] + ['me'] so the
- * UI re-reads the backend-resolved plan.
+ * PRODUCT CATALOG + PRICES come from the server (`/subscription/offerings`,
+ * PricingConfig-backed) so sticker prices change without an app update; this
+ * gateway only executes the purchase for a given store productId — the
+ * subscription or a consumable credit pack — and re-reads server entitlements.
+ * The mock gateway drives the same normalized backend pipeline as the
+ * RevenueCat webhook.
  */
-
-export interface Offering {
-  productId: 'masalim_premium_monthly' | 'masalim_premium_yearly';
-  period: 'monthly' | 'yearly';
-  /** Display price — placeholder ₺ pricing in mock mode. */
-  priceLabel: string;
-}
-
 export interface PurchasesGateway {
-  getOfferings(): Promise<Offering[]>;
-  purchase(productId: Offering['productId']): Promise<{ success: boolean; cancelled?: boolean }>;
+  purchase(productId: string): Promise<{ success: boolean; cancelled?: boolean }>;
   restore(): Promise<{ success: boolean }>;
 }
 
@@ -35,23 +28,13 @@ async function invalidateEntitlements(): Promise<void> {
 }
 
 /**
- * Mock IAP — dev only. `POST /subscription/mock/purchase` emits the same
- * normalized SubscriptionEvent the RevenueCat webhook does, so the real
- * entitlement flip happens server-side exactly like production.
+ * Mock IAP — dev/staging only. `POST /subscription/mock/purchase` emits the
+ * same normalized SubscriptionEvent the RevenueCat webhook does (INITIAL_
+ * PURCHASE for the subscription, NON_RENEWING_PURCHASE for credit packs), so
+ * the real entitlement/credit flip happens server-side exactly like production.
  */
 class MockPurchasesGateway implements PurchasesGateway {
-  getOfferings(): Promise<Offering[]> {
-    // Placeholder ₺ pricing — real store pricing (App Store / Play / RevenueCat
-    // offerings) replaces these labels in the RevenueCat gateway.
-    return Promise.resolve([
-      { productId: 'masalim_premium_monthly', period: 'monthly', priceLabel: '₺129,99' },
-      { productId: 'masalim_premium_yearly', period: 'yearly', priceLabel: '₺899,99' },
-    ]);
-  }
-
-  async purchase(
-    productId: Offering['productId'],
-  ): Promise<{ success: boolean; cancelled?: boolean }> {
+  async purchase(productId: string): Promise<{ success: boolean; cancelled?: boolean }> {
     await api.subscription.mockPurchase({ productId });
     await invalidateEntitlements();
     return { success: true };
@@ -78,12 +61,10 @@ function isUserCancelled(error: unknown): boolean {
 /**
  * Real store purchases via react-native-purchases. The RevenueCat webhook
  * feeds the backend, which owns the entitlement flip — this gateway only
- * drives the store sheet and then re-reads server state.
+ * drives the store sheet for the requested product and re-reads server state.
  */
 class RevenueCatPurchasesGateway implements PurchasesGateway {
   private configured = false;
-  /** Last-fetched packages by canonical productId — purchase() consumes these. */
-  private packages = new Map<Offering['productId'], PurchasesPackage>();
 
   /** Lazy one-time configure; a missing key leaves the gateway inert. */
   private ensureConfigured(): boolean {
@@ -95,42 +76,20 @@ class RevenueCatPurchasesGateway implements PurchasesGateway {
     return true;
   }
 
-  async getOfferings(): Promise<Offering[]> {
-    if (!this.ensureConfigured()) return [];
+  /** Find the store package carrying this productId across all offerings. */
+  private async packageFor(productId: string): Promise<PurchasesPackage | null> {
     const offerings = await Purchases.getOfferings();
-    const current = offerings.current;
-    if (current == null) return [];
-
-    const result: Offering[] = [];
-    if (current.monthly != null) {
-      this.packages.set('masalim_premium_monthly', current.monthly);
-      result.push({
-        productId: 'masalim_premium_monthly',
-        period: 'monthly',
-        priceLabel: current.monthly.product.priceString,
-      });
+    for (const offering of Object.values(offerings.all)) {
+      for (const pkg of offering.availablePackages) {
+        if (pkg.product.identifier === productId) return pkg;
+      }
     }
-    if (current.annual != null) {
-      this.packages.set('masalim_premium_yearly', current.annual);
-      result.push({
-        productId: 'masalim_premium_yearly',
-        period: 'yearly',
-        priceLabel: current.annual.product.priceString,
-      });
-    }
-    return result;
+    return null;
   }
 
-  async purchase(
-    productId: Offering['productId'],
-  ): Promise<{ success: boolean; cancelled?: boolean }> {
+  async purchase(productId: string): Promise<{ success: boolean; cancelled?: boolean }> {
     if (!this.ensureConfigured()) return { success: false };
-    let pkg = this.packages.get(productId);
-    if (pkg == null) {
-      // Deep-link entry without a prior getOfferings() — fetch once.
-      await this.getOfferings();
-      pkg = this.packages.get(productId);
-    }
+    const pkg = await this.packageFor(productId);
     if (pkg == null) return { success: false };
 
     try {

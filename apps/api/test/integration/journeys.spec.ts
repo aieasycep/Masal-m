@@ -2,6 +2,7 @@ import { Test } from '@nestjs/testing';
 import type { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { AppModule } from '../../src/app.module';
+import { PrismaService } from '../../src/prisma/prisma.service';
 
 jest.setTimeout(120_000);
 
@@ -153,7 +154,45 @@ describe('critical journeys (integration)', () => {
       .set('Authorization', `Bearer ${session.token}`)
       .expect(200);
     expect(entitlements.body.plan).toBe('FREE');
-    expect(entitlements.body.quotas.story_monthly_limit.used).toBe(1);
+    // SHORT story = 3 credits, drawn from the 3-credit FREE monthly quota;
+    // the 6-credit signup gift balance stays untouched.
+    expect(entitlements.body.credits.quota.used).toBe(3);
+    expect(entitlements.body.credits.balance).toBe(6);
+  });
+
+  it('grants signup gift credits and sells credit packs through the mock store (§37)', async () => {
+    const session = await register('credits');
+    const before = await http()
+      .get('/subscription/entitlements')
+      .set(...V)
+      .set('Authorization', `Bearer ${session.token}`)
+      .expect(200);
+    expect(before.body.credits.balance).toBe(6);
+
+    const offerings = await http()
+      .get('/subscription/offerings')
+      .set(...V)
+      .set('Authorization', `Bearer ${session.token}`)
+      .expect(200);
+    expect(offerings.body.subscription.productId).toBe('masalim_premium_monthly');
+    const pack = offerings.body.packs.find(
+      (item: { productId: string }) => item.productId === 'masalim_credits_12_std',
+    );
+    expect(pack?.credits).toBe(12);
+
+    await http()
+      .post('/subscription/mock/purchase')
+      .set(...V)
+      .set('Authorization', `Bearer ${session.token}`)
+      .send({ productId: 'masalim_credits_12_std' })
+      .expect(201);
+    const after = await http()
+      .get('/subscription/entitlements')
+      .set(...V)
+      .set('Authorization', `Bearer ${session.token}`)
+      .expect(200);
+    expect(after.body.credits.balance).toBe(18);
+    expect(after.body.plan).toBe('FREE'); // consumable — plan unchanged
   });
 
   it('rejects blocklisted ideas at enqueue without consuming quota (§17)', async () => {
@@ -187,7 +226,8 @@ describe('critical journeys (integration)', () => {
       .set(...V)
       .set('Authorization', `Bearer ${session.token}`)
       .expect(200);
-    expect(entitlements.body.quotas.story_monthly_limit.used).toBe(0);
+    expect(entitlements.body.credits.quota.used).toBe(0);
+    expect(entitlements.body.credits.balance).toBe(6);
   });
 
   it('gates voice cloning on consent (literal true) and premium entitlement (§21/§36)', async () => {
@@ -226,6 +266,26 @@ describe('critical journeys (integration)', () => {
   it('quotes orders server-side and dedupes creation by Idempotency-Key (§78/§82)', async () => {
     const session = await register('order');
     const auth = ['Authorization', `Bearer ${session.token}`] as const;
+
+    // Launch gate: print ordering ships disabled (physical_books seed) and the
+    // API must refuse. The rest of the journey runs with the flag switched on,
+    // exactly what the admin toggle will do when printing launches.
+    const prisma = app.get(PrismaService);
+    await prisma.featureFlag.update({
+      where: { key: 'physical_books' },
+      data: { enabled: false },
+    });
+    const gated = await http()
+      .post('/orders/quote')
+      .set(...V)
+      .set(...auth)
+      .send({ bookId: 'cnonexistent12345', quantity: 1, bookSize: 'SQUARE', coverType: 'HARDCOVER' })
+      .expect(403);
+    expect(gated.body.error.code).toBe('FEATURE_DISABLED');
+    await prisma.featureFlag.update({
+      where: { key: 'physical_books' },
+      data: { enabled: true },
+    });
 
     // story → book → render (mock pipeline) so an orderable book exists
     const draft = await http()

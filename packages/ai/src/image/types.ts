@@ -43,18 +43,24 @@ export class ImageGenerationError extends Error {
   }
 }
 
-/** Server-side style templates (§26) — the client only ever sends the style enum. */
+/**
+ * Server-side style templates (§26) — the client only ever sends the style enum.
+ * Each template is a mutually exclusive MEDIUM spec with explicit negatives:
+ * the earlier near-synonym one-liners ("soft", "warm", "children's book" in
+ * every entry) let gpt-image-1 collapse all five styles into one generic look,
+ * especially once a reference image dominates the edit call.
+ */
 export const STYLE_TEMPLATES: Record<IllustrationStyle, string> = {
   WATERCOLOR:
-    'soft watercolor children\'s book illustration, delicate washes, warm paper texture, gentle pastel palette',
+    'Traditional watercolor painting on cold-press paper: transparent washes, visible pigment blooms and wet edges, white paper showing through highlights, loose wet-on-wet backgrounds. Strictly no 3D rendering, no digital airbrush, no hard vector outlines',
   SOFT_3D:
-    'soft 3D rendered children\'s illustration, rounded friendly shapes, warm studio lighting, subtle subsurface scattering',
+    'Polished 3D animated-movie render (Pixar-like): smooth rounded geometry, glossy plastic-clay surfaces, volumetric lighting with soft shadows, shallow depth of field. Strictly no painterly texture, no visible brushstrokes, no paper grain',
   CLASSIC_STORYBOOK:
-    'classic storybook illustration, warm editorial style, rich but gentle colors, timeless picture-book feel',
+    'Mid-century classic storybook gouache illustration: flat opaque paint layers, bold simplified shapes, textured printmaking feel, limited rich palette with ink-line accents. Strictly no 3D rendering, no photorealism, no airbrushed gradients',
   PASTEL:
-    'pastel chalk children\'s illustration, soft grain, dreamy muted colors, cozy atmosphere',
+    'Soft chalk pastel drawing on toned paper: powdery smudged strokes, heavy visible grain, dreamy hazy edges, muted dusty colors blended by finger. Strictly no crisp outlines, no glossy surfaces, no 3D rendering',
   HAND_DRAWN:
-    'hand-drawn colored pencil children\'s illustration, visible strokes, warm playful linework',
+    'Colored-pencil hand drawing: visible directional pencil strokes and cross-hatching, sketchy graphite outlines, paper tooth texture, lively imperfect linework. Strictly no smooth digital gradients, no 3D rendering, no watercolor washes',
 };
 
 export function buildCharacterBlock(bible: CharacterBible): string {

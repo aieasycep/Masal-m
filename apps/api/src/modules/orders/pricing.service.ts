@@ -61,8 +61,11 @@ export class PricingService {
   }
 
   private async loadTable(): Promise<PricingTable> {
+    // PricingConfig now also carries the monetization row (monetization_v1) —
+    // pin the lookup to book-pricing keys or the newest active row could be a
+    // config with no basePrices at all.
     const row = await this.prisma.pricingConfig.findFirst({
-      where: { active: true },
+      where: { active: true, key: { startsWith: 'book_pricing' } },
       orderBy: { createdAt: 'desc' },
     });
     if (row == null) {

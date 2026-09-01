@@ -42,9 +42,12 @@ export class OpenAIImageProvider implements ImageGenerationProvider {
 
     try {
       if (input.isCharacterSheet || input.characterRef == null) {
+        // Style leads the prompt: a trailing style clause loses to a leading
+        // format anchor ("character sheet") and every style ends up looking
+        // like the model's default sheet idiom.
         const prompt = input.isCharacterSheet
-          ? `Character sheet: ${characterBlock}. Neutral standing pose, plain light background, full body. ${styleBlock}. No text.`
-          : `${input.prompt}. ${characterBlock}. ${styleBlock}. Children's book illustration, no text.`;
+          ? `${styleBlock}. In exactly this art style: full-body illustration of ${characterBlock}. Neutral standing pose, plain light background. No text.`
+          : `${styleBlock}. In exactly this art style, a children's book illustration: ${input.prompt}. ${characterBlock}. No text.`;
         const result = await this.client.images.generate({
           model: this.model,
           prompt,
@@ -63,11 +66,15 @@ export class OpenAIImageProvider implements ImageGenerationProvider {
 
       // Page/cover render referencing the character sheet image.
       const sheet = Buffer.from(input.characterRef, 'base64');
+      // The reference image dominates the edit call's rendering — say
+      // explicitly that it carries IDENTITY only, and re-state the medium
+      // first, or all pages inherit the sheet's look regardless of style.
       const result = await this.client.images.edit({
         model: this.model,
         image: await toFile(sheet, 'character-sheet.png', { type: 'image/png' }),
-        prompt: `Using this exact character, illustrate: ${input.prompt}. ${characterBlock}. ${styleBlock}. Children's book illustration, no text.`,
+        prompt: `${styleBlock}. Re-render the referenced character in exactly this art style — copy the character's identity (face, hair, clothes), NOT the reference image's rendering technique. Scene: ${input.prompt}. ${characterBlock}. Children's book illustration, no text.`,
         size: '1024x1024',
+        quality,
       });
       const b64 = result.data?.[0]?.b64_json;
       if (!b64) throw new ImageGenerationError('OpenAI returned no image data');

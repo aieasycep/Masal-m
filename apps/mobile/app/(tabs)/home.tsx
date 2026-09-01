@@ -73,19 +73,24 @@ export default function Home() {
     queryFn: () => api.subscription.entitlements(),
   });
 
-  // Quota banner (final design): warning at ≤2 remaining, exhausted at 0.
-  // Premium plans never see it — their quota headroom is not a sales surface.
+  // Credit banner: spendable = monthly quota left + purchased balance.
+  // "exhausted" once even a short story (3 kredi) is unaffordable, "warning"
+  // at roughly one medium story left. Premium plans never see it — their
+  // headroom is not a sales surface.
   const entitlements = entitlementsQuery.data;
-  const storyQuota = entitlements?.quotas.story_monthly_limit;
-  const quotaRemaining = storyQuota == null ? null : storyQuota.limit - storyQuota.used;
+  const creditState = entitlements?.credits;
+  const quotaRemaining =
+    creditState == null
+      ? null
+      : Math.max(0, creditState.quota.limit - creditState.quota.used) + creditState.balance;
   const quotaVariant: 'warning' | 'exhausted' | null =
     entitlements == null ||
     entitlements.plan === SubscriptionPlan.PREMIUM ||
     quotaRemaining == null
       ? null
-      : quotaRemaining <= 0
+      : quotaRemaining < 3
         ? 'exhausted'
-        : quotaRemaining <= 2
+        : quotaRemaining <= 6
           ? 'warning'
           : null;
 
@@ -236,7 +241,7 @@ export default function Home() {
           <QuotaBanner
             variant={quotaVariant}
             remaining={Math.max(quotaRemaining ?? 0, 0)}
-            onSeePremium={() => router.push('/subscription/paywall' as never)}
+            onSeePremium={() => router.push('/subscription/quota' as never)}
           />
         </View>
       ) : null}

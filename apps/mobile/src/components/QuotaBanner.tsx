@@ -5,7 +5,7 @@ import { Button } from './Button';
 
 interface QuotaBannerProps {
   variant: 'warning' | 'exhausted';
-  /** Remaining story quota — interpolated into the warning copy. */
+  /** Total credits still spendable (monthly quota left + purchased balance). */
   remaining?: number;
   onSeePremium: () => void;
 }
@@ -30,7 +30,7 @@ export function QuotaBanner({ variant, remaining = 0, onSeePremium }: QuotaBanne
           {t('quotaBanner.warningSuffix')}
         </Text>
         <Pressable onPress={onSeePremium} hitSlop={8} accessibilityRole="button">
-          <Text style={styles.warningLink}>{t('quotaBanner.seePremium')}</Text>
+          <Text style={styles.warningLink}>{t('quotaBanner.getCredits')}</Text>
         </Pressable>
       </View>
     );
@@ -43,7 +43,7 @@ export function QuotaBanner({ variant, remaining = 0, onSeePremium }: QuotaBanne
         <Text style={styles.exhaustedTitle}>{t('quotaBanner.exhaustedTitle')}</Text>
         <Text style={styles.exhaustedBody}>{t('quotaBanner.exhaustedBody')}</Text>
       </View>
-      <Button label={t('quotaBanner.explorePremium')} onPress={onSeePremium} compact />
+      <Button label={t('quotaBanner.getCredits')} onPress={onSeePremium} compact />
     </View>
   );
 }

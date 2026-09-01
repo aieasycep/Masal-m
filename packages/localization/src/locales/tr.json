@@ -242,7 +242,8 @@
     "step2SubtitleGeneral": "Hayalî bir kahraman oluştur.",
     "customHeroGeneralTitle": "Hayalî bir kahraman oluştur",
     "customHeroGeneralSub": "İsim ve türü sen belirle",
-    "ageFromProfile": "Yaş bilgisi profilden alınıyor · {{range}} yaş"
+    "ageFromProfile": "Yaş bilgisi profilden alınıyor · {{range}} yaş",
+    "creditCost": "{{count}} kredi"
   },
   "generating": {
     "messages": [
@@ -488,11 +489,11 @@
     "pickerTitle": "İllüstrasyon stili seç",
     "pickerHint": "✨ Her sayfa için yapay zekâ yeni bir görsel oluşturacak. Kahramanın görünümü kitap boyunca tutarlı kalacak.",
     "styleDescriptions": {
-      "WATERCOLOR": "Yumuşak, akıcı renkler",
-      "SOFT_3D": "Sıcak, hacimli figürler",
-      "CLASSIC_STORYBOOK": "Geleneksel illüstrasyon",
-      "PASTEL": "Hafif ve huzur verici",
-      "HAND_DRAWN": "Sıcak, kişisel dokunuş"
+      "WATERCOLOR": "Kâğıda boyanmış gibi: şeffaf boya akışları, yumuşak kenarlar (ör. \"Küçük Prens\" tarzı)",
+      "SOFT_3D": "Animasyon filmi görünümü: hacimli, ışıltılı 3D karakterler (ör. Pixar tarzı)",
+      "CLASSIC_STORYBOOK": "Nostaljik masal kitabı: düz boya katmanları, kalın şekiller, baskı dokusu",
+      "PASTEL": "Tebeşir pasteli: pudramsı, taneli, sisli-rüya gibi yumuşak geçişler",
+      "HAND_DRAWN": "Kuru boya kalemi: görünür kalem çizgileri, eskiz havası, kâğıt dokusu"
     },
     "generateCaption": "{{count}} görsel oluşturulacak · 1–2 dakika sürebilir",
     "generatingStep": "{{label}} hazırlanıyor",
@@ -552,7 +553,9 @@
     "pageLabel": "Sayfa {{number}}",
     "backQuote": "Her çocuk kendi hikâyesinin kahramanıdır.",
     "backToEdit": "Düzenlemeye Dön",
-    "previewBookCta": "Kitabı Önizle"
+    "previewBookCta": "Kitabı Önizle",
+    "printSoonBadge": "YAKINDA",
+    "printSoonBody": "Kitap baskısı çok yakında! Şimdilik dijital kitabının keyfini çıkar — baskı hazır olduğunda haber vereceğiz. 💛"
   },
   "checkout": {
     "configTitle": "Kitap Seçenekleri",
@@ -796,7 +799,7 @@
     "manage": "Aboneliği Yönet",
     "voiceCloneGate": "Anne & baba sesi oluşturmak Premium'a özel.",
     "quotaReachedStories": "Bu ayki hikâye hakkın doldu. Premium ile daha fazlasını oluşturabilirsin.",
-    "quotaReachedIllustrations": "Bu ayki görsel hakkın doldu. Premium ile daha fazlasını oluşturabilirsin.",
+    "quotaReachedIllustrations": "Kredin yetmedi — Kredilerim ekranından kredi alabilirsin.",
     "heroTitle": "Daha fazla masal, daha özel anılar ✨",
     "heroSubtitle": "Çocuğunun büyülü dünyasını yıldızlarla doldur.",
     "featuresLabel": "Premium Özellikler",
@@ -812,7 +815,25 @@
     "quotaTitle": "Bu ay {{limit}} hikâye hakkın doldu!",
     "quotaSubtitle": "Masalım Premium ile daha fazla hikâye oluştur, ses ve illüstrasyon özelliklerinden yararlan.",
     "later": "Daha Sonra",
-    "yearlyAdvantage": "aylığa göre %{{percent}} avantajlı"
+    "yearlyAdvantage": "aylığa göre %{{percent}} avantajlı",
+    "compareTitle": "Neler dahil?",
+    "comparePremium": "PREMİUM",
+    "compareFree": "ÜCRETSİZ",
+    "compareRows": {
+      "storyFull": "Hikâye + görsel + duygusal seslendirme",
+      "monthlyCredits": "Her ay {{count}} kredi (yeni masal dakikası)",
+      "voiceClone": "Anne-baba sesi klonlama",
+      "premiumVoices": "Premium anlatıcı sesleri",
+      "hdBook": "HD kitap dışa aktarımı"
+    },
+    "compareFootnote": "Ücretsiz planda masallar kredilerle oluşturulur: Kısa 3 · Orta 6 · Uzun 10 kredi. Dinlemek her zaman ücretsizdir.",
+    "monthlyPlanDesc": "Ayda {{count}} kredi · ses klonlama · istediğin zaman iptal",
+    "packsTitle": "Kredi Paketleri",
+    "packsSubFree": "Abonelik istemeyenler için — krediler süresiz geçerli.",
+    "packsSubPremium": "Üyelere özel fiyatla ekstra kredi — kota bitince masallara devam.",
+    "packCredits": "{{count}} kredi",
+    "buyPack": "Satın Al",
+    "creditsAdded": "Krediler hesabına eklendi!"
   },
   "notificationsScreen": {
     "title": "Bildirimler",
@@ -865,7 +886,8 @@
     "PAYMENT_FAILED": "Ödeme tamamlanamadı. Lütfen tekrar dene.",
     "PAYMENT_AMOUNT_MISMATCH": "Ödeme tutarında bir uyuşmazlık oldu. Lütfen tekrar dene.",
     "ORDER_CREATION_FAILED": "Sipariş oluşturulamadı. Lütfen tekrar dene.",
-    "ORDER_NOT_CANCELLABLE": "Bu sipariş artık iptal edilemiyor."
+    "ORDER_NOT_CANCELLABLE": "Bu sipariş artık iptal edilemiyor.",
+    "INSUFFICIENT_CREDITS": "Bu masal için kredin yetmiyor. Kredi alabilir ya da Premium’a geçebilirsin."
   },
   "preview": {
     "play": "Önizle",
@@ -883,13 +905,14 @@
     "dismiss": "Şimdilik Değil"
   },
   "quotaBanner": {
-    "warningPrefix": "Bu ay ",
-    "warningCount": "{{n}} masal hakkın",
+    "warningPrefix": "Sadece ",
+    "warningCount": "{{n}} kredin",
     "warningSuffix": " kaldı.",
     "seePremium": "Premium'u Gör",
-    "exhaustedTitle": "Bu ayki ücretsiz masal hakkını kullandın.",
-    "exhaustedBody": "Premium ile daha fazla hikâye oluşturabilirsin.",
-    "explorePremium": "Premium'u İncele"
+    "exhaustedTitle": "Kredilerin bitti",
+    "exhaustedBody": "Yeni masal için kredi al ya da Premium’a geç.",
+    "explorePremium": "Premium'u İncele",
+    "getCredits": "Kredi Al"
   },
   "states": {
     "error": {
@@ -939,5 +962,17 @@
     "resultBookBody": "Önce Görselleştir ile sayfalara resim ekle; sonra Kitap Yap ile gerçek bir kitaba dönüştür.",
     "readerFollowTitle": "Sayfalar sesle dönüyor 🎵",
     "readerFollowBody": "Seslendirme çalarken sayfalar kendiliğinden ilerler. Elle kaydırırsan durur; bu düğmeyle yeniden açarsın."
+  },
+  "credits": {
+    "title": "Kredilerim",
+    "subtitle": "Masal oluşturmak kredi kullanır; dinlemek her zaman ücretsizdir.",
+    "emptyTitle": "Kredin bitti",
+    "emptySubtitle": "Yeni masallar için kredi alabilir ya da Premium’a geçebilirsin.",
+    "quotaLabel": "Aylık hak",
+    "quotaValue": "{{left}} / {{limit}} kredi",
+    "balanceLabel": "Satın alınan bakiye",
+    "balanceValue": "{{count}} kredi",
+    "costsHint": "Kısa masal 3 · Orta 6 · Uzun 10 kredi. Masalın ilk seslendirmesi ve ilk görsel seti dahildir.",
+    "premiumCta": "Premium’a Geç — ayda 30 kredi"
   }
 }
