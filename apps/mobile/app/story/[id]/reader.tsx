@@ -39,6 +39,7 @@ import {
   spacing,
 } from '@masalim/ui';
 import { Button } from '../../../src/components/Button';
+import { FeatureTour, type TourStep } from '../../../src/components/FeatureTour';
 import { Starfield } from '../../../src/components/Starfield';
 import { storyThemeEmoji } from '../../../src/components/StorySheet';
 import { useActiveTrack, useIsPlaying } from 'react-native-track-player';
@@ -46,6 +47,8 @@ import { ChevronLeftIcon, ChevronRightIcon } from '../../../src/components/icons
 import { api } from '../../../src/lib/api';
 import { activePageNumber } from '../../../src/lib/narration-sync';
 import { usePlayerProgress } from '../../../src/lib/player';
+import { registerTourTarget } from '../../../src/lib/tour-targets';
+import { useAppPrefs } from '../../../src/stores/app-prefs';
 
 type ReaderSlide = { key: string; kind: 'page'; page: StoryPage } | { key: 'end'; kind: 'end' };
 
@@ -187,6 +190,9 @@ export default function Reader() {
     enabled: id != null && id.length > 0,
   });
   const [follow, setFollow] = useState(true);
+  const seenFollowTour = useAppPrefs((state) => state.seenTours.readerFollow === true);
+  const markTourSeen = useAppPrefs((state) => state.markTourSeen);
+  const [tourVisible, setTourVisible] = useState(false);
   const activeTrack = useActiveTrack();
   const { playing } = useIsPlaying();
   const { position } = usePlayerProgress(500);
@@ -205,6 +211,21 @@ export default function Reader() {
   useEffect(() => {
     setFollow(true);
   }, [activeTrackId]);
+
+  // One-time hint the first time the auto-follow chip appears.
+  useEffect(() => {
+    if (seenFollowTour || tourVisible || !syncing) return;
+    const timer = setTimeout(() => setTourVisible(true), 900);
+    return () => clearTimeout(timer);
+  }, [seenFollowTour, tourVisible, syncing]);
+
+  const followTourSteps: TourStep[] = [
+    {
+      targetKey: 'reader.follow',
+      title: t('tour.readerFollowTitle'),
+      body: t('tour.readerFollowBody'),
+    },
+  ];
 
   useEffect(() => {
     if (!follow || !syncing || story == null) return;
@@ -432,6 +453,7 @@ export default function Reader() {
       {syncing || (playingNarration != null && !follow) ? (
         <View style={styles.followRow}>
           <Pressable
+            ref={(view) => registerTourTarget('reader.follow', view)}
             onPress={() => setFollow((value) => !value)}
             accessibilityRole="button"
             accessibilityState={{ selected: follow }}
@@ -444,6 +466,14 @@ export default function Reader() {
           </Pressable>
         </View>
       ) : null}
+      <FeatureTour
+        steps={followTourSteps}
+        visible={tourVisible}
+        onDone={() => {
+          setTourVisible(false);
+          markTourSeen('readerFollow');
+        }}
+      />
       <FlatList
         ref={listRef}
         data={slides}

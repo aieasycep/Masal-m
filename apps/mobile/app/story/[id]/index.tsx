@@ -27,7 +27,10 @@ import { colors, fontFamilies, fontSizes, gradients, radius, spacing } from '@ma
 import { api } from '../../../src/lib/api';
 import { openBookBuilderForStory } from '../../../src/lib/book-nav';
 import { useJobProgress } from '../../../src/lib/job-stream';
+import { registerTourTarget } from '../../../src/lib/tour-targets';
+import { useAppPrefs } from '../../../src/stores/app-prefs';
 import { Button } from '../../../src/components/Button';
+import { FeatureTour, type TourStep } from '../../../src/components/FeatureTour';
 import { ScreenHeader } from '../../../src/components/ScreenHeader';
 import { Starfield } from '../../../src/components/Starfield';
 import { ChevronLeftIcon, PlayIcon, ShareIcon } from '../../../src/components/icons';
@@ -104,6 +107,9 @@ export default function StoryResult() {
   const coverFloatStyle = useFloatStyle(4000);
   const [bookLoading, setBookLoading] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+  const seenResultTour = useAppPrefs((state) => state.seenTours.result === true);
+  const markTourSeen = useAppPrefs((state) => state.markTourSeen);
+  const [tourVisible, setTourVisible] = useState(false);
 
   const storyQuery = useQuery({
     queryKey: ['story', id],
@@ -111,6 +117,14 @@ export default function StoryResult() {
     enabled: id != null && id.length > 0,
   });
   const story = storyQuery.data;
+
+  // One-time hint on the first READY story: what the action tiles unlock.
+  const storyReady = storyQuery.data?.status === StoryStatus.READY;
+  useEffect(() => {
+    if (seenResultTour || tourVisible || !storyReady) return;
+    const timer = setTimeout(() => setTourVisible(true), 700);
+    return () => clearTimeout(timer);
+  }, [seenResultTour, tourVisible, storyReady]);
 
   const narrationsQuery = useQuery({
     queryKey: ['narrations', id],
@@ -278,6 +292,15 @@ export default function StoryResult() {
     { key: 'edit', emoji: '✏️', label: t('storyResult.edit'), onPress: openEdit },
   ];
 
+  const resultTourSteps: TourStep[] = [
+    {
+      targetKey: 'result.narrate',
+      title: t('tour.resultNarrateTitle'),
+      body: t('tour.resultNarrateBody'),
+    },
+    { targetKey: 'result.book', title: t('tour.resultBookTitle'), body: t('tour.resultBookBody') },
+  ];
+
   return (
     <ScrollView
       style={styles.root}
@@ -384,6 +407,11 @@ export default function StoryResult() {
           {actions.map((action) => (
             <Pressable
               key={action.key}
+              ref={
+                action.key === 'narrate' || action.key === 'book'
+                  ? (view) => registerTourTarget(`result.${action.key}`, view)
+                  : undefined
+              }
               onPress={action.onPress}
               disabled={action.loading === true}
               accessibilityRole="button"
@@ -416,6 +444,14 @@ export default function StoryResult() {
           </View>
         ) : null}
       </Animated.View>
+      <FeatureTour
+        steps={resultTourSteps}
+        visible={tourVisible}
+        onDone={() => {
+          setTourVisible(false);
+          markTourSeen('result');
+        }}
+      />
     </ScrollView>
   );
 }

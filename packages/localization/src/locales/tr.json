@@ -767,7 +767,9 @@
     "audioSpeedSection": "Oynatma Hızı",
     "audioPlayerSection": "Hikâye Oynatıcı",
     "autoAdvance": "Sonraki sayfaya otomatik geç",
-    "autoAdvanceSub": "Seslendirme ilerledikçe kitap sayfasını takip et"
+    "autoAdvanceSub": "Seslendirme ilerledikçe kitap sayfasını takip et",
+    "replayTour": "Tanıtımı tekrar göster",
+    "replayTourSub": "Ekran ipuçlarını sıfırlar ve ana sayfadan yeniden başlatır"
   },
   "subscription": {
     "title": "Masalım Premium",
@@ -916,5 +918,26 @@
         "body": "İllüstrasyon hazırlanırken bir sorun oluştu. Tekrar deneyelim."
       }
     }
+  },
+  "tour": {
+    "skip": "Atla",
+    "next": "İleri",
+    "done": "Başlayalım!",
+    "homeHeroTitle": "Masal burada başlar ✨",
+    "homeHeroBody": "Yeni bir masal oluşturmak için bu karta dokun — sihirbaz seni adım adım yönlendirir.",
+    "homeSuggestionsTitle": "Hazır fikirler",
+    "homeSuggestionsBody": "Çocuğuna özel önerilerden birine dokun; tema ve fikir sihirbaza dolu gelir.",
+    "homeCategoriesTitle": "Bu gece için",
+    "homeCategoriesBody": "Temaya göre hızlı başlangıç: Uyku, Macera, Öğretici ve daha fazlası.",
+    "tabLibraryTitle": "Hikâyelerim",
+    "tabLibraryBody": "Oluşturduğun tüm masallar burada birikir; arayabilir, filtreleyebilirsin.",
+    "tabProfileTitle": "Profil",
+    "tabProfileBody": "Çocuk profilleri, aile sesleri, siparişler ve ayarlar burada.",
+    "resultNarrateTitle": "Masalını seslendir 🎙",
+    "resultNarrateBody": "Hazır anlatıcılardan birini seç ya da kendi sesinle anlat — masal sesli kitaba dönüşsün.",
+    "resultBookTitle": "Resimle ve kitaplaştır 📚",
+    "resultBookBody": "Önce Görselleştir ile sayfalara resim ekle; sonra Kitap Yap ile gerçek bir kitaba dönüştür.",
+    "readerFollowTitle": "Sayfalar sesle dönüyor 🎵",
+    "readerFollowBody": "Seslendirme çalarken sayfalar kendiliğinden ilerler. Elle kaydırırsan durur; bu düğmeyle yeniden açarsın."
   }
 }

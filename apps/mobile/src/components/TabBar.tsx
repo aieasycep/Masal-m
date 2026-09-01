@@ -5,6 +5,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { colors, fontFamilies, fontSizes, gradients, shadows, spacing } from '@masalim/ui';
+import { registerTourTarget } from '../lib/tour-targets';
 import { BookIcon, HomeIcon, PlusCircleIcon, UserIcon } from './icons';
 
 interface TabMeta {
@@ -52,6 +53,7 @@ export function TabBar({ state, navigation, insets }: BottomTabBarProps) {
     return (
       <Pressable
         key={route.key}
+        ref={(view) => registerTourTarget(`tabs.${route.name}`, view)}
         onPress={onPress}
         accessibilityRole="tab"
         accessibilityState={{ selected: isFocused }}
