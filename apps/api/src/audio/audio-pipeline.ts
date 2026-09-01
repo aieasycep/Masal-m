@@ -81,6 +81,26 @@ async function probeDurationSeconds(binary: string, file: string): Promise<numbe
   return Number(source[1]) * 3600 + Number(source[2]) * 60 + Number(source[3]);
 }
 
+/** Parse "Audio: …, 44100 Hz, mono" from ffmpeg -i stderr. */
+async function probeStreamInfo(
+  binary: string,
+  file: string,
+): Promise<{ sampleRate: number; channelLayout: 'mono' | 'stereo' }> {
+  const { stderr } = await execFileAsync(binary, ['-i', file, '-f', 'null', '-'], {
+    maxBuffer: 8 * 1024 * 1024,
+  }).catch((error: { stderr?: string }) => ({ stderr: error.stderr ?? '' }));
+  const match = stderr.match(/Audio:.*?(\d+) Hz, (mono|stereo)/);
+  if (match == null) throw new Error(`ffmpeg reported no audio stream for ${file}`);
+  return { sampleRate: Number(match[1]), channelLayout: match[2] as 'mono' | 'stereo' };
+}
+
+export interface AudioChunkInput {
+  audio: Buffer;
+  contentType: string;
+  /** Silence inserted AFTER this clip (page-turn breathing room); 0/absent = none. */
+  gapAfterSeconds?: number;
+}
+
 export interface ConcatResult {
   audio: Buffer;
   contentType: 'audio/mpeg';
@@ -92,15 +112,18 @@ export interface ConcatResult {
  * Concatenate per-chunk TTS clips into one MP3 (§6a): concat demuxer with a
  * single libmp3lame re-encode (stream-copy misreports duration), 44.1kHz/128k.
  * Per-chunk durations are probed first — they become the Narration timings.
+ * `gapAfterSeconds` inserts real silence between clips (generated to match the
+ * clips' codec/sample rate so the demuxer sees uniform inputs).
  */
 export async function concatAudioChunks(
-  chunks: Array<{ audio: Buffer; contentType: string }>,
+  chunks: AudioChunkInput[],
   configuredFfmpegPath = '',
 ): Promise<ConcatResult> {
   if (chunks.length === 0) throw new Error('no audio chunks to concatenate');
   const binary = ffmpegPath(configuredFfmpegPath);
   const workDir = await mkdtemp(join(tmpdir(), 'masalim-narration-'));
   try {
+    const isWav = chunks[0]?.contentType.includes('wav') ?? false;
     const files: string[] = [];
     for (const [index, chunk] of chunks.entries()) {
       const ext = chunk.contentType.includes('wav') ? 'wav' : 'mp3';
@@ -114,10 +137,45 @@ export async function concatAudioChunks(
       chunkDurationsSeconds.push(await probeDurationSeconds(binary, file));
     }
 
+    // One silence file per distinct gap length, in the clips' own format.
+    const silenceFiles = new Map<number, string>();
+    const wantsSilence = chunks.some(
+      (chunk, index) => (chunk.gapAfterSeconds ?? 0) > 0 && index < chunks.length - 1,
+    );
+    if (wantsSilence) {
+      const info = await probeStreamInfo(binary, files[0] as string);
+      for (const chunk of chunks) {
+        const gap = chunk.gapAfterSeconds ?? 0;
+        if (gap <= 0 || silenceFiles.has(gap)) continue;
+        const silenceFile = join(workDir, `silence-${gap.toFixed(2)}.${isWav ? 'wav' : 'mp3'}`);
+        await execFileAsync(binary, [
+          '-y',
+          '-f',
+          'lavfi',
+          '-i',
+          `anullsrc=r=${info.sampleRate}:cl=${info.channelLayout}`,
+          '-t',
+          gap.toFixed(2),
+          ...(isWav ? ['-c:a', 'pcm_s16le'] : ['-c:a', 'libmp3lame', '-b:a', '128k']),
+          silenceFile,
+        ]);
+        silenceFiles.set(gap, silenceFile);
+      }
+    }
+
+    const listEntries: string[] = [];
+    for (const [index, file] of files.entries()) {
+      listEntries.push(file);
+      const gap = chunks[index]?.gapAfterSeconds ?? 0;
+      const silenceFile = silenceFiles.get(gap);
+      if (gap > 0 && silenceFile != null && index < files.length - 1) {
+        listEntries.push(silenceFile);
+      }
+    }
     const listFile = join(workDir, 'list.txt');
     await writeFile(
       listFile,
-      files.map((file) => `file '${file.replaceAll("'", "'\\''")}'`).join('\n'),
+      listEntries.map((file) => `file '${file.replaceAll("'", "'\\''")}'`).join('\n'),
     );
     const outFile = join(workDir, 'narration.mp3');
     await execFileAsync(binary, [
