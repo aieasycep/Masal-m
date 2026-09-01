@@ -295,7 +295,8 @@
     "pageLabel": "Sayfa {{current}} / {{total}}",
     "previous": "Önceki",
     "next": "Sonraki",
-    "autoFollow": "Otomatik takip"
+    "autoFollowOn": "Otomatik takip açık",
+    "autoFollowOff": "Otomatik takip kapalı"
   },
   "library": {
     "title": "Hikâyelerim",

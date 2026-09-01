@@ -21,7 +21,14 @@ import { NARRATION_DIRECTOR, STORAGE, TTS } from '../../providers/providers.modu
 import { JobsService } from '../../jobs/jobs.service';
 import { QueueName, type QueueJobData } from '../../jobs/queues';
 import { NotificationsService } from '../notifications/notifications.service';
-import { chunkStoryPages, concatAudioChunks } from '../../audio/audio-pipeline';
+import {
+  chunkStoryPages,
+  concatAudioChunks,
+  type AudioChunkInput,
+} from '../../audio/audio-pipeline';
+
+/** Silence between story pages so page turns don't sound rushed. */
+const PAGE_TURN_GAP_SECONDS = 1;
 
 /**
  * Narration worker (§19/§6a): sentence-boundary chunks → TTS per chunk →
@@ -103,18 +110,24 @@ export class NarrationProcessor implements OnModuleInit, OnApplicationShutdown {
           ? this.director
           : null;
 
-      const rendered: Array<{ audio: Buffer; contentType: string }> = [];
+      // Breathing room at page turns: silence between the last words of a page
+      // and the first words of the next (chunks within one page stay seamless).
+      const gapAfter = chunks.map((chunk, index) => {
+        const next = chunks[index + 1];
+        return next != null && next.pageNumber !== chunk.pageNumber ? PAGE_TURN_GAP_SECONDS : 0;
+      });
+
+      const rendered: AudioChunkInput[] = [];
       for (const [index, chunk] of chunks.entries()) {
         const expressiveText =
           director == null ? undefined : await director.annotate(chunk.text, language);
-        rendered.push(
-          await this.tts.generateSpeech({
-            text: chunk.text,
-            expressiveText: expressiveText !== chunk.text ? expressiveText : undefined,
-            providerVoiceId,
-            language,
-          }),
-        );
+        const speech = await this.tts.generateSpeech({
+          text: chunk.text,
+          expressiveText: expressiveText !== chunk.text ? expressiveText : undefined,
+          providerVoiceId,
+          language,
+        });
+        rendered.push({ ...speech, gapAfterSeconds: gapAfter[index] });
         // 5→80% spread over chunks — every tick is a really synthesized chunk.
         await this.jobs.setProgress(aiJob.id, 5 + Math.round(((index + 1) / chunks.length) * 75));
       }
@@ -133,7 +146,8 @@ export class NarrationProcessor implements OnModuleInit, OnApplicationShutdown {
           startSeconds: round2(cursor),
           durationSeconds: round2(duration),
         });
-        cursor += duration;
+        // The page-turn silence shifts everything after it.
+        cursor += duration + (gapAfter[index] ?? 0);
       }
 
       const audioKey = StorageKeys.narrationAudio(
