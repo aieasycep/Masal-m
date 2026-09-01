@@ -488,11 +488,11 @@
     "pickerTitle": "İllüstrasyon stili seç",
     "pickerHint": "✨ Her sayfa için yapay zekâ yeni bir görsel oluşturacak. Kahramanın görünümü kitap boyunca tutarlı kalacak.",
     "styleDescriptions": {
-      "WATERCOLOR": "Yumuşak, akıcı renkler",
-      "SOFT_3D": "Sıcak, hacimli figürler",
-      "CLASSIC_STORYBOOK": "Geleneksel illüstrasyon",
-      "PASTEL": "Hafif ve huzur verici",
-      "HAND_DRAWN": "Sıcak, kişisel dokunuş"
+      "WATERCOLOR": "Kâğıda boyanmış gibi: şeffaf boya akışları, yumuşak kenarlar (ör. \"Küçük Prens\" tarzı)",
+      "SOFT_3D": "Animasyon filmi görünümü: hacimli, ışıltılı 3D karakterler (ör. Pixar tarzı)",
+      "CLASSIC_STORYBOOK": "Nostaljik masal kitabı: düz boya katmanları, kalın şekiller, baskı dokusu",
+      "PASTEL": "Tebeşir pasteli: pudramsı, taneli, sisli-rüya gibi yumuşak geçişler",
+      "HAND_DRAWN": "Kuru boya kalemi: görünür kalem çizgileri, eskiz havası, kâğıt dokusu"
     },
     "generateCaption": "{{count}} görsel oluşturulacak · 1–2 dakika sürebilir",
     "generatingStep": "{{label}} hazırlanıyor",

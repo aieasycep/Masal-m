@@ -488,11 +488,11 @@
     "pickerTitle": "Choose an illustration style",
     "pickerHint": "✨ AI will create a new image for every page. Your hero will look consistent throughout the book.",
     "styleDescriptions": {
-      "WATERCOLOR": "Soft, flowing colors",
-      "SOFT_3D": "Warm, rounded figures",
-      "CLASSIC_STORYBOOK": "Traditional illustration",
-      "PASTEL": "Light and calming",
-      "HAND_DRAWN": "A warm, personal touch"
+      "WATERCOLOR": "Like paint on paper: transparent washes, soft blooming edges",
+      "SOFT_3D": "Animated-movie look: rounded, glossy 3D characters (Pixar-like)",
+      "CLASSIC_STORYBOOK": "Nostalgic picture book: flat paint layers, bold shapes, print texture",
+      "PASTEL": "Chalk pastel: powdery, grainy, dreamy-hazy soft blends",
+      "HAND_DRAWN": "Colored pencil: visible strokes, sketchy feel, paper texture"
     },
     "generateCaption": "{{count}} images will be created · may take 1–2 minutes",
     "generatingStep": "Preparing {{label}}",
