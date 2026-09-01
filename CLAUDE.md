@@ -299,6 +299,28 @@ Local `.env` = `.env.example` + generated JWT secrets (already present, gitignor
   APK builds: android-apk.yml (push on claude/* + workflow_dispatch on main).
   Verify EVERY handed-over APK via android-crash-log.yml (input apk_run_id).
 
+- **PR #11 MERGED (Sep 1): first-run feature tour** — spotlight engine
+  (src/lib/tour-targets.ts + FeatureTour.tsx, SVG Mask scrim, pure JS), Home
+  5-step tour, result 2-step + reader auto-follow 1-step hints, persisted
+  seenTours in app-prefs, settings "Tanıtımı tekrar göster" row, tour.* i18n
+  (790 keys parity). Tour APK: android-apk run 33512730502 (96fecef) —
+  emulator verify dispatched; superseded by the server-migration APK below.
+- **VPS MIGRATION IN PROGRESS (Sep 1, user approved "Evet, sunucuya taşı")**:
+  moving live backend off Render onto user's OVH VPS (ubuntu@57.129.6.57 —
+  password was posted in chat, user told to rotate it; NEVER store it).
+  SSH egress is BLOCKED from this container — all server access goes through
+  GitHub Actions (deploy-server.yml: rsync code → /opt/masalim/app, build
+  images ON the server, compose up, health check). Package: deploy/
+  docker-compose.server.yml (caddy+postgres+redis+minio+api+admin),
+  Caddyfile (sslip.io hosts, SSE flush -1), admin.Dockerfile,
+  remote-setup.sh (generates /opt/masalim/.env once), docs/deploy-server.md
+  (Turkish walkthrough). URLs: https://api.57-129-6-57.sslip.io (+ admin./
+  storage.). Needs user: bootstrap block on server + 5 GitHub secrets
+  (SERVER_SSH_KEY, AI/TTS/VOICE_CLONE/IMAGE_API_KEY). After first green
+  deploy: switch android-apk.yml EXPO_PUBLIC_API_URL to the new API URL,
+  rebuild+verify APK, then retire Render + keepalive.yml. Server DB starts
+  EMPTY (Render test data not migrated unless asked).
+
 ## Environment gotchas
 
 - ⚠ NestJS runs via `pnpm dev` (nest start) — NEVER tsx (esbuild drops

@@ -1,0 +1,23 @@
+# Masalım — Caddy ters vekil + otomatik HTTPS (Let's Encrypt).
+# sslip.io: alan adı satın almadan IP'ye çözünen ücretsiz DNS
+# (api.57-129-6-57.sslip.io → 57.129.6.57). Gerçek bir alan adına geçerken
+# yalnızca bu üç satırdaki host'ları değiştirmek yeterli (bkz.
+# docs/deploy-server.md).
+
+api.57-129-6-57.sslip.io {
+	encode gzip
+	# flush_interval -1: SSE (GET /jobs/:id/stream) akışı tamponlanmasın.
+	reverse_proxy api:3001 {
+		flush_interval -1
+	}
+}
+
+storage.57-129-6-57.sslip.io {
+	# MinIO — imzalı URL'ler telefondan doğrudan buraya gelir; gzip yok (medya).
+	reverse_proxy minio:9000
+}
+
+admin.57-129-6-57.sslip.io {
+	encode gzip
+	reverse_proxy admin:3000
+}

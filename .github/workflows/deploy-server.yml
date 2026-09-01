@@ -1,0 +1,88 @@
+# Masalım — OVH sunucusuna dağıtım (57.129.6.57).
+# Kod runner'dan sunucuya rsync'lenir, Docker imajları SUNUCUDA derlenir
+# (katman önbelleği sunucuda kaldığından lockfile değişmedikçe yeniden
+# derlemeler hızlıdır), compose ayağa kaldırılır, sağlık kontrolü yapılır.
+#
+# Gerekli GitHub Secrets (Settings → Secrets and variables → Actions):
+#   SERVER_SSH_KEY       — sunucudaki ~/.ssh/masalim_deploy ÖZEL anahtarı
+#   AI_API_KEY           — OpenAI anahtarı (hikâye + denetim)
+#   TTS_API_KEY          — ElevenLabs anahtarı (seslendirme)
+#   VOICE_CLONE_API_KEY  — ElevenLabs anahtarı (ses klonlama)
+#   IMAGE_API_KEY        — OpenAI anahtarı (görseller)
+# Kurulum adımları: docs/deploy-server.md (Türkçe, adım adım).
+name: Deploy Server
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "apps/api/**"
+      - "apps/admin/**"
+      - "packages/**"
+      - "deploy/**"
+      - "pnpm-lock.yaml"
+      - ".github/workflows/deploy-server.yml"
+
+concurrency:
+  group: deploy-server
+  cancel-in-progress: false
+
+env:
+  SERVER: ubuntu@57.129.6.57
+  API_URL: https://api.57-129-6-57.sslip.io
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: SSH anahtarını hazırla
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s\n' "${{ secrets.SERVER_SSH_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -H 57.129.6.57 >> ~/.ssh/known_hosts
+
+      - name: Kodu sunucuya eşitle
+        run: |
+          ssh "$SERVER" 'mkdir -p /opt/masalim/app'
+          rsync -az --delete \
+            --exclude .git --exclude node_modules --exclude .turbo \
+            ./ "$SERVER":/opt/masalim/app/
+
+      - name: Sunucu hazırlığı (.env üretimi, ilk seferde)
+        run: ssh "$SERVER" 'bash /opt/masalim/app/deploy/remote-setup.sh'
+
+      - name: Sağlayıcı anahtarlarını yaz
+        env:
+          AI_API_KEY: ${{ secrets.AI_API_KEY }}
+          TTS_API_KEY: ${{ secrets.TTS_API_KEY }}
+          VOICE_CLONE_API_KEY: ${{ secrets.VOICE_CLONE_API_KEY }}
+          IMAGE_API_KEY: ${{ secrets.IMAGE_API_KEY }}
+        run: |
+          {
+            echo "AI_API_KEY=$AI_API_KEY"
+            echo "TTS_API_KEY=$TTS_API_KEY"
+            echo "VOICE_CLONE_API_KEY=$VOICE_CLONE_API_KEY"
+            echo "IMAGE_API_KEY=$IMAGE_API_KEY"
+          } | ssh "$SERVER" 'umask 077; cat > /opt/masalim/providers.env'
+
+      - name: Derle ve ayağa kaldır
+        run: |
+          ssh "$SERVER" '
+            set -e
+            COMPOSE="docker compose -f /opt/masalim/app/deploy/docker-compose.server.yml --project-directory /opt/masalim"
+            $COMPOSE build --pull api admin
+            $COMPOSE up -d --remove-orphans
+            docker image prune -f
+          '
+
+      - name: Sağlık kontrolü
+        run: |
+          echo "API bekleniyor: $API_URL/health"
+          curl --retry 40 --retry-delay 10 --retry-all-errors -fsS "$API_URL/health"
+          echo
+          echo "API canlı: $API_URL"
