@@ -321,6 +321,39 @@ Local `.env` = `.env.example` + generated JWT secrets (already present, gitignor
   rebuild+verify APK, then retire Render + keepalive.yml. Server DB starts
   EMPTY (Render test data not migrated unless asked).
 
+- **MONETIZATION LIVE MODEL IMPLEMENTED (Sep 1, PR #13)** — hybrid credits,
+  all numbers user-locked on MAX-cost basis (v3+görsel her masalda; net =
+  sticker×0.708; ₺15,5/kredi tavan): story costs SHORT 3/MEDIUM 6/LONG 10
+  kredi (1 kr ≈ 1 dk; first narration+illustration set INCLUDED, extras half
+  2/3/5); PREMIUM ₺999,99/ay + 30 kr/ay kota (tavan kullanımda bile %34 marj);
+  packs FREE ₺50/kr (6/12/30 = ₺299,99/₺599,99/₺1.499,99), member ₺40/kr
+  (₺239,99/₺479,99/₺1.199,99); signup gift 6 kr + FREE aylık kota 3 kr
+  ("ayda 1 kısa masal"); purchased credits never expire; yearly DEFERRED.
+  Backend: CreditLedger (quota/balance split, idempotent refund/grant) +
+  User.creditBalance; EntitlementService.consumeCredits (kota→bakiye, CAS tx)
+  + INSUFFICIENT_CREDITS (402); prices in PricingConfig row monetization_v1
+  (runtime-read → change without app update); /subscription/offerings serves
+  plan-priced packs (_std/_member DOUBLE products — stores can't per-user
+  price); NON_RENEWING_PURCHASE grants via same normalized webhook/mock
+  pipeline. Mobile: comparison-table paywall (user's screenshot layout, NO
+  time trial), quota.tsx → "Kredilerim" wallet (packs in-place),
+  credit-aware Home banner, wizard duration cards show 3/6/10 badges,
+  INSUFFICIENT_CREDITS routes to wallet everywhere. Verified:
+  scratchpad/smoke-monetization.sh (gift→kota→bakiye→insufficient→pack→
+  resume→print gate) + premium path (30 kr kota, member packs).
+- **BOOK PRINT = "YAKINDA" (launch decision)**: physical_books flag seeds
+  DISABLED (create-only — existing DBs keep value; admin panel toggles);
+  orders quote/create throw FEATURE_DISABLED server-side; mobile preview
+  print CTA shows YAKINDA badge + note instead of checkout. Digital
+  books/preview untouched.
+- **Illustration style fix**: STYLE_TEMPLATES rewritten as mutually exclusive
+  medium specs with negatives; style now LEADS sheet+edit prompts; edit
+  prompt carries "reference = identity only" + quality tier. Root cause of
+  "hep aynı tarz görsel": near-synonym templates + 'Character sheet:' anchor
+  + edit call's preserve-the-reference dominance. Picker descriptions now
+  concrete (Pixar tarzı / suluboya kâğıdı vs.). Style-sample thumbnails on
+  picker cards = open idea (needs IMAGE_API_KEY one-off generation).
+
 ## Environment gotchas
 
 - ⚠ NestJS runs via `pnpm dev` (nest start) — NEVER tsx (esbuild drops
