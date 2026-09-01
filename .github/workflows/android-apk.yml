@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       api_url:
-        description: "API adresi (örn. https://masalim-api-z6ry.onrender.com). Boş bırakılırsa canlı test API'si kullanılır."
+        description: "API adresi. Boş bırakılırsa canlı sunucu (VPS) kullanılır."
         required: false
         default: ""
   push:
@@ -23,7 +23,7 @@ jobs:
     timeout-minutes: 60
     env:
       # EXPO_PUBLIC_* values are inlined into the JS bundle at build time.
-      EXPO_PUBLIC_API_URL: ${{ inputs.api_url != '' && inputs.api_url || 'https://masalim-api-z6ry.onrender.com' }}
+      EXPO_PUBLIC_API_URL: ${{ inputs.api_url != '' && inputs.api_url || 'https://api.57-129-6-57.sslip.io' }}
       EXPO_PUBLIC_PURCHASES_PROVIDER: mock
     steps:
       - uses: actions/checkout@v4

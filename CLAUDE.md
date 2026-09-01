@@ -305,21 +305,25 @@ Local `.env` = `.env.example` + generated JWT secrets (already present, gitignor
   seenTours in app-prefs, settings "Tanıtımı tekrar göster" row, tour.* i18n
   (790 keys parity). Tour APK: android-apk run 33512730502 (96fecef) —
   emulator verify dispatched; superseded by the server-migration APK below.
-- **VPS MIGRATION IN PROGRESS (Sep 1, user approved "Evet, sunucuya taşı")**:
-  moving live backend off Render onto user's OVH VPS (ubuntu@57.129.6.57 —
-  password was posted in chat, user told to rotate it; NEVER store it).
-  SSH egress is BLOCKED from this container — all server access goes through
-  GitHub Actions (deploy-server.yml: rsync code → /opt/masalim/app, build
-  images ON the server, compose up, health check). Package: deploy/
-  docker-compose.server.yml (caddy+postgres+redis+minio+api+admin),
-  Caddyfile (sslip.io hosts, SSE flush -1), admin.Dockerfile,
-  remote-setup.sh (generates /opt/masalim/.env once), docs/deploy-server.md
-  (Turkish walkthrough). URLs: https://api.57-129-6-57.sslip.io (+ admin./
-  storage.). Needs user: bootstrap block on server + 5 GitHub secrets
-  (SERVER_SSH_KEY, AI/TTS/VOICE_CLONE/IMAGE_API_KEY). After first green
-  deploy: switch android-apk.yml EXPO_PUBLIC_API_URL to the new API URL,
-  rebuild+verify APK, then retire Render + keepalive.yml. Server DB starts
-  EMPTY (Render test data not migrated unless asked).
+- **VPS LIVE (Sep 1) — backend runs on user's OVH server**: deploy-server.yml
+  run 33560702506 GREEN → https://api.57-129-6-57.sslip.io/health ok, admin at
+  https://admin.57-129-6-57.sslip.io, storage at storage.<same>. Architecture
+  (PR #12 + #14): server keeps its host nginx on 80/443 (OTHER projects live
+  there — never restart it, `nginx -t` + reload only); Masalım services bind
+  127.0.0.1 only (api 8801, minio 8802, admin 8803) via
+  deploy/docker-compose.server.yml; deploy/nginx-masalim.conf adds 3 vhosts;
+  certbot --nginx handles TLS. Deploy = rsync → /opt/masalim/app, images built
+  ON the server, compose up, health check; auto-runs on main pushes touching
+  apps/api|admin/packages/deploy. Secrets: SERVER_SSH_KEY +
+  AI/TTS/VOICE_CLONE/IMAGE_API_KEY; /opt/masalim/.env generated once by
+  remote-setup.sh, providers.env rewritten each deploy. SSH egress BLOCKED
+  from this container — server access ONLY via GitHub Actions. VPS DB started
+  EMPTY (fresh seed: monetization_v1 config, physical_books OFF; Render test
+  data not migrated unless asked). android-apk.yml default EXPO_PUBLIC_API_URL
+  now the VPS URL (3a532f4). REMAINING: user tests the VPS APK a few days →
+  then delete Render services + keepalive.yml (+ UptimeRobot). User reminded
+  to rotate server password + regenerate the SSH deploy key (private key was
+  visible in a screenshot).
 
 - **MONETIZATION LIVE MODEL IMPLEMENTED (Sep 1, PR #13)** — hybrid credits,
   all numbers user-locked on MAX-cost basis (v3+görsel her masalda; net =
