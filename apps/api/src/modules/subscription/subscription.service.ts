@@ -1,8 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { SubscriptionPlan, SubscriptionStatus } from '@masalim/types';
+import { CreditReason, SubscriptionPlan, SubscriptionStatus } from '@masalim/types';
 import type { Subscription as SubscriptionDto, SubscriptionEvent } from '@masalim/validation';
 import { PrismaService } from '../../prisma/prisma.service';
 import { EntitlementService } from './entitlement.service';
+import { MonetizationConfigService } from './monetization-config.service';
 
 /**
  * Store-subscription sync (§37): consumes normalized events — RevenueCat
@@ -16,6 +17,7 @@ export class SubscriptionService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly entitlements: EntitlementService,
+    private readonly monetization: MonetizationConfigService,
   ) {}
 
   async get(userId: string): Promise<SubscriptionDto> {
@@ -39,6 +41,28 @@ export class SubscriptionService {
       return;
     }
 
+    // Consumable credit pack: grant credits (idempotent on the store event id),
+    // plan/subscription state untouched.
+    if (event.eventType === 'NON_RENEWING_PURCHASE') {
+      const pack = await this.monetization.packFor(event.productId);
+      if (pack == null) {
+        this.logger.warn({ productId: event.productId }, 'credit purchase for unknown product');
+        return;
+      }
+      const idempotencyKey = `${provider}:${event.eventId ?? `${event.appUserId}:${event.eventTimeMs}`}`;
+      const granted = await this.entitlements.grantCredits(
+        user.id,
+        pack.credits,
+        CreditReason.PURCHASE,
+        { type: 'product', id: event.productId },
+        idempotencyKey,
+      );
+      if (!granted) {
+        this.logger.warn({ idempotencyKey }, 'replayed credit purchase ignored');
+      }
+      return;
+    }
+
     const eventAt = new Date(event.eventTimeMs);
     const existing = await this.prisma.subscription.findUnique({
       where: { userId: user.id },
@@ -52,7 +76,8 @@ export class SubscriptionService {
       return;
     }
 
-    const status = statusForEvent(event.eventType);
+    // NON_RENEWING_PURCHASE returned above — the remaining kinds drive plan state.
+    const status = statusForEvent(event.eventType as Exclude<SubscriptionEvent['eventType'], 'NON_RENEWING_PURCHASE'>);
     const expiresAt = event.expirationAtMs == null ? null : new Date(event.expirationAtMs);
 
     await this.prisma.subscription.upsert({
@@ -85,7 +110,9 @@ export class SubscriptionService {
   }
 }
 
-function statusForEvent(eventType: SubscriptionEvent['eventType']): SubscriptionStatus {
+function statusForEvent(
+  eventType: Exclude<SubscriptionEvent['eventType'], 'NON_RENEWING_PURCHASE'>,
+): SubscriptionStatus {
   switch (eventType) {
     case 'INITIAL_PURCHASE':
     case 'RENEWAL':

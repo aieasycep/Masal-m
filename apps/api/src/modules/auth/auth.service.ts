@@ -1,7 +1,7 @@
 import { createHash, randomInt } from 'node:crypto';
 import { HttpStatus, Injectable } from '@nestjs/common';
 import * as argon2 from 'argon2';
-import { AuthProvider, ErrorCode } from '@masalim/types';
+import { AuthProvider, ErrorCode, CreditReason, SIGNUP_GIFT_CREDITS } from '@masalim/types';
 import type {
   AppleAuthInput,
   AuthSession,
@@ -16,6 +16,7 @@ import type { User } from '@masalim/database';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AppException } from '../../common/errors/app.exception';
 import { MailService } from '../../providers/mail.service';
+import { EntitlementService } from '../subscription/entitlement.service';
 import { LockoutService } from './lockout.service';
 import { SocialVerifyService } from './social-verify.service';
 import { TokenService } from './token.service';
@@ -30,6 +31,7 @@ export class AuthService {
     private readonly social: SocialVerifyService,
     private readonly lockout: LockoutService,
     private readonly mail: MailService,
+    private readonly entitlements: EntitlementService,
   ) {}
 
   async register(input: RegisterInput): Promise<AuthSession> {
@@ -52,6 +54,7 @@ export class AuthService {
         },
       },
     });
+    await this.grantSignupGift(user.id);
     return this.buildSession(user);
   }
 
@@ -193,13 +196,28 @@ export class AuthService {
     }
 
     const placeholderEmail = email ?? `${provider.toLowerCase()}-${providerUserId}@users.masalim.app`;
-    return this.prisma.user.create({
+    const created = await this.prisma.user.create({
       data: {
         email: placeholderEmail,
         name: fullName ?? 'Masalım Kullanıcısı',
         identities: { create: { provider, providerUserId } },
       },
     });
+    await this.grantSignupGift(created.id);
+    return created;
+  }
+
+  /** Tanışma hediyesi: every new account starts with a small credit gift. */
+  private async grantSignupGift(userId: string): Promise<void> {
+    await this.entitlements
+      .grantCredits(
+        userId,
+        SIGNUP_GIFT_CREDITS,
+        CreditReason.SIGNUP_GIFT,
+        { type: 'user', id: userId },
+        `gift:${userId}`,
+      )
+      .catch(() => undefined); // a failed gift must never block registration
   }
 
   /** Signing in during the grace period cancels a pending account deletion (§84). */

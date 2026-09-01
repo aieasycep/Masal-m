@@ -9,7 +9,6 @@ import { UnrecoverableError, Worker, Job } from 'bullmq';
 import type Redis from 'ioredis';
 import {
   AIJobType,
-  EntitlementKey,
   ErrorCode,
   ModerationStatus,
   NotificationType,
@@ -207,7 +206,7 @@ export class StoryGenerationProcessor implements OnModuleInit, OnApplicationShut
       where: { id: storyId },
       data: { status: StoryStatus.FAILED, moderationStatus: ModerationStatus.REJECTED },
     });
-    await this.entitlements.refundQuota(userId, EntitlementKey.STORY_MONTHLY_LIMIT);
+    await this.entitlements.refundCreditsForRef(userId, 'story', storyId);
     await this.jobs.fail(
       aiJob.id,
       ErrorCode.MODERATION_REJECTED,
@@ -225,7 +224,7 @@ export class StoryGenerationProcessor implements OnModuleInit, OnApplicationShut
       where: { id: storyId },
       data: { status: StoryStatus.FAILED },
     });
-    await this.entitlements.refundQuota(userId, EntitlementKey.STORY_MONTHLY_LIMIT);
+    await this.entitlements.refundCreditsForRef(userId, 'story', storyId);
     await this.prisma.aIUsageLog.create({
       data: {
         userId,

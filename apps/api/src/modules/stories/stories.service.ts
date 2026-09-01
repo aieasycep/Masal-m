@@ -1,9 +1,10 @@
 import { HttpStatus, Inject, Injectable } from '@nestjs/common';
 import {
   AIJobType,
-  EntitlementKey,
+  CreditReason,
   ErrorCode,
   ModerationStatus,
+  STORY_CREDIT_COSTS,
   StoryStatus,
 } from '@masalim/types';
 import type { ContentModerator } from '@masalim/ai';
@@ -134,7 +135,14 @@ export class StoriesService {
       }
     }
 
-    await this.entitlements.consumeQuota(userId, EntitlementKey.STORY_MONTHLY_LIMIT);
+    // Credit cost scales with length (1 kredi ≈ 1 dakika): SHORT 3 / MEDIUM 6 /
+    // LONG 10. The story's first narration + first illustration set are included.
+    await this.entitlements.consumeCredits(
+      userId,
+      STORY_CREDIT_COSTS[story.durationTarget],
+      CreditReason.STORY_SPEND,
+      { type: 'story', id: storyId },
+    );
     try {
       await this.prisma.story.update({
         where: { id: storyId },
@@ -148,7 +156,7 @@ export class StoriesService {
       });
       return { jobId: job.id };
     } catch (error) {
-      await this.entitlements.refundQuota(userId, EntitlementKey.STORY_MONTHLY_LIMIT);
+      await this.entitlements.refundCreditsForRef(userId, 'story', storyId);
       await this.prisma.story
         .update({ where: { id: storyId }, data: { status: story.status } })
         .catch(() => undefined);

@@ -172,6 +172,16 @@ enum SubscriptionStatus {
   GRACE
 }
 
+enum CreditReason {
+  SIGNUP_GIFT
+  PURCHASE
+  STORY_SPEND
+  EXTRA_NARRATION_SPEND
+  EXTRA_ILLUSTRATION_SPEND
+  REFUND
+  ADMIN_ADJUST
+}
+
 enum AIJobType {
   STORY_GENERATION
   VOICE_CLONE
@@ -230,6 +240,9 @@ model User {
   onboardingCompleted Boolean   @default(false)
   notificationPrefs   Json      @default("{}")
   subscriptionPlan    SubscriptionPlan @default(FREE)
+  /// Purchased/gifted credit balance (never expires). Monthly quota lives in
+  /// EntitlementUsage; every change to this column has a CreditLedger row.
+  creditBalance       Int       @default(0)
   createdAt           DateTime  @default(now())
   updatedAt           DateTime  @updatedAt
   deletedAt           DateTime?
@@ -249,6 +262,7 @@ model User {
   aiJobs            AIJob[]
   usageLogs         AIUsageLog[]
   entitlementUsages EntitlementUsage[]
+  creditLedger      CreditLedger[]
   deletionRequests  DeletionRequest[]
   passwordResets    PasswordReset[]
   playbackPositions PlaybackPosition[]
@@ -679,6 +693,27 @@ model EntitlementUsage {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, key, periodStart])
+}
+
+/// Append-only credit movements. `delta` is the change to User.creditBalance
+/// (negative = spend); `quotaPart` records how much of the same action was
+/// covered by the monthly quota instead — refunds reverse both parts.
+model CreditLedger {
+  id             String       @id @default(cuid())
+  userId         String
+  delta          Int
+  quotaPart      Int          @default(0)
+  reason         CreditReason
+  refType        String?
+  refId          String?
+  balanceAfter   Int
+  idempotencyKey String?      @unique
+  createdAt      DateTime     @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([refType, refId])
 }
 
 // ── Notifications ────────────────────────────────────────────────────────────

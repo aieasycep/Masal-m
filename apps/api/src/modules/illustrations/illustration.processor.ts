@@ -8,7 +8,6 @@ import {
 import { UnrecoverableError, Worker, type Job } from 'bullmq';
 import Redis from 'ioredis';
 import {
-  EntitlementKey,
   ErrorCode,
   IllustrationSetStatus,
   NotificationType,
@@ -180,10 +179,7 @@ export class IllustrationProcessor implements OnModuleInit, OnApplicationShutdow
           where: { id: set.id },
           data: { status: IllustrationSetStatus.FAILED },
         });
-        await this.entitlements.refundQuota(
-          story.userId,
-          EntitlementKey.ILLUSTRATION_MONTHLY_LIMIT,
-        );
+        await this.entitlements.refundCreditsForRef(story.userId, 'illustration_set', set.id);
         await this.jobs.fail(
           aiJob.id,
           ErrorCode.ILLUSTRATION_FAILED,

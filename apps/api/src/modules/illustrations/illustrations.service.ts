@@ -1,8 +1,9 @@
 import { HttpStatus, Inject, Injectable } from '@nestjs/common';
 import {
   AIJobType,
-  EntitlementKey,
+  CreditReason,
   ErrorCode,
+  EXTRA_ACTION_CREDIT_COSTS,
   IllustrationSetStatus,
   StoryStatus,
 } from '@masalim/types';
@@ -82,17 +83,40 @@ export class IllustrationsService {
       };
     }
 
-    await this.entitlements.consumeQuota(userId, EntitlementKey.ILLUSTRATION_MONTHLY_LIMIT);
+    // The story's FIRST illustration set is included in its story credits;
+    // every further set (a different style) costs half the story price.
+    const priorSets = await this.prisma.illustrationSet.count({
+      where: {
+        storyId,
+        storyVersion: story.version,
+        status: { in: ['QUEUED', 'GENERATING', 'READY'] },
+      },
+    });
+    const creditCost = priorSets === 0 ? 0 : EXTRA_ACTION_CREDIT_COSTS[story.durationTarget];
+
+    const set = await this.prisma.illustrationSet.create({
+      data: {
+        storyId,
+        storyVersion: story.version,
+        style: input.style,
+        status: IllustrationSetStatus.QUEUED,
+      },
+      include: { illustrations: true },
+    });
+    if (creditCost > 0) {
+      try {
+        await this.entitlements.consumeCredits(
+          userId,
+          creditCost,
+          CreditReason.EXTRA_ILLUSTRATION_SPEND,
+          { type: 'illustration_set', id: set.id },
+        );
+      } catch (error) {
+        await this.prisma.illustrationSet.delete({ where: { id: set.id } }).catch(() => undefined);
+        throw error;
+      }
+    }
     try {
-      const set = await this.prisma.illustrationSet.create({
-        data: {
-          storyId,
-          storyVersion: story.version,
-          style: input.style,
-          status: IllustrationSetStatus.QUEUED,
-        },
-        include: { illustrations: true },
-      });
       const job = await this.jobs.enqueue({
         userId,
         type: AIJobType.ILLUSTRATION_GENERATION,
@@ -101,7 +125,8 @@ export class IllustrationsService {
       });
       return { set: await this.toDto(set, pageCount, userId), jobId: job.id };
     } catch (error) {
-      await this.entitlements.refundQuota(userId, EntitlementKey.ILLUSTRATION_MONTHLY_LIMIT);
+      await this.entitlements.refundCreditsForRef(userId, 'illustration_set', set.id);
+      await this.prisma.illustrationSet.delete({ where: { id: set.id } }).catch(() => undefined);
       throw error;
     }
   }

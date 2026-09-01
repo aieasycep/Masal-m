@@ -11,11 +11,13 @@ import {
 import { ApiTags } from '@nestjs/swagger';
 import { createZodDto } from 'nestjs-zod';
 import { z } from 'zod';
-import { ErrorCode } from '@masalim/types';
+import { randomUUID } from 'node:crypto';
+import { CREDIT_PACK_PRODUCT_IDS, ErrorCode } from '@masalim/types';
 import {
   mockPurchaseSchema,
   subscriptionEventSchema,
   EntitlementsResponse,
+  OfferingsResponse,
   Subscription,
   SubscriptionEvent,
 } from '@masalim/validation';
@@ -26,11 +28,13 @@ import { AppException } from '../../common/errors/app.exception';
 import { ENV } from '../../config/config.module';
 import type { Env } from '../../config/env';
 import { EntitlementService } from './entitlement.service';
+import { MonetizationConfigService } from './monetization-config.service';
 import { SubscriptionService } from './subscription.service';
 
 /** RevenueCat webhook envelope — mapped to the normalized event shape. */
 const revenueCatWebhookSchema = z.object({
   event: z.object({
+    id: z.string().nullish(),
     type: z.string(),
     app_user_id: z.string(),
     product_id: z.string().nullish(),
@@ -50,6 +54,7 @@ const SUPPORTED_EVENTS = new Set<SubscriptionEvent['eventType']>([
   'EXPIRATION',
   'BILLING_ISSUE',
   'UNCANCELLATION',
+  'NON_RENEWING_PURCHASE',
 ]);
 
 @ApiTags('subscription')
@@ -58,6 +63,7 @@ export class SubscriptionController {
   constructor(
     private readonly subscriptions: SubscriptionService,
     private readonly entitlements: EntitlementService,
+    private readonly monetization: MonetizationConfigService,
     @Inject(ENV) private readonly env: Env,
   ) {}
 
@@ -69,6 +75,13 @@ export class SubscriptionController {
   @Get('entitlements')
   resolveEntitlements(@CurrentUser() user: AuthenticatedUser): Promise<EntitlementsResponse> {
     return this.entitlements.resolve(user.id);
+  }
+
+  /** Paywall products for THIS user: subscription + plan-priced credit packs. */
+  @Get('offerings')
+  async offerings(@CurrentUser() user: AuthenticatedUser): Promise<OfferingsResponse> {
+    const plan = await this.entitlements.planFor(user.id);
+    return this.monetization.offeringsFor(plan);
   }
 
   /** RevenueCat-shaped webhook — authenticated by the shared Authorization secret. */
@@ -100,6 +113,7 @@ export class SubscriptionController {
         eventTimeMs: body.event.event_timestamp_ms,
         expirationAtMs: body.event.expiration_at_ms ?? null,
         environment: body.event.environment,
+        eventId: body.event.id ?? null,
       }),
       'revenuecat',
     );
@@ -116,16 +130,26 @@ export class SubscriptionController {
     @Body() body: MockPurchaseDto,
   ): Promise<Subscription> {
     this.assertMockAllowed();
-    const days = body.productId === 'masalim_premium_yearly' ? 365 : 30;
+    const isPack = (CREDIT_PACK_PRODUCT_IDS as readonly string[]).includes(body.productId);
     await this.subscriptions.applyEvent(
-      {
-        eventType: 'INITIAL_PURCHASE',
-        appUserId: user.id,
-        productId: body.productId,
-        eventTimeMs: Date.now(),
-        expirationAtMs: Date.now() + days * 24 * 3600 * 1000,
-        environment: 'SANDBOX',
-      },
+      isPack
+        ? {
+            eventType: 'NON_RENEWING_PURCHASE',
+            appUserId: user.id,
+            productId: body.productId,
+            eventTimeMs: Date.now(),
+            expirationAtMs: null,
+            environment: 'SANDBOX',
+            eventId: `mock:${randomUUID()}`,
+          }
+        : {
+            eventType: 'INITIAL_PURCHASE',
+            appUserId: user.id,
+            productId: body.productId,
+            eventTimeMs: Date.now(),
+            expirationAtMs: Date.now() + 30 * 24 * 3600 * 1000,
+            environment: 'SANDBOX',
+          },
       'mock',
     );
     return this.subscriptions.get(user.id);

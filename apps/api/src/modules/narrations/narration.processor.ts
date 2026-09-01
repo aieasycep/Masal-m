@@ -19,6 +19,7 @@ import { ENV } from '../../config/config.module';
 import type { Env } from '../../config/env';
 import { NARRATION_DIRECTOR, STORAGE, TTS } from '../../providers/providers.module';
 import { JobsService } from '../../jobs/jobs.service';
+import { EntitlementService } from '../subscription/entitlement.service';
 import { QueueName, type QueueJobData } from '../../jobs/queues';
 import { NotificationsService } from '../notifications/notifications.service';
 import {
@@ -49,6 +50,7 @@ export class NarrationProcessor implements OnModuleInit, OnApplicationShutdown {
     @Inject(STORAGE) private readonly storage: StorageProvider,
     @Inject(REDIS) private readonly redis: Redis,
     @Inject(ENV) private readonly env: Env,
+    private readonly entitlements: EntitlementService,
   ) {}
 
   onModuleInit(): void {
@@ -191,10 +193,14 @@ export class NarrationProcessor implements OnModuleInit, OnApplicationShutdown {
   }
 
   private async finalizeFailure(aiJobId: string, narrationId: string, message: string): Promise<void> {
-    await this.prisma.narration.update({
+    const row = await this.prisma.narration.update({
       where: { id: narrationId },
       data: { status: NarrationStatus.FAILED, error: message.slice(0, 300) },
+      include: { story: { select: { userId: true } } },
     });
+    // Extra-narration spends are given back on terminal failure (no-op for
+    // the included first narration, which has no spend row).
+    await this.entitlements.refundCreditsForRef(row.story.userId, 'narration', narrationId);
     await this.jobs.fail(aiJobId, ErrorCode.TTS_FAILED, message);
   }
 

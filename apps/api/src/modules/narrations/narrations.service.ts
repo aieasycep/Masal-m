@@ -1,8 +1,10 @@
 import { HttpStatus, Inject, Injectable } from '@nestjs/common';
 import {
   AIJobType,
+  CreditReason,
   EntitlementKey,
   ErrorCode,
+  EXTRA_ACTION_CREDIT_COSTS,
   NarrationStatus,
   StoryStatus,
   VoiceProfileStatus,
@@ -150,6 +152,17 @@ export class NarrationsService {
       return { narration: await this.toDto(existing), jobId: activeJob?.id ?? null };
     }
 
+    // The story's FIRST narration is included in its story credits; narrating
+    // the same version with ANOTHER voice costs half the story price.
+    const priorNarrations = await this.prisma.narration.count({
+      where: {
+        storyId,
+        storyVersion: story.version,
+        status: { in: [NarrationStatus.QUEUED, NarrationStatus.PROCESSING, NarrationStatus.READY] },
+      },
+    });
+    const creditCost = priorNarrations === 0 ? 0 : EXTRA_ACTION_CREDIT_COSTS[story.durationTarget];
+
     const narration = await this.prisma.narration.create({
       data: {
         storyId,
@@ -161,14 +174,33 @@ export class NarrationsService {
       },
       include: NARRATION_INCLUDE,
     });
-    const job = await this.jobs.enqueue({
-      userId,
-      type: AIJobType.NARRATION_GENERATION,
-      entityId: narration.id,
-      queueJobId: `narration:${storyId}:v${story.version}:${voiceKey}`,
-    });
-    await this.pruneFailed(storyId);
-    return { narration: await this.toDto(narration), jobId: job.id };
+    if (creditCost > 0) {
+      try {
+        await this.entitlements.consumeCredits(
+          userId,
+          creditCost,
+          CreditReason.EXTRA_NARRATION_SPEND,
+          { type: 'narration', id: narration.id },
+        );
+      } catch (error) {
+        await this.prisma.narration.delete({ where: { id: narration.id } }).catch(() => undefined);
+        throw error;
+      }
+    }
+    try {
+      const job = await this.jobs.enqueue({
+        userId,
+        type: AIJobType.NARRATION_GENERATION,
+        entityId: narration.id,
+        queueJobId: `narration:${storyId}:v${story.version}:${voiceKey}`,
+      });
+      await this.pruneFailed(storyId);
+      return { narration: await this.toDto(narration), jobId: job.id };
+    } catch (error) {
+      await this.entitlements.refundCreditsForRef(userId, 'narration', narration.id);
+      await this.prisma.narration.delete({ where: { id: narration.id } }).catch(() => undefined);
+      throw error;
+    }
   }
 
   private async toDto(row: NarrationWithVoices): Promise<NarrationDto> {

@@ -103,7 +103,10 @@ async function seedSystemVoices() {
 
 async function seedFeatureFlags() {
   const flags = [
-    { key: 'physical_books', enabled: true, isPublic: true, description: 'Physical book ordering flow' },
+    // Launch decision (Sep 2026): book PRINT ordering is "Yakında" — the digital
+    // book/preview experience stays, checkout is closed. Existing databases keep
+    // their current value (enabled is create-only here); toggle via admin panel.
+    { key: 'physical_books', enabled: false, isPublic: true, description: 'Physical book ordering flow' },
     { key: 'parent_voice_cloning', enabled: true, isPublic: true, description: 'Parent voice recording & cloning' },
     { key: 'illustrations', enabled: true, isPublic: true, description: 'AI illustration generation' },
     { key: 'subscriptions', enabled: true, isPublic: true, description: 'Premium subscriptions & paywall' },
@@ -137,6 +140,31 @@ async function seedPricing() {
           { minQuantity: 4, percentOff: 10 },
         ],
         estimatedDeliveryDays: { min: 7, max: 12 },
+      },
+      active: true,
+    },
+    update: {},
+  });
+
+  // Monetization (Sep 2026 launch model): the API reads THIS row at runtime —
+  // prices/quotas can be changed here (or via admin/db) without an app update.
+  // Pack prices differ by plan tier; store products carry fixed prices, so
+  // each size exists as a _std (free-tier ₺50/kr) and _member (₺40/kr) product.
+  await prisma.pricingConfig.upsert({
+    where: { key: 'monetization_v1' },
+    create: {
+      key: 'monetization_v1',
+      value: {
+        currency: 'TRY',
+        subscription: { productId: 'masalim_premium_monthly', priceTRY: '999.99', monthlyCredits: 30 },
+        packs: [
+          { productId: 'masalim_credits_6_std', tier: 'FREE', credits: 6, priceTRY: '299.99' },
+          { productId: 'masalim_credits_12_std', tier: 'FREE', credits: 12, priceTRY: '599.99' },
+          { productId: 'masalim_credits_30_std', tier: 'FREE', credits: 30, priceTRY: '1499.99' },
+          { productId: 'masalim_credits_6_member', tier: 'PREMIUM', credits: 6, priceTRY: '239.99' },
+          { productId: 'masalim_credits_12_member', tier: 'PREMIUM', credits: 12, priceTRY: '479.99' },
+          { productId: 'masalim_credits_30_member', tier: 'PREMIUM', credits: 30, priceTRY: '1199.99' },
+        ],
       },
       active: true,
     },

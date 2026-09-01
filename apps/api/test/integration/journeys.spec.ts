@@ -153,7 +153,45 @@ describe('critical journeys (integration)', () => {
       .set('Authorization', `Bearer ${session.token}`)
       .expect(200);
     expect(entitlements.body.plan).toBe('FREE');
-    expect(entitlements.body.quotas.story_monthly_limit.used).toBe(1);
+    // SHORT story = 3 credits, drawn from the 3-credit FREE monthly quota;
+    // the 6-credit signup gift balance stays untouched.
+    expect(entitlements.body.credits.quota.used).toBe(3);
+    expect(entitlements.body.credits.balance).toBe(6);
+  });
+
+  it('grants signup gift credits and sells credit packs through the mock store (§37)', async () => {
+    const session = await register('credits');
+    const before = await http()
+      .get('/subscription/entitlements')
+      .set(...V)
+      .set('Authorization', `Bearer ${session.token}`)
+      .expect(200);
+    expect(before.body.credits.balance).toBe(6);
+
+    const offerings = await http()
+      .get('/subscription/offerings')
+      .set(...V)
+      .set('Authorization', `Bearer ${session.token}`)
+      .expect(200);
+    expect(offerings.body.subscription.productId).toBe('masalim_premium_monthly');
+    const pack = offerings.body.packs.find(
+      (item: { productId: string }) => item.productId === 'masalim_credits_12_std',
+    );
+    expect(pack?.credits).toBe(12);
+
+    await http()
+      .post('/subscription/mock/purchase')
+      .set(...V)
+      .set('Authorization', `Bearer ${session.token}`)
+      .send({ productId: 'masalim_credits_12_std' })
+      .expect(201);
+    const after = await http()
+      .get('/subscription/entitlements')
+      .set(...V)
+      .set('Authorization', `Bearer ${session.token}`)
+      .expect(200);
+    expect(after.body.credits.balance).toBe(18);
+    expect(after.body.plan).toBe('FREE'); // consumable — plan unchanged
   });
 
   it('rejects blocklisted ideas at enqueue without consuming quota (§17)', async () => {
@@ -187,7 +225,8 @@ describe('critical journeys (integration)', () => {
       .set(...V)
       .set('Authorization', `Bearer ${session.token}`)
       .expect(200);
-    expect(entitlements.body.quotas.story_monthly_limit.used).toBe(0);
+    expect(entitlements.body.credits.quota.used).toBe(0);
+    expect(entitlements.body.credits.balance).toBe(6);
   });
 
   it('gates voice cloning on consent (literal true) and premium entitlement (§21/§36)', async () => {
