@@ -235,8 +235,8 @@ Local `.env` = `.env.example` + generated JWT secrets (already present, gitignor
   (also fixes the "Annemin Sesi" paid-plan failures). After upgrade user just
   taps "Tekrar Dene" — no code change needed. NOT an app bug.
 
-- **UI/UX REVIEW BRANCH (`uiux-review`)** — controlled review experiment, NOT
-  merged to main. Stable checkpoint: branch `stable-before-uiux-review` +
+- **UI/UX REVIEW BRANCH (`uiux-review`)** — review experiment, since APPROVED
+  and merged to main (see below). Stable checkpoint: branch `stable-before-uiux-review` +
   local tag `before-uiux-review` @ 7ba9dc1. Side-by-side review APK: package
   `com.masalim.app.uiuxreview`, name "Kendi Hikayem — UI/UX Review", identity
   applied ONLY in the runner (uiux-review-apk.yml mutates app.json at build;
@@ -262,19 +262,42 @@ Local `.env` = `.env.example` + generated JWT secrets (already present, gitignor
   hidden for registered children ("Yaş bilgisi profilden alınıyor"), result
   narrate tile "Sesi Değiştir" when narrations exist, Kitap Yap routes to
   illustrate when no READY set, suggestions-header "Tümü" removed. PR #4
-  draft "[DO NOT MERGE]" exists only for CI. NO merge without the user's
-  explicit "Yeni UI'yı onaylıyorum, production'a al."
-- **REVIEW APK DELIVERED & VERIFIED (Aug 28 18:47)**: run 33183446262
-  (b635ecb, V1+V2) — apk+smoke jobs green, APP_ALIVE=yes SMOKE_ALIVE=yes,
-  zero FATAL; artifact `kendihikayem-uiux-review-apk` /
-  KendiHikayem-UIUX-Review.apk (57.6MB). Final §43 report given; STATUS: NOT
-  MERGED — AWAITING USER REVIEW. QA at handoff: typecheck 27/27, lint 27/27,
-  test 26/26, i18n 771 keys. Artifact downloads need a logged-in GitHub tab
-  (incognito hides the link). No active send_later triggers. NEXT: on "Yeni
-  UI'yı onaylıyorum, production'a al" → merge uiux-review→main via PR #4
-  (review-only workflows uiux-review-apk.yml can come along harmlessly;
-  MIN_DURATION_SECONDS 45 then tightens the API); on rejection → branch stays,
-  stable untouched (checkpoint stable-before-uiux-review @ 7ba9dc1).
+  draft later became the promotion PR and was merged Sep 1.
+- **NEW UI PROMOTED TO PRODUCTION (Sep 1)** — user gave the explicit "Yeni
+  UI'yı onaylıyorum, production'a al" → PR #4 (uiux-review→main) merged @
+  401d18b. SINGLE app again: package `com.masalim.app` / "Masalım" carries the
+  approved design; the side-by-side review app is obsolete (user told to
+  uninstall). uiux-review-apk.yml removed from main in the cleanup PR;
+  `uiux-review` branch + checkpoint `stable-before-uiux-review` (@7ba9dc1,
+  pre-review rollback) left in place. VOICE_RECORDING 45s floor now enforced
+  by the API too (shared constant landed via the merge).
+- **Post-review fix train (all MERGED to main, Aug 29–Sep 1)**: PR #5 OpenAI
+  moderation provider (staging is now ALL-GPT: AI_PROVIDER=openai,
+  AI_MODEL=gpt-4o via cross-vendor model guard in providers.module.ts,
+  MODERATION_PROVIDER=openai/gpt-4o-mini; AI_API_KEY holds the OpenAI key —
+  reverting to Claude = flip those 3 env values back). PR #6 expressive
+  narration: TTS_MODEL defaults to eleven_v3 + NarrationDirector LLM pass
+  inserts v3 audio tags per chunk (tag-only guard — story words never change;
+  auto-fallback to eleven_multilingual_v2 + plain text; v2 path uses
+  storytelling voice_settings 0.35/0.45). PR #7 four-item UX pass: hard word
+  budgets + expand-repair in both story providers (countStoryWords/
+  minTotalWords in prompt-engine — GPT undershot 'Kısa' to 92 words),
+  KeepScreenAwake on job/recording screens (expo-keep-awake ships inside
+  expo), reader auto-follow 'sesli slayt' (timings-driven page turns,
+  activePageNumber in src/lib/narration-sync), wizard voice step REMOVED
+  (4 steps; voiceId threading deleted). PR #8 1s real silence at page
+  boundaries in narration concat (AudioChunkInput.gapAfterSeconds, anullsrc
+  silence matching clip format; timings cursor shifts by the gap). PR #9
+  auto-follow disengage fix: detect hand swipes via onScrollBeginDrag ONLY
+  (Android fires momentum-end for programmatic scrolls too — the reader's own
+  page turn was mistaken for a swipe), follow re-engages per new narration,
+  chip shows explicit açık/kapalı states.
+- **GitHub cron NEVER fires keepalive.yml** (state active, zero scheduled
+  runs) → Render still spins down after 15 idle min; user advised UptimeRobot
+  free 5-min monitor on /health (or Render Starter). Manual dispatch works.
+- Artifact downloads need a logged-in GitHub tab (incognito hides the link).
+  APK builds: android-apk.yml (push on claude/* + workflow_dispatch on main).
+  Verify EVERY handed-over APK via android-crash-log.yml (input apk_run_id).
 
 ## Environment gotchas
 
@@ -282,8 +305,6 @@ Local `.env` = `.env.example` + generated JWT secrets (already present, gitignor
   emitDecoratorMetadata → DI breaks). eslint consistent-type-imports is OFF in
   apps/api for the same reason.
 - Integration tests: `NODE_ENV=test` skips throttling (shared Redis buckets).
-- Known deferred deviation: voice preview playback buttons (wizard step 5,
-  voice studio list/review/success rows) await a shared preview-player pass.
 
 ## Verification checklist per phase
 
