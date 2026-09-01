@@ -187,7 +187,6 @@ export default function Reader() {
     enabled: id != null && id.length > 0,
   });
   const [follow, setFollow] = useState(true);
-  const programmaticScroll = useRef(false);
   const activeTrack = useActiveTrack();
   const { playing } = useIsPlaying();
   const { position } = usePlayerProgress(500);
@@ -201,6 +200,11 @@ export default function Reader() {
     );
   }, [activeTrack?.id, narrationsQuery.data]);
   const syncing = playing === true && playingNarration != null;
+  // A freshly loaded narration starts a new listening session — follow again.
+  const activeTrackId = activeTrack?.id ?? null;
+  useEffect(() => {
+    setFollow(true);
+  }, [activeTrackId]);
 
   useEffect(() => {
     if (!follow || !syncing || story == null) return;
@@ -210,7 +214,6 @@ export default function Reader() {
     const sorted = [...story.pages].sort((a, b) => a.pageNumber - b.pageNumber);
     const index = sorted.findIndex((page) => page.pageNumber === pageNumber);
     if (index < 0 || index === slideIndex) return;
-    programmaticScroll.current = true;
     listRef.current?.scrollToIndex({ index, animated: true });
     setSlideIndex(index);
   }, [follow, syncing, playingNarration, position, story, slideIndex]);
@@ -284,19 +287,19 @@ export default function Reader() {
   const goToSlide = (index: number) => {
     const clamped = Math.min(Math.max(index, 0), slides.length - 1);
     if (syncing) setFollow(false);
-    programmaticScroll.current = true;
     listRef.current?.scrollToIndex({ index: clamped, animated: true });
     setSlideIndex(clamped);
   };
 
+  // Only a real finger drag hands control back to the reader — programmatic
+  // scrolls never fire onScrollBeginDrag, while Android fires momentum-end for
+  // them too (sometimes twice), so momentum-end must not be treated as a swipe.
+  const onScrollBeginDrag = () => {
+    if (syncing) setFollow(false);
+  };
+
   const onMomentumScrollEnd = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
     const index = Math.round(event.nativeEvent.contentOffset.x / width);
-    if (programmaticScroll.current) {
-      programmaticScroll.current = false;
-    } else if (syncing) {
-      // A hand swipe while the audio drives the pages = the reader takes over.
-      setFollow(false);
-    }
     setSlideIndex(Math.min(Math.max(index, 0), slides.length - 1));
   };
 
@@ -436,7 +439,7 @@ export default function Reader() {
             style={[styles.followChip, follow && styles.followChipOn]}
           >
             <Text style={[styles.followChipText, follow && styles.followChipTextOn]}>
-              {`${follow ? '🎵' : '✋'} ${t('reader.autoFollow')}`}
+              {follow ? `🎵 ${t('reader.autoFollowOn')}` : `✋ ${t('reader.autoFollowOff')}`}
             </Text>
           </Pressable>
         </View>
@@ -450,6 +453,7 @@ export default function Reader() {
         pagingEnabled
         bounces={false}
         showsHorizontalScrollIndicator={false}
+        onScrollBeginDrag={onScrollBeginDrag}
         onMomentumScrollEnd={onMomentumScrollEnd}
         getItemLayout={(_, index) => ({ length: width, offset: width * index, index })}
       />
