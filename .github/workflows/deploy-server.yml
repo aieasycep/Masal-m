@@ -70,6 +70,32 @@ jobs:
             echo "IMAGE_API_KEY=$IMAGE_API_KEY"
           } | ssh "$SERVER" 'umask 077; cat > /opt/masalim/providers.env'
 
+      # Sunucuda 80/443 host nginx'te (başka projeler de yayında). Masalım'ın
+      # üç sanal sunucusu eklenir, `nginx -t` geçerse yalnızca RELOAD edilir —
+      # diğer siteler kesintiye uğramaz. TLS'i certbot aynı bloklara işler.
+      - name: Nginx sanal sunucuları + TLS sertifikaları
+        run: |
+          ssh "$SERVER" '
+            set -e
+            if ! sudo -n true 2>/dev/null; then
+              echo "::error::ubuntu kullanıcısında şifresiz sudo yok — nginx/TLS adımı elle yapılmalı (docs/deploy-server.md)"
+              exit 1
+            fi
+            sudo cp /opt/masalim/app/deploy/nginx-masalim.conf /etc/nginx/sites-available/masalim.conf
+            sudo ln -sf /etc/nginx/sites-available/masalim.conf /etc/nginx/sites-enabled/masalim.conf
+            sudo nginx -t
+            sudo systemctl reload nginx
+            if ! command -v certbot >/dev/null 2>&1; then
+              sudo apt-get update -y
+              sudo apt-get install -y certbot python3-certbot-nginx
+            fi
+            sudo certbot --nginx --non-interactive --agree-tos --register-unsafely-without-email \
+              --keep-until-expiring --redirect \
+              -d api.57-129-6-57.sslip.io -d storage.57-129-6-57.sslip.io -d admin.57-129-6-57.sslip.io
+            sudo nginx -t
+            sudo systemctl reload nginx
+          '
+
       - name: Derle ve ayağa kaldır
         run: |
           ssh "$SERVER" '

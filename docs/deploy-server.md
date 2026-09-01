@@ -6,7 +6,11 @@ Bu rehber Masalım'ın canlı ortamını Render yerine kendi sunucunda
 - API, veritabanı (PostgreSQL), Redis ve medya deposu (MinIO) **tek sunucuda**
   çalışır — uyku moduna geçme / soğuk açılış sorunu **tamamen biter**.
 - Her `main` güncellemesi GitHub Actions ile sunucuya **otomatik** yüklenir.
-- HTTPS sertifikaları (Let's Encrypt) otomatik alınır ve yenilenir.
+- HTTPS sertifikaları (Let's Encrypt/certbot) otomatik alınır ve yenilenir.
+- **Sunucudaki diğer projelere dokunulmaz:** her şey /opt/masalim klasöründe
+  yaşar, Masalım servisleri yalnızca 127.0.0.1'e açılır ve mevcut host
+  nginx'ine sadece kendi alan adlarımız için üç sanal sunucu eklenir
+  (`nginx -t` sınaması + yalnızca `reload` — restart yok).
 
 Adresler (kurulum sonrası):
 
@@ -46,7 +50,7 @@ Aynı SSH ekranında aşağıdaki bloğu **komple** kopyalayıp yapıştır ve E
 bas (Docker kurulumu birkaç dakika sürebilir):
 
 ```bash
-curl -fsSL https://get.docker.com | sudo sh
+command -v docker >/dev/null 2>&1 || (curl -fsSL https://get.docker.com | sudo sh)
 sudo usermod -aG docker ubuntu
 sudo mkdir -p /opt/masalim && sudo chown ubuntu:ubuntu /opt/masalim
 rm -f ~/.ssh/masalim_deploy ~/.ssh/masalim_deploy.pub
@@ -57,6 +61,9 @@ echo "===== SERVER_SSH_KEY (asagidaki TUM satirlari kopyala) ====="
 cat ~/.ssh/masalim_deploy
 echo "===== SON ====="
 ```
+
+(İlk satır Docker'ı yalnızca kurulu DEĞİLSE kurar — sunucudaki diğer
+projelerin Docker'ı varsa ona dokunulmaz.)
 
 Ekranın sonunda `-----BEGIN OPENSSH PRIVATE KEY-----` ile başlayıp
 `-----END OPENSSH PRIVATE KEY-----` ile biten bir metin göreceksin.
@@ -118,10 +125,15 @@ gerekmez, silebilirsin.
 
 ## Teknik notlar (meraklısına)
 
-- Dosyalar: `deploy/docker-compose.server.yml` (servisler),
-  `deploy/Caddyfile` (HTTPS + yönlendirme), `deploy/remote-setup.sh`
-  (ilk kurulumda sunucuda sırları üretir), `deploy/admin.Dockerfile`,
-  `.github/workflows/deploy-server.yml` (dağıtım).
+- Dosyalar: `deploy/docker-compose.server.yml` (servisler; api/minio/admin
+  yalnızca 127.0.0.1:8801-8803'e açılır), `deploy/nginx-masalim.conf`
+  (host nginx'ine eklenen üç sanal sunucu — TLS'i certbot işler),
+  `deploy/remote-setup.sh` (ilk kurulumda sunucuda sırları üretir),
+  `deploy/admin.Dockerfile`, `.github/workflows/deploy-server.yml` (dağıtım:
+  rsync → nginx vhost + certbot → compose build/up → sağlık kontrolü).
+- Bu sunucuda başka projeler host nginx'i (80/443) üzerinden yayında —
+  Masalım o nginx'in ARKASINA yerleşir; dağıtım nginx'i asla restart etmez,
+  `nginx -t` başarılıysa yalnızca reload eder.
 - Sırlar sunucuda `/opt/masalim/.env` (üretilmiş; git'e girmez) ve
   `/opt/masalim/providers.env` (GitHub Secrets'tan her dağıtımda yazılır)
   dosyalarındadır.

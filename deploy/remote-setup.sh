@@ -19,7 +19,8 @@ if [ ! -f "$ENV_FILE" ]; then
   cat > "$ENV_FILE" <<EOF
 # Masalım sunucu ortamı — deploy/remote-setup.sh tarafından üretildi.
 # Bu dosya sunucuda kalır, git'e girmez. Alan adı değişikliğinde buradaki
-# URL'ler + deploy/Caddyfile + compose'daki admin build arg birlikte güncellenir.
+# URL'ler + deploy/nginx-masalim.conf + compose'daki admin build arg birlikte
+# güncellenir.
 NODE_ENV=staging
 API_PORT=3001
 API_PUBLIC_URL=https://api.${DOMAIN_BASE}

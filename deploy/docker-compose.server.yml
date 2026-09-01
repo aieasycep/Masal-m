@@ -1,5 +1,12 @@
 # Masalım — tek sunucu canlı ortamı (Ubuntu VPS, 57.129.6.57).
 #
+# Bu sunucuda BAŞKA projeler de nginx (host) üzerinden yayında — 80/443 nginx'te
+# kalır. Masalım servisleri yalnızca 127.0.0.1'e açılır ve host nginx'i üç
+# sanal sunucu ile önlerine geçer (deploy/nginx-masalim.conf):
+#   api.57-129-6-57.sslip.io     → 127.0.0.1:8801 (api)
+#   storage.57-129-6-57.sslip.io → 127.0.0.1:8802 (minio)
+#   admin.57-129-6-57.sslip.io   → 127.0.0.1:8803 (admin)
+#
 # Sunucuda /opt/masalim düzeni:
 #   /opt/masalim/app            → repo kopyası (deploy workflow rsync'ler)
 #   /opt/masalim/.env           → üretilmiş sırlar (deploy/remote-setup.sh yazar)
@@ -9,25 +16,10 @@
 # Çalıştırma (deploy workflow'un yaptığı):
 #   docker compose -f /opt/masalim/app/deploy/docker-compose.server.yml \
 #     --project-directory /opt/masalim up -d --build
-#
-# Alan adı değiştirmek istersen: deploy/Caddyfile + buradaki admin build arg +
-# sunucudaki /opt/masalim/.env içindeki URL'ler birlikte güncellenmeli.
 
 name: masalim
 
 services:
-  caddy:
-    image: caddy:2
-    restart: unless-stopped
-    ports:
-      - "80:80"
-      - "443:443"
-      - "443:443/udp"
-    volumes:
-      - /opt/masalim/app/deploy/Caddyfile:/etc/caddy/Caddyfile:ro
-      - caddy-data:/data
-      - caddy-config:/config
-
   postgres:
     image: postgres:16-alpine
     restart: unless-stopped
@@ -59,6 +51,8 @@ services:
     command: server /data
     env_file:
       - /opt/masalim/.env
+    ports:
+      - "127.0.0.1:8802:9000"
     volumes:
       - minio-data:/data
     healthcheck:
@@ -87,6 +81,8 @@ services:
     env_file:
       - /opt/masalim/.env
       - /opt/masalim/providers.env
+    ports:
+      - "127.0.0.1:8801:3001"
     depends_on:
       postgres:
         condition: service_healthy
@@ -102,12 +98,12 @@ services:
       args:
         NEXT_PUBLIC_API_URL: https://api.57-129-6-57.sslip.io
     restart: unless-stopped
+    ports:
+      - "127.0.0.1:8803:3000"
     depends_on:
       - api
 
 volumes:
-  caddy-data:
-  caddy-config:
   postgres-data:
   redis-data:
   minio-data:
