@@ -242,7 +242,8 @@
     "step2SubtitleGeneral": "Create an imaginary hero.",
     "customHeroGeneralTitle": "Create an imaginary hero",
     "customHeroGeneralSub": "You pick the name and type",
-    "ageFromProfile": "Age comes from the profile · ages {{range}}"
+    "ageFromProfile": "Age comes from the profile · ages {{range}}",
+    "creditCost": "{{count}} credits"
   },
   "generating": {
     "messages": [
@@ -552,7 +553,9 @@
     "pageLabel": "Page {{number}}",
     "backQuote": "Every child is the hero of their own story.",
     "backToEdit": "Back to Editing",
-    "previewBookCta": "Preview the Book"
+    "previewBookCta": "Preview the Book",
+    "printSoonBadge": "SOON",
+    "printSoonBody": "Printed books are coming soon! Enjoy your digital book for now — we'll let you know the moment printing is ready. 💛"
   },
   "checkout": {
     "configTitle": "Book Options",
@@ -796,7 +799,7 @@
     "manage": "Manage Subscription",
     "voiceCloneGate": "Creating mom & dad voices is a Premium feature.",
     "quotaReachedStories": "You've used this month's story quota. Create more with Premium.",
-    "quotaReachedIllustrations": "You've used this month's image quota. Create more with Premium.",
+    "quotaReachedIllustrations": "Not enough credits — you can buy more on the My Credits screen.",
     "heroTitle": "More tales, more special memories ✨",
     "heroSubtitle": "Fill your child's magical world with stars.",
     "featuresLabel": "Premium Features",
@@ -812,7 +815,25 @@
     "quotaTitle": "You've used your {{limit}} stories this month!",
     "quotaSubtitle": "Create more stories with Masalım Premium and use the voice and illustration features.",
     "later": "Later",
-    "yearlyAdvantage": "%{{percent}} better value than monthly"
+    "yearlyAdvantage": "%{{percent}} better value than monthly",
+    "compareTitle": "What's included?",
+    "comparePremium": "PREMIUM",
+    "compareFree": "FREE",
+    "compareRows": {
+      "storyFull": "Story + art + expressive narration",
+      "monthlyCredits": "{{count}} credits every month (new-story minutes)",
+      "voiceClone": "Parent voice cloning",
+      "premiumVoices": "Premium narrator voices",
+      "hdBook": "HD book export"
+    },
+    "compareFootnote": "On the free plan, stories use credits: Short 3 · Medium 6 · Long 10. Listening is always free.",
+    "monthlyPlanDesc": "{{count}} credits/month · voice cloning · cancel anytime",
+    "packsTitle": "Credit Packs",
+    "packsSubFree": "No subscription needed — credits never expire.",
+    "packsSubPremium": "Member-priced extra credits — keep creating after your quota.",
+    "packCredits": "{{count}} credits",
+    "buyPack": "Buy",
+    "creditsAdded": "Credits added to your account!"
   },
   "notificationsScreen": {
     "title": "Notifications",
@@ -865,7 +886,8 @@
     "PAYMENT_FAILED": "The payment couldn't be completed. Please try again.",
     "PAYMENT_AMOUNT_MISMATCH": "There was a mismatch in the payment amount. Please try again.",
     "ORDER_CREATION_FAILED": "The order couldn't be created. Please try again.",
-    "ORDER_NOT_CANCELLABLE": "This order can no longer be cancelled."
+    "ORDER_NOT_CANCELLABLE": "This order can no longer be cancelled.",
+    "INSUFFICIENT_CREDITS": "You don't have enough credits for this story. Buy credits or go Premium."
   },
   "preview": {
     "play": "Preview",
@@ -883,13 +905,14 @@
     "dismiss": "Not Now"
   },
   "quotaBanner": {
-    "warningPrefix": "This month ",
-    "warningCount": "{{n}} stories",
+    "warningPrefix": "Only ",
+    "warningCount": "{{n}} credits",
     "warningSuffix": " left.",
     "seePremium": "See Premium",
-    "exhaustedTitle": "You’ve used this month’s free stories.",
-    "exhaustedBody": "Create more stories with Premium.",
-    "explorePremium": "Explore Premium"
+    "exhaustedTitle": "Out of credits",
+    "exhaustedBody": "Buy credits or go Premium to create new stories.",
+    "explorePremium": "Explore Premium",
+    "getCredits": "Buy Credits"
   },
   "states": {
     "error": {
@@ -939,5 +962,17 @@
     "resultBookBody": "Illustrate the pages first; then Make a Book turns it into a real printed book.",
     "readerFollowTitle": "Pages turn with the audio 🎵",
     "readerFollowBody": "While narration plays, pages advance on their own. A manual swipe pauses it; this button turns it back on."
+  },
+  "credits": {
+    "title": "My Credits",
+    "subtitle": "Creating a story uses credits; listening is always free.",
+    "emptyTitle": "Out of credits",
+    "emptySubtitle": "Buy credits or go Premium to keep creating.",
+    "quotaLabel": "Monthly allowance",
+    "quotaValue": "{{left}} / {{limit}} credits",
+    "balanceLabel": "Purchased balance",
+    "balanceValue": "{{count}} credits",
+    "costsHint": "Short 3 · Medium 6 · Long 10 credits. The first narration and first art set are included.",
+    "premiumCta": "Go Premium — 30 credits/month"
   }
 }

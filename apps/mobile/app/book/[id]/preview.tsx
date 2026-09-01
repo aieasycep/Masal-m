@@ -12,6 +12,7 @@ import {
   type NativeSyntheticEvent,
 } from 'react-native';
 import { Image } from 'expo-image';
+import Animated, { FadeInUp } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -24,6 +25,7 @@ import {
   colors,
   coverPalettes,
   fontFamilies,
+  night,
   fontSizes,
   gradients,
   premiumGold,
@@ -85,6 +87,7 @@ export default function BookPreview() {
   const queryClient = useQueryClient();
   const [slideIndex, setSlideIndex] = useState(0);
   const [jobId, setJobId] = useState<string | null>(null);
+  const [printSoonNote, setPrintSoonNote] = useState(false);
   const triggeredRef = useRef(false);
   const listRef = useRef<FlatList<PreviewSlide>>(null);
 
@@ -484,10 +487,17 @@ export default function BookPreview() {
       </View>
       <Text style={styles.pageLabel}>{slideLabel(slides[slideIndex])}</Text>
 
-      {/* CTA stack. */}
+      {/* CTA stack. Launch decision (Sep 2026): print ordering is "Yakında" —
+          the CTA shows the coming-soon note instead of entering checkout (the
+          API refuses orders too while the physical_books flag is off). */}
       <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 16) + spacing.xs }]}>
+        {printSoonNote ? (
+          <Animated.Text entering={FadeInUp.duration(220)} style={styles.printSoonNote}>
+            {t('book.printSoonBody')}
+          </Animated.Text>
+        ) : null}
         <Pressable
-          onPress={() => router.push(`/checkout/${book.id}/configure` as never)}
+          onPress={() => setPrintSoonNote(true)}
           accessibilityRole="button"
           style={({ pressed }) => [
             styles.printCta,
@@ -503,6 +513,9 @@ export default function BookPreview() {
             style={styles.printGradient}
           >
             <Text style={styles.printText}>🖨 {t('book.printCta')}</Text>
+            <View style={styles.printSoonBadge}>
+              <Text style={styles.printSoonBadgeText}>{t('book.printSoonBadge')}</Text>
+            </View>
           </LinearGradient>
         </Pressable>
         <Button label={t('book.backToEdit')} variant="ghostDark" onPress={() => router.back()} />
@@ -780,6 +793,27 @@ const styles = StyleSheet.create({
 
   footer: { paddingHorizontal: spacing.pageX, gap: 10 },
   printCta: { borderRadius: radius.lg, overflow: 'hidden' },
+  printSoonNote: {
+    fontFamily: fontFamilies.bodySemiBold,
+    fontSize: fontSizes.md,
+    color: night.text,
+    textAlign: 'center',
+    lineHeight: 19,
+    marginBottom: 10,
+  },
+  printSoonBadge: {
+    backgroundColor: 'rgba(255,255,255,0.25)',
+    borderRadius: radius.xs,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    marginLeft: 8,
+  },
+  printSoonBadgeText: {
+    fontFamily: fontFamilies.bodyExtraBold,
+    fontSize: fontSizes.xs,
+    color: colors.primaryForeground,
+    letterSpacing: 0.5,
+  },
   printShadow: {
     shadowColor: colors.coral,
     shadowOffset: { width: 0, height: 8 },
@@ -787,7 +821,12 @@ const styles = StyleSheet.create({
     shadowRadius: 24,
     elevation: 6,
   },
-  printGradient: { paddingVertical: 18, alignItems: 'center', justifyContent: 'center' },
+  printGradient: {
+    flexDirection: 'row',
+    paddingVertical: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   printText: {
     fontFamily: fontFamilies.bodyExtraBold,
     fontSize: fontSizes.xxl,

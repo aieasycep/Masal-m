@@ -20,6 +20,7 @@ import {
   AgeRange,
   DURATION_TARGETS,
   HeroType,
+  STORY_CREDIT_COSTS,
   StoryDuration,
   StoryTheme,
 } from '@masalim/types';
@@ -241,7 +242,7 @@ export default function CreateStory() {
         if (err.code === 'MODERATION_REJECTED') {
           setModerationError(t('errors.MODERATION_REJECTED'));
           setStep(3);
-        } else if (err.code === 'QUOTA_EXCEEDED') {
+        } else if (err.code === 'QUOTA_EXCEEDED' || err.code === 'INSUFFICIENT_CREDITS') {
           // Full-screen quota stop; the inline banner stays as a fallback so
           // dismissing the screen never leaves a dead end.
           setQuotaError(true);
@@ -584,6 +585,12 @@ export default function CreateStory() {
                 </Text>
                 <Text style={styles.durationSub}>{t(`wizard.durationSubs.${duration}`)}</Text>
               </View>
+              {/* Transparent pricing: length drives the credit cost (3/6/10). */}
+              <View style={[styles.creditChip, selected && styles.creditChipSelected]}>
+                <Text style={[styles.creditChipText, selected && styles.creditChipTextSelected]}>
+                  {t('wizard.creditCost', { count: STORY_CREDIT_COSTS[duration] })}
+                </Text>
+              </View>
             </SelectableCard>
           );
         })}
@@ -603,6 +610,7 @@ export default function CreateStory() {
       icon: '⏱',
       label: t('common.minutesShort', { count: DURATION_TARGETS[durationTarget].minutes }),
     },
+    { icon: '🎟', label: t('wizard.creditCost', { count: STORY_CREDIT_COSTS[durationTarget] }) },
   ];
 
   return (
@@ -850,6 +858,19 @@ const styles = StyleSheet.create({
     fontSize: fontSizes.md,
     color: colors.mutedForeground,
   },
+  creditChip: {
+    backgroundColor: colors.muted,
+    borderRadius: radius.chip,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  creditChipSelected: { backgroundColor: colors.secondary },
+  creditChipText: {
+    fontFamily: fontFamilies.bodyBold,
+    fontSize: fontSizes.sm,
+    color: colors.mutedForeground,
+  },
+  creditChipTextSelected: { color: colors.secondaryForeground },
   voiceNameRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   voiceName: { fontFamily: fontFamilies.bodyBold, fontSize: fontSizes.lg, color: colors.foreground },
   voiceDescription: {

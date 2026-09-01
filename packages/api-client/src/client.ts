@@ -36,6 +36,7 @@ import type {
   LoginInput,
   Me,
   MockPurchaseInput,
+  OfferingsResponse,
   Narration,
   NotificationItem,
   PaginatedMeta,
@@ -184,6 +185,8 @@ export class MasalimApiClient {
   readonly subscription = {
     get: () => this.http.get<Subscription>('/subscription'),
     entitlements: () => this.http.get<EntitlementsResponse>('/subscription/entitlements'),
+    /** Paywall products for this user — server-config prices, plan-matched packs. */
+    offerings: () => this.http.get<OfferingsResponse>('/subscription/offerings'),
     /** Dev-only mock IAP — rejected by the API outside mock mode. */
     mockPurchase: (input: MockPurchaseInput) =>
       this.http.post<Subscription>('/subscription/mock/purchase', input),

@@ -535,7 +535,10 @@ export default function NarrateStory() {
       setDone(false);
       setActiveJob({ jobId, narrationId: narration.id, narratorName: narration.narratorName });
     } catch (err) {
-      if (err instanceof ApiError) {
+      if (err instanceof ApiError && err.code === 'INSUFFICIENT_CREDITS') {
+        // Second-voice narration costs credits — send them to the wallet.
+        router.push('/subscription/quota' as never);
+      } else if (err instanceof ApiError) {
         setCreateError(t(`errors.${err.code}`, { defaultValue: t('errors.GENERIC') }));
       } else if (err instanceof NetworkError) {
         setCreateError(t('errors.OFFLINE'));
