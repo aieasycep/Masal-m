@@ -2,6 +2,7 @@ import { Test } from '@nestjs/testing';
 import type { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { AppModule } from '../../src/app.module';
+import { PrismaService } from '../../src/prisma/prisma.service';
 
 jest.setTimeout(120_000);
 
@@ -265,6 +266,26 @@ describe('critical journeys (integration)', () => {
   it('quotes orders server-side and dedupes creation by Idempotency-Key (§78/§82)', async () => {
     const session = await register('order');
     const auth = ['Authorization', `Bearer ${session.token}`] as const;
+
+    // Launch gate: print ordering ships disabled (physical_books seed) and the
+    // API must refuse. The rest of the journey runs with the flag switched on,
+    // exactly what the admin toggle will do when printing launches.
+    const prisma = app.get(PrismaService);
+    await prisma.featureFlag.update({
+      where: { key: 'physical_books' },
+      data: { enabled: false },
+    });
+    const gated = await http()
+      .post('/orders/quote')
+      .set(...V)
+      .set(...auth)
+      .send({ bookId: 'cnonexistent12345', quantity: 1, bookSize: 'SQUARE', coverType: 'HARDCOVER' })
+      .expect(403);
+    expect(gated.body.error.code).toBe('FEATURE_DISABLED');
+    await prisma.featureFlag.update({
+      where: { key: 'physical_books' },
+      data: { enabled: true },
+    });
 
     // story → book → render (mock pipeline) so an orderable book exists
     const draft = await http()
