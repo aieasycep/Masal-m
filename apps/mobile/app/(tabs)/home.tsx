@@ -15,8 +15,10 @@ import { Screen } from '../../src/components/Screen';
 import { SectionHeader } from '../../src/components/SectionHeader';
 import { StoryCardVertical, StoryCardWide } from '../../src/components/StoryCard';
 import { ChevronRightIcon } from '../../src/components/icons';
+import { FeatureTour, type TourStep } from '../../src/components/FeatureTour';
 import { EmptyState, ErrorState } from '../../src/components/states';
 import { api } from '../../src/lib/api';
+import { registerTourTarget } from '../../src/lib/tour-targets';
 import { useAppPrefs } from '../../src/stores/app-prefs';
 import { useWizardStore } from '../../src/stores/wizard';
 
@@ -50,6 +52,9 @@ export default function Home() {
   const [switcherVisible, setSwitcherVisible] = useState(false);
   const selectedChildId = useAppPrefs((state) => state.selectedChildId);
   const setSelectedChildId = useAppPrefs((state) => state.setSelectedChildId);
+  const seenHomeTour = useAppPrefs((state) => state.seenTours.home === true);
+  const markTourSeen = useAppPrefs((state) => state.markTourSeen);
+  const [tourVisible, setTourVisible] = useState(false);
 
   const meQuery = useQuery({ queryKey: ['me'], queryFn: () => api.users.me() });
   const childrenQuery = useQuery({ queryKey: ['children'], queryFn: () => api.children.list() });
@@ -116,6 +121,32 @@ export default function Home() {
   const continueNarration = continueStory?.latestNarration ?? null;
   const showEmptyState = storiesQuery.isSuccess && stories.length === 0;
   const hasError = meQuery.isError || childrenQuery.isError;
+
+  // First-run spotlight tour: once per device, after real data has rendered.
+  useEffect(() => {
+    if (seenHomeTour || tourVisible) return;
+    if (onboardingCompleted !== true || !childrenQuery.isSuccess || !storiesQuery.isSuccess) {
+      return;
+    }
+    const timer = setTimeout(() => setTourVisible(true), 700);
+    return () => clearTimeout(timer);
+  }, [seenHomeTour, tourVisible, onboardingCompleted, childrenQuery.isSuccess, storiesQuery.isSuccess]);
+
+  const tourSteps: TourStep[] = [
+    { targetKey: 'home.hero', title: t('tour.homeHeroTitle'), body: t('tour.homeHeroBody') },
+    {
+      targetKey: 'home.suggestions',
+      title: t('tour.homeSuggestionsTitle'),
+      body: t('tour.homeSuggestionsBody'),
+    },
+    {
+      targetKey: 'home.categories',
+      title: t('tour.homeCategoriesTitle'),
+      body: t('tour.homeCategoriesBody'),
+    },
+    { targetKey: 'tabs.library', title: t('tour.tabLibraryTitle'), body: t('tour.tabLibraryBody') },
+    { targetKey: 'tabs.profile', title: t('tour.tabProfileTitle'), body: t('tour.tabProfileBody') },
+  ];
 
   // V2 context continuity: a stale in-session draft for a DIFFERENT child must
   // not hijack the entry (Ada selected → wizard must not reopen Ege's draft);
@@ -211,7 +242,11 @@ export default function Home() {
       ) : null}
 
       {/* Hero CTA */}
-      <View style={styles.section}>
+      <View
+        style={styles.section}
+        collapsable={false}
+        ref={(view) => registerTourTarget('home.hero', view)}
+      >
         <Pressable
           onPress={goCreate}
           accessibilityRole="button"
@@ -249,7 +284,11 @@ export default function Home() {
 
       {/* AI suggestions */}
       {selectedChild != null && recommendations.length > 0 ? (
-        <View style={styles.section}>
+        <View
+          style={styles.section}
+          collapsable={false}
+          ref={(view) => registerTourTarget('home.suggestions', view)}
+        >
           {/* V2 semantics: no "Tümü" here — recommendations aren't the library. */}
           <SectionHeader title={t('home.suggestionsTitle', { name: selectedChild.name })} />
           <View style={styles.suggestionList}>
@@ -339,7 +378,11 @@ export default function Home() {
       ) : null}
 
       {/* Tonight's categories */}
-      <View style={styles.lastSection}>
+      <View
+        style={styles.lastSection}
+        collapsable={false}
+        ref={(view) => registerTourTarget('home.categories', view)}
+      >
         <SectionHeader title={t('home.tonightTitle')} />
         <View style={styles.categoryGrid}>
           {CATEGORIES.map((category) => (
@@ -362,6 +405,14 @@ export default function Home() {
       </View>
 
       <ChildSwitcherSheet visible={switcherVisible} onClose={() => setSwitcherVisible(false)} />
+      <FeatureTour
+        steps={tourSteps}
+        visible={tourVisible}
+        onDone={() => {
+          setTourVisible(false);
+          markTourSeen('home');
+        }}
+      />
     </Screen>
   );
 }

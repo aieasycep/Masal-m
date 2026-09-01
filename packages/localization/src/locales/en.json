@@ -767,7 +767,9 @@
     "audioSpeedSection": "Playback Speed",
     "audioPlayerSection": "Story Player",
     "autoAdvance": "Auto-advance to the next page",
-    "autoAdvanceSub": "Follow the book page as the narration progresses"
+    "autoAdvanceSub": "Follow the book page as the narration progresses",
+    "replayTour": "Replay the tour",
+    "replayTourSub": "Resets the screen tips and starts over from Home"
   },
   "subscription": {
     "title": "Masalım Premium",
@@ -916,5 +918,26 @@
         "body": "Something went wrong while preparing the illustration. Let’s try again."
       }
     }
+  },
+  "tour": {
+    "skip": "Skip",
+    "next": "Next",
+    "done": "Let's start!",
+    "homeHeroTitle": "Stories start here ✨",
+    "homeHeroBody": "Tap this card to create a new story — the wizard guides you step by step.",
+    "homeSuggestionsTitle": "Ready-made ideas",
+    "homeSuggestionsBody": "Tap a suggestion made for your child; the theme and idea prefill the wizard.",
+    "homeCategoriesTitle": "For tonight",
+    "homeCategoriesBody": "Quick starts by theme: Sleep, Adventure, Educational and more.",
+    "tabLibraryTitle": "My Stories",
+    "tabLibraryBody": "Every story you create lives here; search and filter anytime.",
+    "tabProfileTitle": "Profile",
+    "tabProfileBody": "Child profiles, family voices, orders and settings live here.",
+    "resultNarrateTitle": "Narrate your story 🎙",
+    "resultNarrateBody": "Pick a narrator or use your own voice — turn the story into an audiobook.",
+    "resultBookTitle": "Illustrate & make a book 📚",
+    "resultBookBody": "Illustrate the pages first; then Make a Book turns it into a real printed book.",
+    "readerFollowTitle": "Pages turn with the audio 🎵",
+    "readerFollowBody": "While narration plays, pages advance on their own. A manual swipe pauses it; this button turns it back on."
   }
 }

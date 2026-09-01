@@ -85,6 +85,7 @@ export default function SettingsIndex() {
   const languageCode = i18n.language === 'en' ? 'en' : 'tr';
   const defaultPlaybackRate = useAppPrefs((state) => state.defaultPlaybackRate);
   const rateLabel = `${defaultPlaybackRate}x`.replace('.', ',');
+  const resetSeenTours = useAppPrefs((state) => state.resetSeenTours);
   const version = Constants.expoConfig?.version ?? '0.1.0';
 
   const signOut = async () => {
@@ -149,6 +150,15 @@ export default function SettingsIndex() {
           label={t('settings.audio')}
           sub={t('settings.audioSub', { rate: rateLabel })}
           onPress={() => router.push('/settings/audio' as never)}
+        />
+        <ListRow
+          icon="🧭"
+          label={t('settings.replayTour')}
+          sub={t('settings.replayTourSub')}
+          onPress={() => {
+            resetSeenTours();
+            router.push('/(tabs)/home' as never);
+          }}
           showDivider={false}
         />
       </SectionCard>

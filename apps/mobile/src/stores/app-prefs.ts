@@ -11,10 +11,15 @@ interface AppPrefsState {
   defaultPlaybackRate: number;
   /** "Ses ve Oynatma": auto-advance the story text page with the narration. */
   autoFollowPage: boolean;
+  /** Feature tours/hints already shown on this device, by tour key. */
+  seenTours: Record<string, boolean>;
   setHasSeenOnboarding: (seen: boolean) => void;
   setSelectedChildId: (childId: string | null) => void;
   setDefaultPlaybackRate: (rate: number) => void;
   setAutoFollowPage: (enabled: boolean) => void;
+  markTourSeen: (key: string) => void;
+  /** Settings "Tanıtımı tekrar göster" — every tour replays once more. */
+  resetSeenTours: () => void;
 }
 
 export const useAppPrefs = create<AppPrefsState>()(
@@ -24,10 +29,13 @@ export const useAppPrefs = create<AppPrefsState>()(
       selectedChildId: null,
       defaultPlaybackRate: 1,
       autoFollowPage: true,
+      seenTours: {},
       setHasSeenOnboarding: (seen) => set({ hasSeenOnboarding: seen }),
       setSelectedChildId: (childId) => set({ selectedChildId: childId }),
       setDefaultPlaybackRate: (rate) => set({ defaultPlaybackRate: rate }),
       setAutoFollowPage: (enabled) => set({ autoFollowPage: enabled }),
+      markTourSeen: (key) => set((state) => ({ seenTours: { ...state.seenTours, [key]: true } })),
+      resetSeenTours: () => set({ seenTours: {} }),
     }),
     {
       name: 'masalim.app-prefs',
