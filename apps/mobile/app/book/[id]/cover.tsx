@@ -17,7 +17,7 @@ import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { ApiError } from '@masalim/api-client';
-import { AIJobStatus } from '@masalim/types';
+import { AIJobStatus, ErrorCode, ILLUSTRATION_REGENERATE_CREDIT_COST } from '@masalim/types';
 import type { Illustration, UpdateBookInput } from '@masalim/validation';
 import {
   colors,
@@ -32,6 +32,7 @@ import {
 } from '@masalim/ui';
 import { api } from '../../../src/lib/api';
 import { useJobProgress } from '../../../src/lib/job-stream';
+import { ConfirmSheet } from '../../../src/components/ConfirmSheet';
 import { Input } from '../../../src/components/Input';
 import { Screen } from '../../../src/components/Screen';
 import { ScreenHeader } from '../../../src/components/ScreenHeader';
@@ -227,6 +228,8 @@ export default function CoverEditor() {
   const [showAlternatives, setShowAlternatives] = useState(false);
   const [regenJobId, setRegenJobId] = useState<string | null>(null);
   const [regenError, setRegenError] = useState<string | null>(null);
+  /** Cover regenerate is a credit spend — confirmed in a sheet before queuing. */
+  const [regenConfirm, setRegenConfirm] = useState(false);
   const [ctaSaved, setCtaSaved] = useState(false);
   const backTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const autosave = useBookAutosave(id);
@@ -350,6 +353,12 @@ export default function CoverEditor() {
       const { jobId } = await api.illustrations.regenerate(coverIllustration.id);
       setRegenJobId(jobId);
     } catch (err) {
+      if (err instanceof ApiError && err.code === ErrorCode.INSUFFICIENT_CREDITS) {
+        // Regenerate costs a credit — send them to the wallet, keep the note here.
+        setRegenError(t('subscription.quotaReachedIllustrations'));
+        router.push('/subscription/quota' as never);
+        return;
+      }
       setRegenError(
         err instanceof ApiError
           ? t(`errors.${err.code}`, { defaultValue: t('errors.GENERIC') })
@@ -377,6 +386,20 @@ export default function CoverEditor() {
       <View style={styles.flex}>
         <Screen style={styles.screenContent}>
           <ScreenHeader title={t('book.coverTitle')} />
+          <ConfirmSheet
+            visible={regenConfirm}
+            title={t('illustrate.regenerateConfirmTitle')}
+            body={t('illustrate.regenerateConfirmBody', {
+              count: ILLUSTRATION_REGENERATE_CREDIT_COST,
+            })}
+            confirmLabel={t('illustrate.regenerateConfirmCta')}
+            cancelLabel={t('common.cancel')}
+            onConfirm={() => {
+              setRegenConfirm(false);
+              void onRegenerate();
+            }}
+            onCancel={() => setRegenConfirm(false)}
+          />
           <AutosaveTick visible={autosave.saved} error={autosave.error} />
 
           {/* Live cover preview: selected palette gradient, star dots, cover image on top. */}
@@ -525,9 +548,7 @@ export default function CoverEditor() {
             </Text>
             <View style={styles.changeRow}>
               <Pressable
-                onPress={() => {
-                  void onRegenerate();
-                }}
+                onPress={() => setRegenConfirm(true)}
                 disabled={coverIllustration == null || regenerating}
                 accessibilityRole="button"
                 accessibilityState={{ disabled: coverIllustration == null || regenerating }}
@@ -540,7 +561,12 @@ export default function CoverEditor() {
                 {regenerating ? (
                   <ActivityIndicator size="small" color={colors.primary} />
                 ) : (
-                  <Text style={styles.changeButtonText}>🔄 {t('book.regenerateCover')}</Text>
+                  <View style={styles.changeButtonInner}>
+                    <Text style={styles.changeButtonText}>🔄 {t('book.regenerateCover')}</Text>
+                    <Text style={styles.changeButtonCost}>
+                      {t('credits.regenerateCost', { count: ILLUSTRATION_REGENERATE_CREDIT_COST })}
+                    </Text>
+                  </View>
                 )}
               </Pressable>
               <Pressable
@@ -770,6 +796,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   changeButtonDisabled: { opacity: 0.5 },
+  changeButtonInner: { alignItems: 'center', gap: 2 },
+  changeButtonCost: {
+    fontFamily: fontFamilies.bodyBold,
+    fontSize: fontSizes.xs,
+    color: colors.primary,
+  },
   changeButtonText: {
     fontFamily: fontFamilies.bodyBold,
     fontSize: fontSizes.md,

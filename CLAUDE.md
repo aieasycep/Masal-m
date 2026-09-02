@@ -342,7 +342,16 @@ Local `.env` = `.env.example` + generated JWT secrets (already present, gitignor
   pipeline. Mobile: comparison-table paywall (user's screenshot layout, NO
   time trial), quota.tsx → "Kredilerim" wallet (packs in-place),
   credit-aware Home banner, wizard duration cards show 3/6/10 badges,
-  INSUFFICIENT_CREDITS routes to wallet everywhere. Verified:
+  INSUFFICIENT_CREDITS routes to wallet everywhere. **Regenerate = 1 kredi
+  (Sep 2, user: "her tekrarı 1 kredi", no free retries)**:
+  ILLUSTRATION_REGENERATE_CREDIT_COST in types; regenerate() consumes up
+  front (ref illustration_regen/`${illustrationId}:${uuid}`, payload
+  creditRefId), processor refunds THAT ref on terminal failure (never the
+  set's); mobile ConfirmSheet + "1 kredi" chip on illustrate + cover editor.
+  Wallet discoverability fix (same PR): Profile "Kredilerim" row (live
+  count), Home header 🎟 pill (all plans), paywall "Kredilerimi Gör" link —
+  before this the wallet was reachable ONLY via the low-credit banner.
+  Verified:
   scratchpad/smoke-monetization.sh (gift→kota→bakiye→insufficient→pack→
   resume→print gate) + premium path (30 kr kota, member packs).
 - **BOOK PRINT = "YAKINDA" (launch decision)**: physical_books flag seeds

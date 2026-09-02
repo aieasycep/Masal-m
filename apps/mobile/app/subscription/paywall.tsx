@@ -425,6 +425,14 @@ export default function Paywall() {
         )}
 
         {renderPacks()}
+        <Pressable
+          onPress={() => router.navigate('/subscription/quota' as never)}
+          accessibilityRole="button"
+          accessibilityLabel={t('subscription.viewCredits')}
+          style={({ pressed }) => [styles.restoreLink, { opacity: pressed ? 0.7 : 1 }]}
+        >
+          <Text style={styles.restoreLinkText}>{t('subscription.viewCredits')}</Text>
+        </Pressable>
         <Text style={styles.legal}>{t('subscription.legal')}</Text>
       </View>
     );

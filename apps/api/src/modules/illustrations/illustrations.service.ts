@@ -1,9 +1,11 @@
+import { randomUUID } from 'node:crypto';
 import { HttpStatus, Inject, Injectable } from '@nestjs/common';
 import {
   AIJobType,
   CreditReason,
   ErrorCode,
   EXTRA_ACTION_CREDIT_COSTS,
+  ILLUSTRATION_REGENERATE_CREDIT_COST,
   IllustrationSetStatus,
   StoryStatus,
 } from '@masalim/types';
@@ -20,6 +22,9 @@ import { STORAGE } from '../../providers/providers.module';
 import { JobsService } from '../../jobs/jobs.service';
 import { EntitlementService } from '../subscription/entitlement.service';
 import { StoriesService } from '../stories/stories.service';
+
+/** Ledger ref type for per-attempt regenerate spends (refId = `${illustrationId}:${uuid}`). */
+export const REGENERATE_CREDIT_REF_TYPE = 'illustration_regen';
 
 type SetWithIllustrations = Prisma.IllustrationSetGetPayload<{
   include: { illustrations: true };
@@ -161,7 +166,12 @@ export class IllustrationsService {
     return this.illustrationDto({ ...illustration, selected: true });
   }
 
-  /** Regenerate one target (page or cover) as a new unselected alternative. */
+  /**
+   * Regenerate one target (page or cover) as a new unselected alternative.
+   * Every regenerate is a metered render: one credit is taken up front
+   * (INSUFFICIENT_CREDITS stops it here, before any job exists) and refunded
+   * only if the job cannot be queued or terminally fails in the processor.
+   */
   async regenerate(userId: string, illustrationId: string): Promise<{ jobId: string }> {
     const illustration = await this.findOwnedIllustration(userId, illustrationId);
     if (illustration.illustrationSet.status !== IllustrationSetStatus.READY) {
@@ -171,14 +181,29 @@ export class IllustrationsService {
         HttpStatus.CONFLICT,
       );
     }
-    const job = await this.jobs.enqueue({
+    // One ledger ref per regenerate — the same illustration can be redone many
+    // times, and each spend must be refundable on its own (uuid, not a
+    // timestamp: two taps in the same millisecond must never share a job id).
+    const creditRefId = `${illustrationId}:${randomUUID()}`;
+    await this.entitlements.consumeCredits(
       userId,
-      type: AIJobType.ILLUSTRATION_GENERATION,
-      entityId: illustration.illustrationSetId,
-      queueJobId: `illust:${illustration.illustrationSetId}:regen:${illustrationId}:${Date.now()}`,
-      payload: { regenerateForIllustrationId: illustrationId },
-    });
-    return { jobId: job.id };
+      ILLUSTRATION_REGENERATE_CREDIT_COST,
+      CreditReason.EXTRA_ILLUSTRATION_SPEND,
+      { type: REGENERATE_CREDIT_REF_TYPE, id: creditRefId },
+    );
+    try {
+      const job = await this.jobs.enqueue({
+        userId,
+        type: AIJobType.ILLUSTRATION_GENERATION,
+        entityId: illustration.illustrationSetId,
+        queueJobId: `illust:${illustration.illustrationSetId}:regen:${creditRefId}`,
+        payload: { regenerateForIllustrationId: illustrationId, creditRefId },
+      });
+      return { jobId: job.id };
+    } catch (error) {
+      await this.entitlements.refundCreditsForRef(userId, REGENERATE_CREDIT_REF_TYPE, creditRefId);
+      throw error;
+    }
   }
 
   private async activeJobFor(setId: string): Promise<string | null> {
