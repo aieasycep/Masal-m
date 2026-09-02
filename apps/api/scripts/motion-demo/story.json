@@ -1,0 +1,36 @@
+{
+  "title": "Ege ve Uçan Balon",
+  "heroName": "Ege",
+  "style": "SOFT_3D",
+  "voiceId": "XrExE9yKIg1WjnnlVkGX",
+  "characterBible": {
+    "name": "Ege",
+    "age": 6,
+    "appearance": "a cheerful six-year-old child with short wavy brown hair, round face, big curious brown eyes and freckles",
+    "clothes": "a mustard-yellow sweater and teal trousers, small red sneakers",
+    "importantFeatures": ["a tiny star-shaped pin on the sweater"]
+  },
+  "coverPrompt": "Ege waves from the basket of a big rainbow-striped hot-air balloon with a small orange fox beside him, floating above a seaside town at golden sunrise; joyful children's-book cover composition, no text or letters",
+  "pages": [
+    {
+      "text": "Bir varmış bir yokmuş, deniz kenarındaki küçük bir kasabada Ege adında meraklı bir çocuk yaşarmış. Bir sabah pencereden bakınca gökyüzünde kocaman, rengârenk bir balon görmüş. Balon yavaşça bahçeye doğru süzülüyormuş.",
+      "prompt": "Ege leans out of a cottage window at sunrise, eyes wide with wonder, watching a huge rainbow-striped hot-air balloon drift down toward the garden of a small seaside town"
+    },
+    {
+      "text": "Ege koşarak bahçeye çıkmış. Balonun sepetinde küçük, turuncu bir tilki oturuyormuş. Tilki gülümseyerek, “Merhaba Ege! Adım Fıstık. Bulutların üstünde bir yolculuğa ne dersin?” demiş. Ege’nin gözleri parlamış.",
+      "prompt": "Ege stands in a flower garden beside the landed hot-air balloon; a small smiling orange fox sits in the wicker basket greeting him, morning light, dewy grass"
+    },
+    {
+      "text": "Balon yükseldikçe kasaba küçülmüş, evler oyuncak gibi görünmüş. Ege pamuk şekerine benzeyen bulutlara dokunmuş. Bir bulut gıdıklanmış gibi kıkırdamış ve minik yağmur damlaları saçmış. Ege ve Fıstık kahkahalarla gülmüş.",
+      "prompt": "Ege and the orange fox ride high in the balloon basket among fluffy cotton-candy clouds, Ege reaching out to touch a giggling cloud that sprinkles tiny raindrops, the toy-like town far below"
+    },
+    {
+      "text": "Sonra rüzgâr sertleşmiş ve balon sallanmaya başlamış. Fıstık korkmuş, kuyruğunu sepete sarmış. Ege derin bir nefes almış. “Korkma Fıstık, birlikte hallederiz,” demiş ve ipleri sıkıca tutmuş. Balon yeniden dengelenmiş.",
+      "prompt": "Strong wind tilts the balloon; Ege bravely grips the ropes with a determined face while the frightened orange fox wraps its tail around the basket, dramatic swirling clouds, still warm and child-friendly"
+    },
+    {
+      "text": "Güneş batarken balon yumuşacık bahçeye inmiş. Fıstık, Ege’ye parlak bir deniz kabuğu hediye etmiş: “Cesaretin için.” Ege o gece yastığının altına kabuğu koymuş ve gökyüzünde süzülen balonların rüyasını görmüş. Tatlı rüyalar, Ege.",
+      "prompt": "At sunset the balloon rests in the garden; the orange fox hands Ege a glowing seashell, both smiling warmly; in the sky above, a few tiny balloons drift like a dream, cozy evening colors"
+    }
+  ]
+}

@@ -1,0 +1,58 @@
+# Masalım — "motion storybook" demo (one-off, throwaway branch).
+# Generates one short story's illustrations (gpt-image-1, sheet-first, one
+# style), narrates every page with the real ElevenLabs voice, aligns words,
+# and renders the 1080×1920 karaoke video with ffmpeg. The MP4 is uploaded
+# as an artifact AND committed to this branch so it can be pulled from a
+# sandbox that cannot reach artifact storage. Delete the branch afterwards.
+name: Motion Demo
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [demo/motion-video]
+
+permissions:
+  contents: write
+
+jobs:
+  render:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }}
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Build AI packages
+        run: pnpm turbo build --filter='@masalim/api^...'
+      - name: Generate assets (images + narration + word alignment)
+        env:
+          DEMO_MODE: real
+          IMAGE_API_KEY: ${{ secrets.IMAGE_API_KEY }}
+          IMAGE_MODEL: gpt-image-1
+          TTS_API_KEY: ${{ secrets.TTS_API_KEY }}
+          TTS_MODEL: eleven_multilingual_v2
+        run: node apps/api/scripts/motion-demo/make-assets.mjs
+      - name: Render video
+        run: node apps/api/scripts/motion-demo/render.mjs
+      - name: Upload demo
+        uses: actions/upload-artifact@v4
+        with:
+          name: masalim-motion-demo
+          path: |
+            apps/api/scripts/motion-demo/out/masalim-motion-demo.mp4
+            apps/api/scripts/motion-demo/out/assets/*
+          retention-days: 14
+      - name: Commit the MP4 to this branch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -f apps/api/scripts/motion-demo/out/masalim-motion-demo.mp4 apps/api/scripts/motion-demo/out/assets/manifest.json apps/api/scripts/motion-demo/out/assets/cover.png
+          git commit -m "chore(demo): rendered motion-storybook demo (generated) [skip ci]"
+          git push origin HEAD:${{ github.ref_name }}
