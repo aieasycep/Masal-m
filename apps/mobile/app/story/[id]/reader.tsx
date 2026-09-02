@@ -41,6 +41,7 @@ import {
 import { AppIcon } from '../../../src/components/AppIcon';
 import { Button } from '../../../src/components/Button';
 import { FeatureTour, type TourStep } from '../../../src/components/FeatureTour';
+import { KeepScreenAwake } from '../../../src/components/KeepScreenAwake';
 import { Starfield } from '../../../src/components/Starfield';
 import { storyThemeEmoji } from '../../../src/components/StorySheet';
 import { useActiveTrack, useIsPlaying } from 'react-native-track-player';
@@ -536,6 +537,8 @@ export default function Reader() {
 
   return (
     <NightScaffold backdrop={backdrop}>
+      {/* Reading is on-screen work: the page must not dim mid-story (with or without narration). */}
+      <KeepScreenAwake />
       <View style={[styles.headerRow, { paddingTop }]}>
         <BackButton label={t('common.back')} />
         <View style={styles.headerCenter}>
