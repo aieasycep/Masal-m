@@ -60,6 +60,7 @@ import {
   usePositionPersistence,
 } from '../../../src/lib/player';
 import { Button } from '../../../src/components/Button';
+import { KeepScreenAwake } from '../../../src/components/KeepScreenAwake';
 import { Starfield } from '../../../src/components/Starfield';
 import { Waveform } from '../../../src/components/Waveform';
 import {
@@ -540,6 +541,8 @@ export default function StoryPlayer() {
 
   return (
     <NightScreen>
+      {/* Text panel / cover stay visible while the narration plays; a paused player may sleep. */}
+      {isPlaying ? <KeepScreenAwake /> : null}
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={[
