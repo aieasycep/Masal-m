@@ -359,6 +359,18 @@ Local `.env` = `.env.example` + generated JWT secrets (already present, gitignor
   orders quote/create throw FEATURE_DISABLED server-side; mobile preview
   print CTA shows YAKINDA badge + note instead of checkout. Digital
   books/preview untouched.
+- **Sep 2 test-feedback train (PR #17, open)**: karaoke word timings (ElevenLabs
+  forced-alignment → `Narration.wordTimings`), recommendations `?limit=`, style-
+  sample thumbnails on the picker (generated via style-samples.yml → assets/
+  style-samples/*.webp), reader "Devamı için kaydır" cue + follow scroll, and
+  **KeepScreenAwake** in the reader (whole session) + player (only while
+  playing) — user reported the screen sleeping mid-listen. Every mobile fix is
+  cherry-picked onto `design-review` too (PR #18, side-by-side review APK).
+  Verified stable APK: android-apk run 33634640078 (a36b2a7); review APK: design-
+  review run 33634657762 (0ef8e6f). design-review-apk.yml smoke job now has a
+  hard Verdict step (APP_ALIVE + SMOKE_ALIVE + `[player-smoke] DONE`), prints
+  ReactNativeJS lines, and re-fires the deep link once (a missing marker on
+  build #6 was a timing flake, not an app bug).
 - **Illustration style fix**: STYLE_TEMPLATES rewritten as mutually exclusive
   medium specs with negatives; style now LEADS sheet+edit prompts; edit
   prompt carries "reference = identity only" + quality tier. Root cause of
