@@ -79,7 +79,7 @@ export class ChildrenService {
    * Recommendation v0 (§38): interests → seeded templates, excluding the
    * child's most recent story themes so suggestions stay fresh.
    */
-  async recommendations(userId: string, childId: string): Promise<Recommendation[]> {
+  async recommendations(userId: string, childId: string, limit = 3): Promise<Recommendation[]> {
     const child = await this.findOwned(userId, childId);
     const recentStories = await this.prisma.story.findMany({
       where: { childId, deletedAt: null },
@@ -93,11 +93,11 @@ export class ChildrenService {
       where: { enabled: true, interest: { in: child.interests } },
     });
     const fallback =
-      templates.length >= 3
+      templates.length >= limit
         ? []
         : await this.prisma.recommendationTemplate.findMany({
             where: { enabled: true, interest: { notIn: child.interests } },
-            take: 6,
+            take: Math.max(6, limit * 2),
           });
 
     const ranked = [...templates, ...fallback]
@@ -106,7 +106,7 @@ export class ChildrenService {
         staleThemes: template.themes.filter((theme) => recentThemes.has(theme)).length,
       }))
       .sort((a, b) => a.staleThemes - b.staleThemes)
-      .slice(0, 3);
+      .slice(0, limit);
 
     return ranked.map(({ template }) => ({
       title: template.title.includes(child.name)

@@ -482,6 +482,8 @@ model Narration {
   audioKey       String?
   duration       Float?
   timings        Json?
+  /// Karaoke word timeline `{ source, words: [{t,p,i,s,e}] }` — see @masalim/validation.
+  wordTimings    Json?
   status         NarrationStatus @default(QUEUED)
   error          String?
   createdAt      DateTime        @default(now())
