@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -19,6 +19,7 @@ import { ApiError } from '@masalim/api-client';
 import { colors, fontFamilies, fontSizes, gradients, radius, spacing } from '@masalim/ui';
 import { api } from '../../../src/lib/api';
 import { useJobProgress } from '../../../src/lib/job-stream';
+import { useJobsStore } from '../../../src/stores/jobs';
 import { Button } from '../../../src/components/Button';
 import { KeepScreenAwake } from '../../../src/components/KeepScreenAwake';
 import { Starfield } from '../../../src/components/Starfield';
@@ -191,6 +192,19 @@ export default function StoryGenerating() {
       ? t('generating.ready')
       : (messages[messageIndex % Math.max(messages.length, 1)] ?? '');
 
+  // "Arka planda devam et": the job keeps running server-side; the dock above
+  // the tab bar shows its real progress and opens the story when it is ready.
+  const continueInBackground = () => {
+    useJobsStore.getState().track({
+      jobId,
+      kind: 'story',
+      storyId: storyId != null && storyId.length > 0 ? storyId : null,
+      title: subtitleSource,
+      route: storyId != null && storyId.length > 0 ? `/story/${storyId}` : '/(tabs)/library',
+    });
+    router.replace('/(tabs)/home' as never);
+  };
+
   return (
     <View style={styles.root}>
       {inProgress ? <KeepScreenAwake /> : null}
@@ -259,6 +273,17 @@ export default function StoryGenerating() {
               </Animated.View>
             </View>
           </View>
+          {inProgress ? (
+            <Pressable
+              onPress={continueInBackground}
+              accessibilityRole="button"
+              accessibilityLabel={t('jobs.background')}
+              hitSlop={8}
+              style={({ pressed }) => [styles.backgroundButton, { opacity: pressed ? 0.7 : 1 }]}
+            >
+              <Text style={styles.backgroundButtonText}>{t('jobs.background')}</Text>
+            </Pressable>
+          ) : null}
         </>
       )}
 
@@ -276,6 +301,21 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: spacing.pageXWide,
     overflow: 'hidden',
+  },
+  backgroundButton: {
+    marginTop: spacing.lg,
+    minHeight: 44,
+    paddingHorizontal: spacing.lg,
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.35)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  backgroundButtonText: {
+    fontFamily: fontFamilies.bodyBold,
+    fontSize: fontSizes.base,
+    color: colors.primaryForeground,
   },
   bookCard: {
     width: 140,

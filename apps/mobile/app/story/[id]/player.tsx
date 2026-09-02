@@ -47,6 +47,7 @@ import {
 import { api } from '../../../src/lib/api';
 import { activePageNumber } from '../../../src/lib/narration-sync';
 import { useAppPrefs } from '../../../src/stores/app-prefs';
+import { usePlayerStore } from '../../../src/stores/player';
 import {
   jumpBack,
   jumpForward,
@@ -352,6 +353,14 @@ export default function StoryPlayer() {
         artworkUrl: storyValue.coverImageUrl ?? undefined,
       });
       setLoadedNarrationId(narrationValue.id);
+      // Mirror the loaded narration for the mini player (RNTP tracks carry no storyId).
+      usePlayerStore.getState().setNowPlaying({
+        storyId: storyValue.id,
+        narrationId: narrationValue.id,
+        title: storyValue.title,
+        subtitle: narratorLabel(narrationValue),
+        artworkUrl: storyValue.coverImageUrl ?? null,
+      });
       const saved = storyValue.playbackPosition;
       if (saved != null && saved.narrationId === narrationValue.id && saved.positionSeconds > 1) {
         await seekTo(saved.positionSeconds);

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useSyncExternalStore } from 'react';
 import TrackPlayer, { Event, State } from 'react-native-track-player';
 import { setupPlayer } from './player';
+import { usePlayerStore } from '../stores/player';
 
 export type PreviewStatus = 'idle' | 'loading' | 'playing' | 'error';
 
@@ -55,6 +56,8 @@ async function startPreview(key: string, loadUrl: () => Promise<string>): Promis
     await setupPlayer();
     bindEndListener();
     await TrackPlayer.reset();
+    // The queue no longer holds a narration — the mini player must not linger.
+    usePlayerStore.getState().clearNowPlaying();
     if (generation !== myGeneration) return;
     await TrackPlayer.add({ url });
     await TrackPlayer.play();

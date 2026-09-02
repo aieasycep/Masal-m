@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { ScrollView, StyleSheet, View, type ViewStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, spacing } from '@masalim/ui';
+import { useDockHeight } from '../lib/dock';
 
 interface ScreenProps {
   children: ReactNode;
@@ -25,8 +26,11 @@ export function Screen({
   backgroundColor = colors.background,
 }: ScreenProps) {
   const insets = useSafeAreaInsets();
+  const dockHeight = useDockHeight();
   const paddingTop = Math.max(insets.top, 20) + 8;
-  const paddingBottom = withTabBar ? spacing.tabBarClearance : Math.max(insets.bottom, 24);
+  const paddingBottom = withTabBar
+    ? spacing.tabBarClearance + dockHeight
+    : Math.max(insets.bottom, 24);
 
   if (!scroll) {
     return (

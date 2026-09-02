@@ -33,6 +33,7 @@ import type {
 import { colors, fontFamilies, fontSizes, gradients, radius, spacing } from '@masalim/ui';
 import { api } from '../../../src/lib/api';
 import { useJobProgress } from '../../../src/lib/job-stream';
+import { useJobsStore } from '../../../src/stores/jobs';
 import { stopPreview, usePreviewPlayer } from '../../../src/lib/preview-player';
 import { AudioPreviewButton } from '../../../src/components/AudioPreviewButton';
 import { KeepScreenAwake } from '../../../src/components/KeepScreenAwake';
@@ -686,6 +687,26 @@ export default function NarrateStory() {
             </Text>
           </View>
           <NightProgress percent={percent} />
+          <Pressable
+            onPress={() => {
+              // Keep waiting in the background: the row keeps its live pill and
+              // the dock above the tab bar tracks the same job.
+              useJobsStore.getState().track({
+                jobId: activeJob.jobId,
+                kind: 'narration',
+                storyId: id,
+                title: story?.title ?? null,
+                route: `/story/${id}/narrate`,
+              });
+              setActiveJob(null);
+            }}
+            accessibilityRole="button"
+            accessibilityLabel={t('jobs.background')}
+            hitSlop={8}
+            style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}
+          >
+            <Text style={styles.nightSecondary}>{t('jobs.background')}</Text>
+          </Pressable>
         </View>
       </View>
     );

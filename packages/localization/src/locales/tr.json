@@ -1006,5 +1006,21 @@
     "lead": "İlgi alanlarına göre hazırlandı — birine dokun, masal sihirbazı dolu gelsin.",
     "emptyTitle": "Şimdilik yeni öneri yok.",
     "emptyBody": "Çocuğunun ilgi alanlarını profilinden ekledikçe öneriler çoğalır."
+  },
+  "jobs": {
+    "story": "Masalın hazırlanıyor…",
+    "narration": "Seslendirme hazırlanıyor…",
+    "illustration": "Görseller hazırlanıyor…",
+    "ready": "Hazır ✨",
+    "failed": "Bir sorun oluştu",
+    "open": "Aç",
+    "hide": "Gizle",
+    "background": "Arka planda devam et",
+    "leaveHint": "Uygulamadan ayrılsan da devam eder"
+  },
+  "miniPlayer": {
+    "open": "Oynatıcıyı aç",
+    "play": "Oynat",
+    "pause": "Duraklat"
   }
 }

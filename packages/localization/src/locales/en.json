@@ -1006,5 +1006,21 @@
     "lead": "Built from their interests — tap one and the story wizard arrives prefilled.",
     "emptyTitle": "No new suggestions right now.",
     "emptyBody": "Suggestions grow as you add your child's interests to their profile."
+  },
+  "jobs": {
+    "story": "Your story is being prepared…",
+    "narration": "Narration is being prepared…",
+    "illustration": "Illustrations are being prepared…",
+    "ready": "Ready ✨",
+    "failed": "Something went wrong",
+    "open": "Open",
+    "hide": "Hide",
+    "background": "Continue in the background",
+    "leaveHint": "Keeps going even if you leave the app"
+  },
+  "miniPlayer": {
+    "open": "Open the player",
+    "play": "Play",
+    "pause": "Pause"
   }
 }

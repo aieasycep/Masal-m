@@ -37,6 +37,7 @@ import {
 import { api } from '../../../src/lib/api';
 import { openBookBuilderForStory } from '../../../src/lib/book-nav';
 import { useJobProgress } from '../../../src/lib/job-stream';
+import { useJobsStore } from '../../../src/stores/jobs';
 import { Button } from '../../../src/components/Button';
 import { Chip } from '../../../src/components/Chip';
 import { ConfirmSheet } from '../../../src/components/ConfirmSheet';
@@ -732,6 +733,26 @@ export default function IllustrateStory() {
               done={done}
               percent={percent}
             />
+            {!done && activeSet.jobId != null ? (
+              <Pressable
+                onPress={() => {
+                  useJobsStore.getState().track({
+                    jobId: activeSet.jobId as string,
+                    kind: 'illustration',
+                    storyId: id,
+                    title: story.title,
+                    route: `/story/${id}/illustrate`,
+                  });
+                  router.back();
+                }}
+                accessibilityRole="button"
+                accessibilityLabel={t('jobs.background')}
+                hitSlop={8}
+                style={({ pressed }) => [styles.backgroundLink, { opacity: pressed ? 0.7 : 1 }]}
+              >
+                <Text style={styles.backgroundLinkText}>{t('jobs.background')}</Text>
+              </Pressable>
+            ) : null}
           </Animated.View>
         </ScrollView>
       </View>
@@ -1203,6 +1224,12 @@ const styles = StyleSheet.create({
     paddingTop: spacing.xs,
   },
   nightCenter: { flexGrow: 1, justifyContent: 'center' },
+  backgroundLink: { alignSelf: 'center', minHeight: 44, justifyContent: 'center', marginTop: spacing.lg },
+  backgroundLinkText: {
+    fontFamily: fontFamilies.bodySemiBold,
+    fontSize: fontSizes.base,
+    color: 'rgba(255,255,255,0.7)',
+  },
   nightPanel: { alignItems: 'center', gap: 28, paddingVertical: spacing.xxxl },
   palette: {
     width: 100,
