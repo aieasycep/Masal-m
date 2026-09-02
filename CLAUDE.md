@@ -371,6 +371,18 @@ Local `.env` = `.env.example` + generated JWT secrets (already present, gitignor
   hard Verdict step (APP_ALIVE + SMOKE_ALIVE + `[player-smoke] DONE`), prints
   ReactNativeJS lines, and re-fires the deep link once (a missing marker on
   build #6 was a timing flake, not an app bug).
+- **Motion-storybook video (PARKED as phase 2, Sep 2)**: user asked whether an
+  "animation" premium tier is feasible; I proposed tier 1 (Ken Burns storybook
+  video from existing illustrations + narration + karaoke subtitles, ffmpeg)
+  and tier 2 (image-to-video per page, ~₺150–₺450/story). Built a real demo
+  on the throwaway branch `demo/motion-video` (scripts in
+  apps/api/scripts/motion-demo/: story.json, make-assets.mjs [local espeak
+  or real gpt-image-1 + ElevenLabs + forced alignment], render.mjs
+  [1080×1920, zoompan + xfade + ASS karaoke, apad=whole_dur — plain apad
+  spins ffmpeg forever]; workflow motion-demo.yml commits the MP4 to the
+  branch). Verdict: "bu haliyle güzel değil" — same as the player screen, so
+  parked; PR #19 closed, branch kept as reference. Follow-up instead: bigger
+  responsive cover on the night player (629aeb1, cherry-picked to review).
 - **Illustration style fix**: STYLE_TEMPLATES rewritten as mutually exclusive
   medium specs with negatives; style now LEADS sheet+edit prompts; edit
   prompt carries "reference = identity only" + quality tier. Root cause of
