@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { colors, fontFamilies, fontSizes, letterSpacing, radius, spacing } from '@masalim/ui';
+import { AppIcon } from '../../src/components/AppIcon';
 import { useAppPrefs } from '../../src/stores/app-prefs';
 import { ListRow } from '../../src/components/ListRow';
 import { Screen } from '../../src/components/Screen';
@@ -61,7 +62,7 @@ export default function AudioSettings() {
 
       <SectionCard title={t('settings.audioPlayerSection')}>
         <ListRow
-          icon="▶️"
+          icon={<AppIcon name="play" size={20} color={colors.primary} />}
           label={t('settings.autoAdvance')}
           sub={t('settings.autoAdvanceSub')}
           variant="toggle"

@@ -45,7 +45,11 @@ import {
   spacing,
 } from '@masalim/ui';
 import { api } from '../../../src/lib/api';
-import { activePageNumber } from '../../../src/lib/narration-sync';
+import {
+  activePageNumber,
+  activeWordIndexOnPage,
+  wordStartSeconds,
+} from '../../../src/lib/narration-sync';
 import { useAppPrefs } from '../../../src/stores/app-prefs';
 import { usePlayerStore } from '../../../src/stores/player';
 import {
@@ -60,6 +64,7 @@ import {
   usePlayerProgress,
   usePositionPersistence,
 } from '../../../src/lib/player';
+import { KaraokeText } from '../../../src/components/KaraokeText';
 import { Button } from '../../../src/components/Button';
 import { Starfield } from '../../../src/components/Starfield';
 import { Waveform } from '../../../src/components/Waveform';
@@ -322,7 +327,8 @@ export default function StoryPlayer() {
 
   const { playing } = useIsPlaying();
   const isPlaying = playing === true;
-  const { position, duration: liveDuration } = usePlayerProgress();
+  // 250ms ticks so the karaoke word highlight keeps up with speech.
+  const { position, duration: liveDuration } = usePlayerProgress(250);
 
   usePositionPersistence(id, loadedNarrationId ?? undefined);
 
@@ -746,9 +752,21 @@ export default function StoryPlayer() {
                     }}
                     style={[styles.paragraph, highlighted && styles.paragraphActive]}
                   >
-                    <Text style={[styles.paragraphText, highlighted && styles.paragraphTextActive]}>
-                      {page.text}
-                    </Text>
+                    <KaraokeText
+                      text={page.text}
+                      activeIndex={
+                        highlighted
+                          ? activeWordIndexOnPage(narration?.wordTimings, position, page.pageNumber)
+                          : null
+                      }
+                      style={[styles.paragraphText, highlighted && styles.paragraphTextActive]}
+                      activeStyle={styles.wordActive}
+                      readStyle={styles.wordRead}
+                      onWordPress={(index) => {
+                        const seconds = wordStartSeconds(narration?.wordTimings, page.pageNumber, index);
+                        if (seconds != null) void seekTo(seconds).catch(() => {});
+                      }}
+                    />
                   </View>
                 );
               })}
@@ -1001,6 +1019,8 @@ const styles = StyleSheet.create({
     opacity: 0.75,
   },
   paragraphTextActive: { color: colors.card, opacity: 1 },
+  wordActive: { color: night.highlight, fontFamily: fontFamilies.bodyBold },
+  wordRead: { color: night.text },
   pressedDim: { opacity: 0.7 },
   sheetBackdrop: { flex: 1, backgroundColor: 'rgba(4,8,16,0.55)' },
   sheet: {

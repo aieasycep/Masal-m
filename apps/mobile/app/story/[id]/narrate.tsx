@@ -31,6 +31,7 @@ import type {
   VoiceProfile,
 } from '@masalim/validation';
 import { colors, fontFamilies, fontSizes, gradients, radius, spacing } from '@masalim/ui';
+import { AppIcon } from '../../../src/components/AppIcon';
 import { api } from '../../../src/lib/api';
 import { useJobProgress } from '../../../src/lib/job-stream';
 import { useJobsStore } from '../../../src/stores/jobs';
@@ -224,7 +225,7 @@ function NarrationRow({ narration, onOpen, onRetry, retryDisabled }: NarrationRo
   if (narration.status === NarrationStatus.FAILED) {
     return (
       <View style={[styles.narrationRow, styles.narrationRowFailed]}>
-        <Text style={styles.failedEmoji}>⚠️</Text>
+        <AppIcon name="alert" size={20} color={colors.error} />
         <View style={styles.narrationBody}>
           <Text style={styles.narrationName} numberOfLines={1}>
             {narration.narratorName}
@@ -832,7 +833,7 @@ export default function NarrateStory() {
               style={({ pressed }) => [styles.addVoiceCard, { opacity: pressed ? 0.8 : 1 }]}
             >
               <View style={styles.mutedAvatar}>
-                <Text style={styles.mutedAvatarEmoji}>🎙</Text>
+                <AppIcon name="mic" size={22} color={colors.mutedForeground} />
               </View>
               <View style={styles.voiceTextBlock}>
                 <Text style={styles.addVoiceTitle}>{t('voice.emptyCta')}</Text>
@@ -1038,7 +1039,6 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   rowFill: { height: '100%', borderRadius: 2, backgroundColor: colors.primary },
-  failedEmoji: { fontSize: 18 },
   failedText: {
     fontFamily: fontFamilies.body,
     fontSize: fontSizes.sm,

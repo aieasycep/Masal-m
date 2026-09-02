@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SubscriptionPlan, SubscriptionStatus, VoiceProfileStatus } from '@masalim/types';
 import { colors, fontFamilies, fontSizes, premiumGold, radius, shadows, spacing } from '@masalim/ui';
+import { AppIcon } from '../../src/components/AppIcon';
 import { api } from '../../src/lib/api';
 import { Screen } from '../../src/components/Screen';
 import { ScreenHeader } from '../../src/components/ScreenHeader';
@@ -112,19 +113,19 @@ export default function ManageSubscription() {
 
           <View style={styles.actions}>
             <ListRow
-              icon="🎟"
+              icon={<AppIcon name="ticket" size={20} color={colors.primary} />}
               label={t('profile.menu.credits')}
               sub={t('subscription.manageCreditsSub')}
               onPress={() => router.push('/subscription/quota' as never)}
             />
             <ListRow
-              icon="🔁"
+              icon={<AppIcon name="crown" size={20} color={colors.primary} />}
               label={t('subscription.manageChangePlan')}
               sub={t('subscription.manageChangePlanSub')}
               onPress={() => router.push('/subscription/paywall' as never)}
             />
             <ListRow
-              icon="🏪"
+              icon={<AppIcon name="store" size={20} color={colors.primary} />}
               label={t('subscription.manage')}
               sub={MOCK_STORE ? t('subscription.manageStoreMock') : t('subscription.manageStoreSub')}
               variant={MOCK_STORE ? 'disabled' : 'default'}

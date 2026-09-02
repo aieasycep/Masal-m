@@ -18,6 +18,7 @@ import {
   shadows,
   spacing,
 } from '@masalim/ui';
+import { AppIcon } from '../../src/components/AppIcon';
 import { api } from '../../src/lib/api';
 import { Button } from '../../src/components/Button';
 import { ConfirmSheet } from '../../src/components/ConfirmSheet';
@@ -303,7 +304,7 @@ export default function OrderDetail() {
             <Button
               label={t('orders.trackShipment')}
               variant="secondary"
-              leading={<Text style={styles.buttonEmoji}>📦</Text>}
+              leading={<AppIcon name="order" size={18} color={colors.primary} />}
               onPress={() => void Linking.openURL(trackingUrl)}
               style={styles.trackButton}
             />
@@ -506,7 +507,6 @@ const styles = StyleSheet.create({
     borderColor: colors.secondary,
     marginBottom: spacing.md,
   },
-  buttonEmoji: { fontSize: fontSizes.xl },
   addressName: {
     fontFamily: fontFamilies.bodyBold,
     fontSize: fontSizes.lg,

@@ -8,6 +8,7 @@ import { ApiError } from '@masalim/api-client';
 import type { StoryTheme } from '@masalim/types';
 import type { StorySummary } from '@masalim/validation';
 import { colors, fontFamilies, fontSizes, radius, spacing } from '@masalim/ui';
+import { AppIcon, type AppIconName } from './AppIcon';
 import { api } from '../lib/api';
 import { ConfirmSheet } from './ConfirmSheet';
 
@@ -45,7 +46,8 @@ interface StorySheetProps {
 }
 
 interface ActionRowProps {
-  emoji: string;
+  icon: AppIconName;
+  filled?: boolean;
   label: string;
   onPress: () => void;
   destructive?: boolean;
@@ -54,7 +56,7 @@ interface ActionRowProps {
 }
 
 /** 44px tappable action row: emoji + Nunito 15/600 label (+ spinner while mutating). */
-function ActionRow({ emoji, label, onPress, destructive, disabled, loading }: ActionRowProps) {
+function ActionRow({ icon, filled, label, onPress, destructive, disabled, loading }: ActionRowProps) {
   return (
     <Pressable
       onPress={onPress}
@@ -64,7 +66,12 @@ function ActionRow({ emoji, label, onPress, destructive, disabled, loading }: Ac
       accessibilityState={{ disabled: disabled === true }}
       style={({ pressed }) => [styles.actionRow, { opacity: disabled ? 0.5 : pressed ? 0.7 : 1 }]}
     >
-      <Text style={styles.actionEmoji}>{emoji}</Text>
+      <AppIcon
+        name={icon}
+        size={20}
+        color={destructive === true ? colors.error : colors.foreground}
+        filled={filled === true}
+      />
       <Text style={[styles.actionLabel, destructive === true && styles.actionLabelDestructive]}>
         {label}
       </Text>
@@ -196,34 +203,35 @@ export function StorySheet({ story, onClose, onChanged }: StorySheetProps) {
         <View style={styles.actions}>
           {latestNarration != null ? (
             <ActionRow
-              emoji="🎧"
+              icon="audio"
               label={t('library.actions.listen')}
               onPress={openPlayer}
               disabled={busy != null}
             />
           ) : null}
           <ActionRow
-            emoji="📖"
+            icon="story"
             label={t('library.actions.read')}
             onPress={openReader}
             disabled={busy != null}
           />
           <ActionRow
-            emoji="🔁"
+            icon="copy"
             label={t('library.actions.duplicate')}
             onPress={() => void duplicate()}
             disabled={busy != null}
             loading={busy === 'duplicate'}
           />
           <ActionRow
-            emoji={active.isFavorite ? '💜' : '⭐'}
+            icon="favorite"
+            filled={active.isFavorite}
             label={t(active.isFavorite ? 'library.actions.unfavorite' : 'library.actions.favorite')}
             onPress={() => void toggleFavorite()}
             disabled={busy != null}
             loading={busy === 'favorite'}
           />
           <ActionRow
-            emoji="🗑"
+            icon="delete"
             label={t('library.actions.delete')}
             onPress={() => setConfirmDelete(true)}
             destructive
@@ -282,7 +290,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: spacing.sm,
   },
-  actionEmoji: { fontSize: 18, width: 26, textAlign: 'center' },
   actionLabel: {
     flex: 1,
     fontFamily: fontFamilies.bodySemiBold,

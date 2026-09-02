@@ -38,6 +38,7 @@ import {
   radius,
   spacing,
 } from '@masalim/ui';
+import { AppIcon } from '../../../src/components/AppIcon';
 import { Button } from '../../../src/components/Button';
 import { FeatureTour, type TourStep } from '../../../src/components/FeatureTour';
 import { Starfield } from '../../../src/components/Starfield';
@@ -45,7 +46,13 @@ import { storyThemeEmoji } from '../../../src/components/StorySheet';
 import { useActiveTrack, useIsPlaying } from 'react-native-track-player';
 import { ChevronLeftIcon, ChevronRightIcon } from '../../../src/components/icons';
 import { api } from '../../../src/lib/api';
-import { activePageNumber } from '../../../src/lib/narration-sync';
+import {
+  activePageNumber,
+  activeWordIndexOnPage,
+  wordStartSeconds,
+} from '../../../src/lib/narration-sync';
+import { seekTo } from '../../../src/lib/player';
+import { KaraokeText } from '../../../src/components/KaraokeText';
 import { usePlayerProgress } from '../../../src/lib/player';
 import { registerTourTarget } from '../../../src/lib/tour-targets';
 import { useAppPrefs } from '../../../src/stores/app-prefs';
@@ -369,7 +376,29 @@ export default function Reader() {
             style={[styles.textScroll, { maxHeight: Math.round(height * 0.3) }]}
             showsVerticalScrollIndicator={false}
           >
-            <Text style={styles.pageText}>{renderPageText(page.text)}</Text>
+            {syncing && playingNarration.wordTimings != null ? (
+              <KaraokeText
+                text={page.text}
+                activeIndex={activeWordIndexOnPage(
+                  playingNarration.wordTimings,
+                  position,
+                  page.pageNumber,
+                )}
+                style={styles.pageText}
+                activeStyle={styles.wordActive}
+                readStyle={styles.wordRead}
+                onWordPress={(wordIndex) => {
+                  const seconds = wordStartSeconds(
+                    playingNarration.wordTimings,
+                    page.pageNumber,
+                    wordIndex,
+                  );
+                  if (seconds != null) void seekTo(seconds).catch(() => {});
+                }}
+              />
+            ) : (
+              <Text style={styles.pageText}>{renderPageText(page.text)}</Text>
+            )}
           </ScrollView>
           <View style={styles.pageNavRow}>
             <Pressable
@@ -432,7 +461,8 @@ export default function Reader() {
                 <View key={barIndex} style={[styles.audioBar, { height: barHeight }]} />
               ))}
             </View>
-            <Text style={styles.audioPillText}>{`🎙 ${story.latestNarration.narratorName}`}</Text>
+            <AppIcon name="mic" size={12} color="rgba(255,255,255,0.8)" />
+            <Text style={styles.audioPillText}>{story.latestNarration.narratorName}</Text>
           </Pressable>
         ) : (
           <View style={styles.headerSpacer} />
@@ -460,8 +490,13 @@ export default function Reader() {
             accessibilityLabel={t('reader.autoFollow')}
             style={[styles.followChip, follow && styles.followChipOn]}
           >
+            <AppIcon
+              name={follow ? 'music' : 'hand'}
+              size={14}
+              color={follow ? '#FFFFFF' : 'rgba(255,255,255,0.7)'}
+            />
             <Text style={[styles.followChipText, follow && styles.followChipTextOn]}>
-              {follow ? `🎵 ${t('reader.autoFollowOn')}` : `✋ ${t('reader.autoFollowOff')}`}
+              {follow ? t('reader.autoFollowOn') : t('reader.autoFollowOff')}
             </Text>
           </Pressable>
         </View>
@@ -546,6 +581,9 @@ const styles = StyleSheet.create({
   },
   followRow: { alignItems: 'center', paddingTop: spacing.sm },
   followChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
     minHeight: 44,
     justifyContent: 'center',
     paddingHorizontal: spacing.md,
@@ -620,6 +658,8 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.92)',
   },
   pageTextHighlight: { fontFamily: fontFamilies.display, color: colors.gold },
+  wordActive: { color: night.highlight, fontFamily: fontFamilies.display },
+  wordRead: { color: night.text },
   pageNavRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   navButton: {
     flexDirection: 'row',

@@ -16,6 +16,7 @@ import {
 import type { AuthSession } from '@masalim/validation';
 import { ApiError, NetworkError } from '@masalim/api-client';
 import { colors, fontFamilies, fontSizes, radius, spacing } from '@masalim/ui';
+import { AppIcon } from '../../src/components/AppIcon';
 import { api } from '../../src/lib/api';
 import { useAuthStore } from '../../src/stores/auth';
 import { Button } from '../../src/components/Button';
@@ -41,7 +42,8 @@ type ForgotStep = 'request' | 'reset';
 function ErrorBanner({ message }: { message: string }) {
   return (
     <View style={styles.errorBanner} accessibilityLiveRegion="polite">
-      <Text style={styles.errorBannerText}>⚠ {message}</Text>
+      <AppIcon name="alert" size={16} color={colors.error} />
+      <Text style={styles.errorBannerText}>{message}</Text>
     </View>
   );
 }
@@ -435,6 +437,9 @@ const styles = StyleSheet.create({
   },
   // Banner tints derive from colors.destructive (#E05454).
   errorBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
     paddingVertical: spacing.sm,
     paddingHorizontal: spacing.md,
     borderRadius: radius.md,
@@ -444,6 +449,7 @@ const styles = StyleSheet.create({
     marginTop: spacing.lg,
   },
   errorBannerText: {
+    flex: 1,
     fontFamily: fontFamilies.bodySemiBold,
     fontSize: fontSizes.md,
     color: colors.destructive,

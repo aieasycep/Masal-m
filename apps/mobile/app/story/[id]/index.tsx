@@ -24,6 +24,7 @@ import {
 } from '@masalim/types';
 import { ApiError, NetworkError } from '@masalim/api-client';
 import { colors, fontFamilies, fontSizes, gradients, radius, spacing } from '@masalim/ui';
+import { AppIcon } from '../../../src/components/AppIcon';
 import { api } from '../../../src/lib/api';
 import { openBookBuilderForStory } from '../../../src/lib/book-nav';
 import { useJobProgress } from '../../../src/lib/job-stream';
@@ -266,30 +267,30 @@ export default function StoryResult() {
   // QA design: 5 tiles, 3 per row (Paylaş lives only in the header now, and
   // Düzenle moved last).
   const actions = [
-    { key: 'read', emoji: '📖', label: t('storyResult.read'), onPress: openReader },
+    { key: 'read', icon: 'story' as const, label: t('storyResult.read'), onPress: openReader },
     {
       key: 'narrate',
-      emoji: '🎙',
+      icon: 'mic' as const,
       // V2 wording: an existing narration makes this a change, not a first pick.
       label: narrations.length > 0 ? t('narrate.changeVoice') : t('narrate.create'),
       onPress: openNarrate,
     },
     {
       key: 'illustrate',
-      emoji: '🎨',
+      icon: 'palette' as const,
       label: t('storyResult.illustrate'),
       onPress: openIllustrate,
     },
     {
       key: 'book',
-      emoji: '📚',
+      icon: 'book' as const,
       label: t('storyResult.makeBook'),
       onPress: () => {
         void openBookBuilder();
       },
       loading: bookLoading,
     },
-    { key: 'edit', emoji: '✏️', label: t('storyResult.edit'), onPress: openEdit },
+    { key: 'edit', icon: 'edit' as const, label: t('storyResult.edit'), onPress: openEdit },
   ];
 
   const resultTourSteps: TourStep[] = [
@@ -388,7 +389,7 @@ export default function StoryResult() {
         ) : (
           <Button
             label={t('storyResult.read')}
-            leading={<Text style={styles.ctaEmoji}>📖</Text>}
+            leading={<AppIcon name="story" size={18} color={colors.primaryForeground} />}
             onPress={openReader}
           />
         )}
@@ -423,7 +424,7 @@ export default function StoryResult() {
                 {action.loading === true ? (
                   <ActivityIndicator size="small" color={colors.primary} />
                 ) : (
-                  <Text style={styles.actionEmoji}>{action.emoji}</Text>
+                  <AppIcon name={action.icon} size={22} color={colors.primary} />
                 )}
               </View>
               <Text style={styles.actionLabel}>{action.label}</Text>
@@ -533,7 +534,6 @@ const styles = StyleSheet.create({
     fontSize: fontSizes.md,
     color: colors.mutedForeground,
   },
-  ctaEmoji: { fontSize: 20 },
   preparingText: {
     fontFamily: fontFamilies.body,
     fontSize: fontSizes.sm,
@@ -562,7 +562,6 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
   },
   actionIconBox: { height: 24, alignItems: 'center', justifyContent: 'center' },
-  actionEmoji: { fontSize: 20 },
   actionLabel: {
     fontFamily: fontFamilies.bodyBold,
     fontSize: fontSizes.sm,

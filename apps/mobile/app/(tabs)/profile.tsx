@@ -13,6 +13,7 @@ import { useAppPrefs } from '../../src/stores/app-prefs';
 import { Avatar } from '../../src/components/Avatar';
 import { ConfirmSheet } from '../../src/components/ConfirmSheet';
 import { ChevronRightIcon } from '../../src/components/icons';
+import { AppIcon, type AppIconName } from '../../src/components/AppIcon';
 
 /** Deterministic child avatar emoji (name-hash) — keep in sync with Home. */
 const CHILD_EMOJIS = ['🧒', '👧', '🦁', '🐻', '🦊', '🐰'] as const;
@@ -27,7 +28,7 @@ function childEmoji(name: string): string {
 
 interface MenuItem {
   key: string;
-  icon: string;
+  icon: AppIconName;
   label: string;
   sub: string;
   route: string;
@@ -75,7 +76,7 @@ export default function Profile() {
   const menuItems: MenuItem[] = [
     {
       key: 'voices',
-      icon: '🎙',
+      icon: 'mic',
       label: t('profile.menu.voices'),
       sub:
         voiceCount > 0
@@ -85,7 +86,7 @@ export default function Profile() {
     },
     {
       key: 'orders',
-      icon: '📦',
+      icon: 'order',
       label: t('profile.menu.orders'),
       sub:
         activeOrderCount > 0
@@ -96,7 +97,7 @@ export default function Profile() {
     },
     {
       key: 'credits',
-      icon: '🎟',
+      icon: 'ticket',
       label: t('profile.menu.credits'),
       sub:
         creditTotal == null
@@ -106,7 +107,7 @@ export default function Profile() {
     },
     {
       key: 'subscription',
-      icon: '👑',
+      icon: 'crown',
       label: t('profile.menu.subscription'),
       // The paywall shows the expiry date; the row keeps the date-less variant.
       sub: isPremium
@@ -117,14 +118,14 @@ export default function Profile() {
     },
     {
       key: 'notifications',
-      icon: '🔔',
+      icon: 'bell',
       label: t('profile.menu.notifications'),
       sub: t('profile.menu.notificationsSub'),
       route: '/settings/notifications',
     },
     {
       key: 'privacy',
-      icon: '🔒',
+      icon: 'lock',
       label: t('profile.menu.privacy'),
       sub: t('profile.menu.privacySub'),
       // Voice-data detail lands in the voice phase — the settings hub hosts the
@@ -133,7 +134,7 @@ export default function Profile() {
     },
     {
       key: 'settings',
-      icon: '⚙️',
+      icon: 'settings',
       label: t('profile.menu.settings'),
       sub: t('profile.menu.settingsSub'),
       route: '/settings',
@@ -258,7 +259,7 @@ export default function Profile() {
               ]}
             >
               <View style={styles.menuIconTile}>
-                <Text style={styles.menuIcon}>{item.icon}</Text>
+                <AppIcon name={item.icon} size={20} color={colors.primary} />
               </View>
               <View style={styles.menuTextBlock}>
                 <Text style={styles.menuLabel}>{item.label}</Text>

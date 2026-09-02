@@ -8,6 +8,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StoryTheme, SubscriptionPlan } from '@masalim/types';
 import type { Recommendation, StorySummary } from '@masalim/validation';
 import { colors, fontFamilies, fontSizes, gradients, radius, shadows, spacing } from '@masalim/ui';
+import { AppIcon } from '../../src/components/AppIcon';
 import { Avatar } from '../../src/components/Avatar';
 import { ChildSwitcherSheet, childAvatarEmoji } from '../../src/components/ChildSwitcherSheet';
 import { QuotaBanner } from '../../src/components/QuotaBanner';
@@ -206,7 +207,8 @@ export default function Home() {
                 hitSlop={6}
                 style={({ pressed }) => [styles.creditPill, { opacity: pressed ? 0.8 : 1 }]}
               >
-                <Text style={styles.creditPillText}>🎟 {quotaRemaining}</Text>
+                <AppIcon name="ticket" size={14} color={colors.primary} />
+                <Text style={styles.creditPillText}>{quotaRemaining}</Text>
               </Pressable>
             ) : null}
           </View>
@@ -295,7 +297,7 @@ export default function Home() {
                 : t('home.heroTitleGeneric')}
             </Text>
             <View style={styles.heroPill}>
-              <Text style={styles.heroPillEmoji}>✨</Text>
+              <AppIcon name="sparkle" size={16} color={colors.primary} />
               <Text style={styles.heroPillLabel}>{t('home.heroCta')}</Text>
             </View>
           </LinearGradient>
@@ -460,6 +462,9 @@ const styles = StyleSheet.create({
   headerText: { flex: 1, paddingRight: spacing.sm },
   greetingRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   creditPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
     backgroundColor: colors.card,
     borderWidth: 1,
     borderColor: colors.border,
@@ -555,7 +560,6 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     paddingHorizontal: spacing.lg,
   },
-  heroPillEmoji: { fontSize: 16 },
   heroPillLabel: {
     fontFamily: fontFamilies.bodyExtraBold,
     fontSize: fontSizes.base,

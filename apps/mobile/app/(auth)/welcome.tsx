@@ -17,6 +17,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { AuthSession } from '@masalim/validation';
 import { ApiError, NetworkError } from '@masalim/api-client';
 import { colors, fontFamilies, fontSizes, gradients, radius, shadows, spacing } from '@masalim/ui';
+import { AppIcon } from '../../src/components/AppIcon';
 import { Starfield } from '../../src/components/Starfield';
 import { SocialAuthCancelled, signInWithApple, signInWithGoogle } from '../../src/lib/social-auth';
 import { useAuthStore } from '../../src/stores/auth';
@@ -233,7 +234,8 @@ export default function Welcome() {
 
         {serverError != null ? (
           <View style={styles.errorBanner} accessibilityLiveRegion="polite">
-            <Text style={styles.errorBannerText}>⚠ {serverError}</Text>
+            <AppIcon name="alert" size={16} color={colors.error} />
+            <Text style={styles.errorBannerText}>{serverError}</Text>
           </View>
         ) : null}
 
@@ -341,6 +343,9 @@ const styles = StyleSheet.create({
   },
   // Banner tints derive from colors.destructive (#E05454).
   errorBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
     paddingVertical: spacing.sm,
     paddingHorizontal: spacing.md,
     borderRadius: radius.md,
@@ -349,6 +354,7 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(224,84,84,0.2)',
   },
   errorBannerText: {
+    flex: 1,
     fontFamily: fontFamilies.bodySemiBold,
     fontSize: fontSizes.md,
     color: colors.destructive,

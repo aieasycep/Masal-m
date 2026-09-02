@@ -34,6 +34,7 @@ import {
   shadows,
   spacing,
 } from '@masalim/ui';
+import { AppIcon } from '../../../src/components/AppIcon';
 import { api } from '../../../src/lib/api';
 import { openBookBuilderForStory } from '../../../src/lib/book-nav';
 import { useJobProgress } from '../../../src/lib/job-stream';
@@ -939,7 +940,7 @@ export default function IllustrateStory() {
               { opacity: regen != null ? 0.5 : pressed ? 0.7 : 1 },
             ]}
           >
-            <Text style={styles.actionEmoji}>🔄</Text>
+            <AppIcon name="retry" size={18} color={colors.foreground} />
             <Text style={styles.actionLabel}>{t('illustrate.regenerateAction')}</Text>
             {/* Transparent pricing: every regenerate is a metered render. */}
             <View style={styles.costChip}>
@@ -957,7 +958,7 @@ export default function IllustrateStory() {
             accessibilityLabel={t('illustrate.chooseAlternative')}
             style={({ pressed }) => [styles.actionButton, { opacity: pressed ? 0.7 : 1 }]}
           >
-            <Text style={styles.actionEmoji}>🖼</Text>
+            <AppIcon name="image" size={18} color={colors.foreground} />
             <Text style={styles.actionLabel}>{t('illustrate.alternatives')}</Text>
           </Pressable>
         </View>
@@ -1070,7 +1071,7 @@ export default function IllustrateStory() {
             {createError != null ? <Text style={styles.submitError}>{createError}</Text> : null}
             <Button
               label={t('illustrate.generate')}
-              leading={<Text style={styles.ctaEmoji}>🎨</Text>}
+              leading={<AppIcon name="palette" size={18} color={colors.primaryForeground} />}
               onPress={() => {
                 if (selectedStyle != null) void create(selectedStyle);
               }}
@@ -1346,7 +1347,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
   },
-  actionEmoji: { fontSize: fontSizes.base },
   actionLabel: {
     fontFamily: fontFamilies.bodyBold,
     fontSize: fontSizes.base,
@@ -1498,7 +1498,6 @@ const styles = StyleSheet.create({
     color: colors.destructive,
     textAlign: 'center',
   },
-  ctaEmoji: { fontSize: fontSizes.xl },
   ctaCaption: {
     fontFamily: fontFamilies.body,
     fontSize: fontSizes.sm,

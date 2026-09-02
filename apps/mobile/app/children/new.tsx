@@ -189,7 +189,7 @@ export default function NewChild() {
             ))}
             <Chip
               label={t('childSetup.addCustomInterest')}
-              emoji="➕"
+              emoji="+"
               dashed
               selected={customOpen}
               onPress={() => setCustomOpen((open) => !open)}

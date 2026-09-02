@@ -2,6 +2,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTranslation } from 'react-i18next';
 import { colors, fontFamilies, fontSizes, premiumGold, radius, spacing } from '@masalim/ui';
+import { AppIcon } from './AppIcon';
 import { Button } from './Button';
 import { CheckIcon } from './icons';
 import { SheetContainer } from './SheetContainer';
@@ -65,7 +66,9 @@ export function PremiumSheet({
             </View>
           ))}
         </View>
-        <Button label={t('premiumSheet.cta')} onPress={onUpgrade} leading="✨" />
+        <Button label={t('premiumSheet.cta')} onPress={onUpgrade}
+          leading={<AppIcon name="sparkle" size={18} color={colors.primaryForeground} />}
+        />
         <Button label={t('premiumSheet.dismiss')} onPress={onDismiss} variant="tertiary" compact />
       </View>
     </SheetContainer>

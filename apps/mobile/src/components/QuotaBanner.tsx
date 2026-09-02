@@ -1,6 +1,7 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { colors, fontFamilies, fontSizes, radius } from '@masalim/ui';
+import { AppIcon } from './AppIcon';
 import { Button } from './Button';
 
 interface QuotaBannerProps {
@@ -21,7 +22,7 @@ export function QuotaBanner({ variant, remaining = 0, onSeePremium }: QuotaBanne
   if (variant === 'warning') {
     return (
       <View style={[styles.root, styles.warning]}>
-        <Text style={styles.emoji}>⚡</Text>
+        <AppIcon name="alert" size={18} color={colors.warning} />
         <Text style={styles.warningText}>
           {t('quotaBanner.warningPrefix')}
           <Text style={styles.warningStrong}>
@@ -38,7 +39,7 @@ export function QuotaBanner({ variant, remaining = 0, onSeePremium }: QuotaBanne
 
   return (
     <View style={[styles.root, styles.exhausted]}>
-      <Text style={styles.emoji}>🚫</Text>
+      <AppIcon name="alert" size={20} color={colors.error} />
       <View style={styles.exhaustedCol}>
         <Text style={styles.exhaustedTitle}>{t('quotaBanner.exhaustedTitle')}</Text>
         <Text style={styles.exhaustedBody}>{t('quotaBanner.exhaustedBody')}</Text>
@@ -68,7 +69,6 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(224, 84, 84, 0.08)',
     borderColor: 'rgba(224, 84, 84, 0.2)',
   },
-  emoji: { fontSize: 18 },
   warningText: {
     flex: 1,
     fontFamily: fontFamilies.bodySemiBold,

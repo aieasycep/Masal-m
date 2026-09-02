@@ -23,6 +23,7 @@ import { VoiceOwnerType, VoiceProfileStatus } from '@masalim/types';
 import type { VoiceProfile } from '@masalim/validation';
 import { ApiError, NetworkError } from '@masalim/api-client';
 import { colors, fontFamilies, fontSizes, letterSpacing, radius, shadows, spacing } from '@masalim/ui';
+import { AppIcon } from '../../src/components/AppIcon';
 import { api } from '../../src/lib/api';
 import { usePreviewPlayer } from '../../src/lib/preview-player';
 import { AudioPreviewButton } from '../../src/components/AudioPreviewButton';
@@ -278,7 +279,7 @@ export default function VoiceStudio() {
             style={({ pressed }) => [styles.addCard, { opacity: pressed ? 0.85 : 1 }]}
           >
             <View style={styles.addEmojiCircle}>
-              <Text style={styles.addEmoji}>🎙</Text>
+              <AppIcon name="mic" size={22} color={colors.primary} />
             </View>
             <View style={styles.addTextBlock}>
               <View style={styles.addTitleRow}>
