@@ -298,7 +298,8 @@
     "previous": "Önceki",
     "next": "Sonraki",
     "autoFollowOn": "Otomatik takip açık",
-    "autoFollowOff": "Otomatik takip kapalı"
+    "autoFollowOff": "Otomatik takip kapalı",
+    "scrollHint": "Devamı için kaydır"
   },
   "library": {
     "title": "Hikâyelerim",

@@ -79,6 +79,9 @@ import {
   Skip15Icon,
 } from '../../../src/components/icons';
 
+/** Height of the sing-along text panel (px). */
+const TEXT_PANEL_HEIGHT = 260;
+
 const RATES = [0.8, 1, 1.2, 1.5] as const;
 const SLEEP_MINUTE_OPTIONS = [5, 10, 15, 30] as const;
 const FADE_STEPS = 10;
@@ -324,6 +327,7 @@ export default function StoryPlayer() {
   const fadeTokenRef = useRef(0);
   const textScrollRef = useRef<ScrollView>(null);
   const paragraphYRef = useRef<Record<number, number>>({});
+  const paragraphHeightRef = useRef<Record<number, number>>({});
 
   const { playing } = useIsPlaying();
   const isPlaying = playing === true;
@@ -458,14 +462,29 @@ export default function StoryPlayer() {
     return activePageNumber(timings, position);
   }, [narration, position]);
 
+  // Word-level progress through the active paragraph (0..1) — with a word
+  // timeline the panel glides down the paragraph as the words are read.
+  const activeWordFraction = useMemo(() => {
+    if (activePage == null || narration?.wordTimings == null) return null;
+    const index = activeWordIndexOnPage(narration.wordTimings, position, activePage);
+    if (index == null) return null;
+    let max = -1;
+    for (const word of narration.wordTimings.words) {
+      if (word.p === activePage && word.i > max) max = word.i;
+    }
+    return max < 0 ? null : Math.min(1, (index + 0.5) / (max + 1));
+  }, [activePage, narration, position]);
+
   useEffect(() => {
     // "Sonraki sayfaya otomatik geç" pref gates the follow-along scroll.
     if (!showText || !autoFollowPage || activePage == null) return;
     const y = paragraphYRef.current[activePage];
-    if (y != null) {
-      textScrollRef.current?.scrollTo({ y: Math.max(0, y - 32), animated: true });
-    }
-  }, [showText, autoFollowPage, activePage]);
+    if (y == null) return;
+    const height = paragraphHeightRef.current[activePage] ?? 0;
+    // Paragraphs taller than the panel: follow the word instead of parking at the top.
+    const lead = activeWordFraction != null && height > TEXT_PANEL_HEIGHT ? activeWordFraction * (height - TEXT_PANEL_HEIGHT * 0.6) : 0;
+    textScrollRef.current?.scrollTo({ y: Math.max(0, y - 32 + lead), animated: true });
+  }, [showText, autoFollowPage, activePage, activeWordFraction]);
 
   const selectRate = (value: number) => {
     setRateState(value);
@@ -749,6 +768,7 @@ export default function StoryPlayer() {
                     key={page.id}
                     onLayout={(event) => {
                       paragraphYRef.current[page.pageNumber] = event.nativeEvent.layout.y;
+                      paragraphHeightRef.current[page.pageNumber] = event.nativeEvent.layout.height;
                     }}
                     style={[styles.paragraph, highlighted && styles.paragraphActive]}
                   >
@@ -1007,7 +1027,7 @@ const styles = StyleSheet.create({
     backgroundColor: night.card,
     overflow: 'hidden',
   },
-  textPanelScroll: { maxHeight: 260 },
+  textPanelScroll: { maxHeight: TEXT_PANEL_HEIGHT },
   textPanelContent: { padding: spacing.md, gap: spacing.xs },
   paragraph: { borderRadius: radius.sm, padding: 10 },
   paragraphActive: { backgroundColor: 'rgba(155,127,212,0.18)' },
@@ -1019,7 +1039,12 @@ const styles = StyleSheet.create({
     opacity: 0.75,
   },
   paragraphTextActive: { color: colors.card, opacity: 1 },
-  wordActive: { color: night.highlight, fontFamily: fontFamilies.bodyBold },
+  wordActive: {
+    color: night.highlight,
+    fontFamily: fontFamilies.bodyBold,
+    backgroundColor: 'rgba(255,210,125,0.22)',
+    borderRadius: 4,
+  },
   wordRead: { color: night.text },
   pressedDim: { opacity: 0.7 },
   sheetBackdrop: { flex: 1, backgroundColor: 'rgba(4,8,16,0.55)' },

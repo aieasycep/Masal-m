@@ -155,6 +155,81 @@ function FloatingCard({ children }: { children: ReactNode }) {
   return <Animated.View style={floatStyle}>{children}</Animated.View>;
 }
 
+/** Number of timed words on a page (max index + 1) — for follow-along scrolling. */
+function pageWordCount(
+  wordTimings: { words: ReadonlyArray<{ p: number; i: number }> } | null | undefined,
+  pageNumber: number,
+): number {
+  let max = -1;
+  for (const word of wordTimings?.words ?? []) {
+    if (word.p === pageNumber && word.i > max) max = word.i;
+  }
+  return max + 1;
+}
+
+/**
+ * Page text panel: a capped ScrollView that (1) shows a fade + "devamı için
+ * kaydır" cue while more text sits below the fold, and (2) while the narration
+ * follows this page, scrolls in step with it (fraction of the page's audio
+ * window) so the read text never hides under the fold.
+ */
+function PageTextPanel({
+  maxHeight,
+  syncFraction,
+  hintLabel,
+  children,
+}: {
+  maxHeight: number;
+  /** 0..1 progress through this page's narration while following; null otherwise. */
+  syncFraction: number | null;
+  hintLabel: string;
+  children: ReactNode;
+}) {
+  const scrollRef = useRef<ScrollView>(null);
+  const [contentHeight, setContentHeight] = useState(0);
+  const [viewHeight, setViewHeight] = useState(0);
+  const [atEnd, setAtEnd] = useState(false);
+  const overflow = contentHeight - viewHeight;
+  const showHint = overflow > 8 && !atEnd;
+
+  useEffect(() => {
+    if (syncFraction == null || overflow <= 8) return;
+    // Lead the playhead a little so the current line sits mid-panel.
+    const y = Math.min(overflow, Math.max(0, syncFraction * overflow * 1.15));
+    scrollRef.current?.scrollTo({ y, animated: true });
+  }, [syncFraction, overflow]);
+
+  return (
+    <View style={[styles.textScroll, { maxHeight }]}>
+      <ScrollView
+        ref={scrollRef}
+        style={{ maxHeight }}
+        showsVerticalScrollIndicator={false}
+        onContentSizeChange={(_w, h) => setContentHeight(h)}
+        onLayout={(event) => setViewHeight(event.nativeEvent.layout.height)}
+        onScroll={(event) => {
+          const { contentOffset, layoutMeasurement, contentSize } = event.nativeEvent;
+          setAtEnd(contentOffset.y + layoutMeasurement.height >= contentSize.height - 12);
+        }}
+        scrollEventThrottle={64}
+      >
+        {children}
+      </ScrollView>
+      {showHint ? (
+        <View pointerEvents="none" style={styles.textFade}>
+          <LinearGradient
+            colors={['rgba(20,12,48,0)', 'rgba(20,12,48,0.92)'] as [string, string]}
+            style={StyleSheet.absoluteFill}
+          />
+          <View style={styles.scrollHint}>
+            <Text style={styles.scrollHintText}>{hintLabel} ↓</Text>
+          </View>
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
 /** Render page text with quoted dialogue emphasized in gold (design's highlight). */
 function renderPageText(text: string): ReactNode {
   const parts = text.split(/(["“][^"”]+["”])/g);
@@ -245,6 +320,29 @@ export default function Reader() {
     listRef.current?.scrollToIndex({ index, animated: true });
     setSlideIndex(index);
   }, [follow, syncing, playingNarration, position, story, slideIndex]);
+
+  // Progress (0..1) through the page's audio window — drives the text panel's
+  // follow-along scroll. Null when the narration is not on that page.
+  const pageSyncFraction = (pageNumber: number): number | null => {
+    if (!syncing) return null;
+    // Word timeline: position of the word being read within the page (exact
+    // enough to keep the glowing word in view).
+    const wordIndex = activeWordIndexOnPage(playingNarration.wordTimings, position, pageNumber);
+    if (wordIndex != null) {
+      const wordCount = pageWordCount(playingNarration.wordTimings, pageNumber);
+      if (wordCount > 0) return Math.min(1, (wordIndex + 0.5) / wordCount);
+    }
+    const windows = (playingNarration.timings ?? []).filter(
+      (timing) => timing.pageNumber === pageNumber,
+    );
+    if (windows.length === 0) return null;
+    const start = Math.min(...windows.map((timing) => timing.startSeconds));
+    const end = Math.max(
+      ...windows.map((timing) => timing.startSeconds + timing.durationSeconds),
+    );
+    if (position < start || end <= start) return null;
+    return Math.min(1, (position - start) / (end - start));
+  };
 
   const paddingTop = Math.max(insets.top, 20) + 8;
 
@@ -372,9 +470,10 @@ export default function Reader() {
           </FloatingCard>
         </View>
         <View style={[styles.textPanel, { paddingBottom: Math.max(insets.bottom, 16) + 24 }]}>
-          <ScrollView
-            style={[styles.textScroll, { maxHeight: Math.round(height * 0.3) }]}
-            showsVerticalScrollIndicator={false}
+          <PageTextPanel
+            maxHeight={Math.round(height * 0.34)}
+            syncFraction={follow && syncing ? pageSyncFraction(page.pageNumber) : null}
+            hintLabel={t('reader.scrollHint')}
           >
             {syncing && playingNarration.wordTimings != null ? (
               <KaraokeText
@@ -399,7 +498,7 @@ export default function Reader() {
             ) : (
               <Text style={styles.pageText}>{renderPageText(page.text)}</Text>
             )}
-          </ScrollView>
+          </PageTextPanel>
           <View style={styles.pageNavRow}>
             <Pressable
               onPress={() => goToSlide(index - 1)}
@@ -651,6 +750,13 @@ const styles = StyleSheet.create({
     minHeight: 200,
   },
   textScroll: { flexGrow: 0, marginBottom: spacing.xl },
+  textFade: { position: 'absolute', left: 0, right: 0, bottom: 0, height: 56, justifyContent: 'flex-end' },
+  scrollHint: { alignSelf: 'center', paddingBottom: 4 },
+  scrollHintText: {
+    fontFamily: fontFamilies.bodySemiBold,
+    fontSize: fontSizes.sm,
+    color: 'rgba(255,255,255,0.75)',
+  },
   pageText: {
     fontFamily: fontFamilies.displayItalic,
     fontSize: fontSizes.xxl,
@@ -658,7 +764,12 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.92)',
   },
   pageTextHighlight: { fontFamily: fontFamilies.display, color: colors.gold },
-  wordActive: { color: night.highlight, fontFamily: fontFamilies.display },
+  wordActive: {
+    color: night.highlight,
+    fontFamily: fontFamilies.display,
+    backgroundColor: 'rgba(255,210,125,0.22)',
+    borderRadius: 4,
+  },
   wordRead: { color: night.text },
   pageNavRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   navButton: {

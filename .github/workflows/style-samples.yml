@@ -1,0 +1,54 @@
+# Masalım — illustration style sample thumbnails (one-off, re-runnable).
+# Renders the same scene in all five styles with the real image provider and
+# commits the webp thumbnails into apps/mobile/assets/style-samples so the
+# style picker can SHOW each style instead of describing it.
+# Needs the IMAGE_API_KEY secret (already set for the server deploy).
+name: Style Samples
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [claude/masalim-implementation-plan-pz1pkl]
+    paths:
+      - ".github/workflows/style-samples.yml"
+      - "apps/api/scripts/generate-style-samples.mjs"
+
+permissions:
+  contents: write
+
+jobs:
+  render:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }}
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Build AI packages
+        run: pnpm turbo build --filter='@masalim/api^...'
+      - name: Render samples
+        env:
+          IMAGE_API_KEY: ${{ secrets.IMAGE_API_KEY }}
+          IMAGE_MODEL: gpt-image-1
+        run: node apps/api/scripts/generate-style-samples.mjs
+      - name: Upload samples (for a quick look)
+        uses: actions/upload-artifact@v4
+        with:
+          name: style-samples
+          path: apps/mobile/assets/style-samples/*.webp
+          retention-days: 14
+      - name: Commit samples to the branch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add apps/mobile/assets/style-samples
+          if git diff --cached --quiet; then echo "no changes"; exit 0; fi
+          git commit -m "chore(mobile): illustration style sample thumbnails (generated)"
+          git push origin HEAD:${{ github.ref_name }}

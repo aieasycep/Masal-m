@@ -298,7 +298,8 @@
     "previous": "Previous",
     "next": "Next",
     "autoFollowOn": "Auto-follow on",
-    "autoFollowOff": "Auto-follow off"
+    "autoFollowOff": "Auto-follow off",
+    "scrollHint": "Scroll for more"
   },
   "library": {
     "title": "My Stories",
