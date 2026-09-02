@@ -112,7 +112,8 @@ export default function Profile() {
       sub: isPremium
         ? t('profile.menu.subscriptionPremiumNoDate')
         : t('profile.menu.subscriptionFree'),
-      route: '/subscription/paywall',
+      // Premium members get the real management screen; free users the paywall.
+      route: isPremium ? '/subscription/manage' : '/subscription/paywall',
     },
     {
       key: 'notifications',

@@ -309,8 +309,14 @@ export default function Home() {
           collapsable={false}
           ref={(view) => registerTourTarget('home.suggestions', view)}
         >
-          {/* V2 semantics: no "Tümü" here — recommendations aren't the library. */}
-          <SectionHeader title={t('home.suggestionsTitle', { name: selectedChild.name })} />
+          <SectionHeader
+            title={t('home.suggestionsTitle', { name: selectedChild.name })}
+            onSeeAll={() =>
+              router.push(
+                `/recommendations?childId=${encodeURIComponent(selectedChild.id)}&name=${encodeURIComponent(selectedChild.name)}` as never,
+              )
+            }
+          />
           <View style={styles.suggestionList}>
             {recommendations.map((suggestion) => {
               const firstTheme = suggestion.themes[0];

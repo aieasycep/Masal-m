@@ -840,7 +840,25 @@
     "packsSubPremium": "Member-priced extra credits — keep creating after your quota.",
     "packCredits": "{{count}} credits",
     "buyPack": "Buy",
-    "creditsAdded": "Credits added to your account!"
+    "creditsAdded": "Credits added to your account!",
+    "manageTitle": "My Subscription",
+    "manageStatusActive": "Active · next renewal: {{date}}",
+    "manageStatusActiveNoDate": "Active",
+    "manageStatusEnding": "Cancelled · valid until {{date}}",
+    "manageStatusEndingSoon": "Cancelled · valid until the end of the period",
+    "managePaymentMock": "Payment: test build (mock store)",
+    "managePaymentStore": "Payment: store subscription",
+    "manageUsageTitle": "This month",
+    "manageStoriesThisMonth": "Stories created",
+    "manageVoices": "Ready family voices",
+    "manageBooks": "Digital books",
+    "manageCreditsLeft": "Available credits",
+    "manageCreditsSub": "Quota, balance and credit packs",
+    "manageChangePlan": "Change Plan",
+    "manageChangePlanSub": "See plan options",
+    "manageStoreSub": "Renewal and cancellation happen in your store account",
+    "manageStoreMock": "No store subscription in the test build",
+    "manageFootnote": "The subscription renews monthly; after cancelling you stay Premium until the period ends."
   },
   "notificationsScreen": {
     "title": "Notifications",
@@ -982,5 +1000,11 @@
     "costsHint": "Short 3 · Medium 6 · Long 10 credits. The first narration and first art set are included; a new voice or style is half price. Regenerating a single image costs 1 credit.",
     "regenerateCost": "{{count}} credit",
     "premiumCta": "Go Premium — 30 credits/month"
+  },
+  "recommendations": {
+    "title": "Suggestions",
+    "lead": "Built from their interests — tap one and the story wizard arrives prefilled.",
+    "emptyTitle": "No new suggestions right now.",
+    "emptyBody": "Suggestions grow as you add your child's interests to their profile."
   }
 }

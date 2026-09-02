@@ -19,11 +19,12 @@ export const fontFamilies = {
  * UI/UX QA pass bans user-facing text at 10px and below — xxs is now 11.
  */
 export const fontSizes = {
-  xxs: 11,
-  xs: 11,
+  // Floor 12 (caption) / body 15 — tired parents, one hand, dim light (design constitution).
+  xxs: 12,
+  xs: 12,
   sm: 12,
   md: 13,
-  base: 14,
+  base: 15,
   lg: 15,
   xl: 16,
   xxl: 17,
