@@ -931,8 +931,12 @@ export default function IllustrateStory() {
               { opacity: regen != null ? 0.5 : pressed ? 0.7 : 1 },
             ]}
           >
-            <Text style={styles.actionEmoji}>🔄</Text>
-            <Text style={styles.actionLabel}>{t('illustrate.regenerateAction')}</Text>
+            <View style={styles.actionMain}>
+              <Text style={styles.actionEmoji}>🔄</Text>
+              <Text style={styles.actionLabel} numberOfLines={2}>
+                {t('illustrate.regenerateAction')}
+              </Text>
+            </View>
             {/* Transparent pricing: every regenerate is a metered render. */}
             <View style={styles.costChip}>
               <Text style={styles.costChipText}>
@@ -949,8 +953,12 @@ export default function IllustrateStory() {
             accessibilityLabel={t('illustrate.chooseAlternative')}
             style={({ pressed }) => [styles.actionButton, { opacity: pressed ? 0.7 : 1 }]}
           >
-            <Text style={styles.actionEmoji}>🖼</Text>
-            <Text style={styles.actionLabel}>{t('illustrate.alternatives')}</Text>
+            <View style={styles.actionMain}>
+              <Text style={styles.actionEmoji}>🖼</Text>
+              <Text style={styles.actionLabel} numberOfLines={2}>
+                {t('illustrate.alternatives')}
+              </Text>
+            </View>
           </Pressable>
         </View>
       </Animated.View>
@@ -1319,23 +1327,29 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.xs,
   },
   actionRow: { flexDirection: 'row', gap: 10, marginTop: spacing.md },
+  // Column: [icon + label] over the optional cost chip. A single row overflowed
+  // the half-width button once the "1 kredi" chip joined the label (icon spilled
+  // past the left edge, chip clipped on the right).
   actionButton: {
     flex: 1,
-    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    paddingVertical: 14,
+    paddingVertical: 12,
+    paddingHorizontal: 10,
     borderRadius: radius.base,
     backgroundColor: colors.card,
     borderWidth: 1,
     borderColor: colors.border,
   },
+  actionMain: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   actionEmoji: { fontSize: fontSizes.base },
   actionLabel: {
+    flexShrink: 1,
     fontFamily: fontFamilies.bodyBold,
     fontSize: fontSizes.base,
     color: colors.foreground,
+    textAlign: 'center',
   },
   costChip: {
     backgroundColor: colors.secondary,
