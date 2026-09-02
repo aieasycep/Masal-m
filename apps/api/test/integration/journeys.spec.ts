@@ -195,6 +195,93 @@ describe('critical journeys (integration)', () => {
     expect(after.body.plan).toBe('FREE'); // consumable — plan unchanged
   });
 
+  it('meters illustration regenerates: first set free, 1 credit each after, 402 when empty (§37)', async () => {
+    const session = await register('regen');
+    const auth = ['Authorization', `Bearer ${session.token}`] as const;
+    const entitlements = async () =>
+      (
+        await http()
+          .get('/subscription/entitlements')
+          .set(...V)
+          .set(...auth)
+          .expect(200)
+      ).body as { credits: { quota: { used: number }; balance: number } };
+
+    const draft = await http()
+      .post('/stories')
+      .set(...V)
+      .set(...auth)
+      .send({
+        childId: null,
+        heroName: 'Ada',
+        heroType: 'CHILD',
+        themes: ['ADVENTURE'],
+        ageRange: 'AGE_3_5',
+        durationTarget: 'SHORT',
+        advanced: {},
+        language: 'tr',
+      })
+      .expect(201);
+    const gen = await http()
+      .post(`/stories/${draft.body.id}/generate`)
+      .set(...V)
+      .set(...auth)
+      .expect(201);
+    expect(await waitForJob(session, gen.body.jobId)).toBe('SUCCEEDED');
+
+    // First illustration set is included in the story price.
+    const set = await http()
+      .post(`/stories/${draft.body.id}/illustrations`)
+      .set(...V)
+      .set(...auth)
+      .send({ style: 'WATERCOLOR' })
+      .expect(201);
+    expect(await waitForJob(session, set.body.jobId)).toBe('SUCCEEDED');
+    const afterSet = await entitlements();
+    expect(afterSet.credits.quota.used).toBe(3); // SHORT story only
+    expect(afterSet.credits.balance).toBe(6); // gift untouched
+
+    const sets = await http()
+      .get(`/stories/${draft.body.id}/illustrations`)
+      .set(...V)
+      .set(...auth)
+      .expect(200);
+    const cover = sets.body[0].illustrations.find((item: { isCover: boolean }) => item.isCover);
+    expect(cover).toBeDefined();
+
+    // Every regenerate is metered at enqueue: six drain the six gift credits.
+    let lastJobId = '';
+    for (let i = 0; i < 6; i++) {
+      const regen = await http()
+        .post(`/illustrations/${cover.id}/regenerate`)
+        .set(...V)
+        .set(...auth)
+        .expect(201);
+      lastJobId = regen.body.jobId;
+    }
+    const drained = await entitlements();
+    expect(drained.credits.balance).toBe(0);
+
+    const refused = await http()
+      .post(`/illustrations/${cover.id}/regenerate`)
+      .set(...V)
+      .set(...auth)
+      .expect(402);
+    expect(refused.body.error.code).toBe('INSUFFICIENT_CREDITS');
+
+    // The paid attempts still complete; each one adds a cover alternative.
+    expect(await waitForJob(session, lastJobId)).toBe('SUCCEEDED');
+    const finalSets = await http()
+      .get(`/stories/${draft.body.id}/illustrations`)
+      .set(...V)
+      .set(...auth)
+      .expect(200);
+    const covers = finalSets.body[0].illustrations.filter(
+      (item: { isCover: boolean }) => item.isCover,
+    );
+    expect(covers.length).toBe(7);
+  });
+
   it('rejects blocklisted ideas at enqueue without consuming quota (§17)', async () => {
     const session = await register('moderation');
     const draft = await http()

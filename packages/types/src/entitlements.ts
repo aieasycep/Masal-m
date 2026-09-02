@@ -35,6 +35,13 @@ export const EXTRA_ACTION_CREDIT_COSTS: Record<StoryDuration, number> = {
   LONG: 5,
 };
 
+/**
+ * Regenerating ONE illustration (a page or the cover) as a new alternative
+ * costs a flat credit — there are no free retries (owner decision, Sep 2026:
+ * every image render is real provider spend, so it is never unmetered).
+ */
+export const ILLUSTRATION_REGENERATE_CREDIT_COST = 1;
+
 /** One-time welcome gift, granted to every new account (2 kısa masal). */
 export const SIGNUP_GIFT_CREDITS = 6;
 

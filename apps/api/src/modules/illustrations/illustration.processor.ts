@@ -27,6 +27,7 @@ import { QueueName, type QueueJobData } from '../../jobs/queues';
 import { NotificationsService } from '../notifications/notifications.service';
 import { EntitlementService } from '../subscription/entitlement.service';
 import { buildCharacterBible } from './character-bible';
+import { REGENERATE_CREDIT_REF_TYPE } from './illustrations.service';
 
 type SetWithStory = Prisma.IllustrationSetGetPayload<{
   include: {
@@ -84,9 +85,18 @@ export class IllustrationProcessor implements OnModuleInit, OnApplicationShutdow
       throw new UnrecoverableError('Set missing');
     }
 
-    const payload = (aiJob.payload ?? {}) as { regenerateForIllustrationId?: string };
+    const payload = (aiJob.payload ?? {}) as {
+      regenerateForIllustrationId?: string;
+      creditRefId?: string;
+    };
     if (payload.regenerateForIllustrationId != null) {
-      await this.processRegeneration(aiJob.id, set, payload.regenerateForIllustrationId, job);
+      await this.processRegeneration(
+        aiJob.id,
+        set,
+        payload.regenerateForIllustrationId,
+        payload.creditRefId ?? null,
+        job,
+      );
       return;
     }
     if (set.status === IllustrationSetStatus.READY) {
@@ -190,15 +200,22 @@ export class IllustrationProcessor implements OnModuleInit, OnApplicationShutdow
     }
   }
 
-  /** Regenerate one page/cover as an unselected alternative inside a READY set. */
+  /**
+   * Regenerate one page/cover as an unselected alternative inside a READY set.
+   * The credit for this attempt was taken at enqueue (creditRefId); a terminal
+   * failure refunds exactly that spend — never the set's own (possibly paid)
+   * ledger row.
+   */
   private async processRegeneration(
     aiJobId: string,
     set: SetWithStory,
     targetIllustrationId: string,
+    creditRefId: string | null,
     job: Job<QueueJobData>,
   ): Promise<void> {
     const target = set.illustrations.find((item) => item.id === targetIllustrationId);
     if (target == null) {
+      await this.refundRegenerate(set.story.userId, creditRefId);
       await this.jobs.fail(aiJobId, ErrorCode.NOT_FOUND, 'Illustration to regenerate missing');
       throw new UnrecoverableError('Regeneration target missing');
     }
@@ -220,6 +237,7 @@ export class IllustrationProcessor implements OnModuleInit, OnApplicationShutdow
     } catch (error) {
       const isLastAttempt = job.attemptsMade + 1 >= (job.opts.attempts ?? 1);
       if (isLastAttempt) {
+        await this.refundRegenerate(set.story.userId, creditRefId);
         await this.jobs.fail(
           aiJobId,
           ErrorCode.ILLUSTRATION_FAILED,
@@ -228,6 +246,11 @@ export class IllustrationProcessor implements OnModuleInit, OnApplicationShutdow
       }
       throw error;
     }
+  }
+
+  private async refundRegenerate(userId: string, creditRefId: string | null): Promise<void> {
+    if (creditRefId == null) return;
+    await this.entitlements.refundCreditsForRef(userId, REGENERATE_CREDIT_REF_TYPE, creditRefId);
   }
 
   private async renderTarget(

@@ -53,6 +53,10 @@ export default function Profile() {
   const childrenQuery = useQuery({ queryKey: ['children'], queryFn: () => api.children.list() });
   const voicesQuery = useQuery({ queryKey: ['voices'], queryFn: () => api.voices.list() });
   const ordersQuery = useQuery({ queryKey: ['orders'], queryFn: () => api.orders.list() });
+  const entitlementsQuery = useQuery({
+    queryKey: ['entitlements'],
+    queryFn: () => api.subscription.entitlements(),
+  });
 
   const me = meQuery.data;
   const isPremium = me?.subscriptionPlan === 'PREMIUM';
@@ -61,6 +65,12 @@ export default function Profile() {
   const activeOrderCount = (ordersQuery.data ?? []).filter(
     (order) => !INACTIVE_ORDER_STATUSES.includes(order.status),
   ).length;
+  // Spendable credits = monthly quota left + purchased balance (wallet math).
+  const credits = entitlementsQuery.data?.credits;
+  const creditTotal =
+    credits == null
+      ? null
+      : Math.max(0, credits.quota.limit - credits.quota.used) + credits.balance;
 
   const menuItems: MenuItem[] = [
     {
@@ -83,6 +93,16 @@ export default function Profile() {
           : t('profile.menu.ordersEmpty'),
       route: '/orders',
       ...(activeOrderCount > 0 ? { badge: String(activeOrderCount) } : {}),
+    },
+    {
+      key: 'credits',
+      icon: '🎟',
+      label: t('profile.menu.credits'),
+      sub:
+        creditTotal == null
+          ? t('common.loading')
+          : t('profile.menu.creditsSub', { count: creditTotal }),
+      route: '/subscription/quota',
     },
     {
       key: 'subscription',

@@ -17,6 +17,7 @@ import Animated, {
 import {
   AIJobStatus,
   ErrorCode,
+  ILLUSTRATION_REGENERATE_CREDIT_COST,
   IllustrationSetStatus,
   IllustrationStyle,
   StoryStatus,
@@ -38,6 +39,7 @@ import { openBookBuilderForStory } from '../../../src/lib/book-nav';
 import { useJobProgress } from '../../../src/lib/job-stream';
 import { Button } from '../../../src/components/Button';
 import { Chip } from '../../../src/components/Chip';
+import { ConfirmSheet } from '../../../src/components/ConfirmSheet';
 import { ScreenHeader } from '../../../src/components/ScreenHeader';
 import { SelectableCard } from '../../../src/components/SelectableCard';
 import { storyThemeEmoji } from '../../../src/components/StorySheet';
@@ -303,6 +305,11 @@ export default function IllustrateStory() {
   /** Pending pick in the alternatives view (null = keep server selection highlighted). */
   const [altPick, setAltPick] = useState<string | null>(null);
   const [lastFailed, setLastFailed] = useState<ReadyRetry | null>(null);
+  /** Regenerate is a credit spend — the sheet confirms it before anything is queued. */
+  const [regenConfirm, setRegenConfirm] = useState<{
+    rowKey: string;
+    illustration: Illustration;
+  } | null>(null);
   const [bookLoading, setBookLoading] = useState(false);
   const [bookError, setBookError] = useState<string | null>(null);
 
@@ -466,7 +473,9 @@ export default function IllustrateStory() {
         err instanceof ApiError &&
         (err.code === ErrorCode.QUOTA_EXCEEDED || err.code === ErrorCode.INSUFFICIENT_CREDITS)
       ) {
+        // Regenerate costs a credit — the wallet is where this gets fixed.
         setQuotaHit(true);
+        router.push('/subscription/quota' as never);
         return;
       }
       setLastFailed({ kind: 'regenerate', rowKey, illustration });
@@ -489,7 +498,9 @@ export default function IllustrateStory() {
     if (lastFailed.kind === 'select') {
       void onSelectAlternative(lastFailed.illustration);
     } else {
-      void onRegenerate(lastFailed.rowKey, lastFailed.illustration);
+      // A failed attempt was refunded; retrying spends again → confirm again.
+      setRowError(null);
+      setRegenConfirm({ rowKey: lastFailed.rowKey, illustration: lastFailed.illustration });
     }
   };
 
@@ -632,8 +643,16 @@ export default function IllustrateStory() {
   };
 
   const quotaBanner = quotaHit ? (
-    <Animated.View entering={FadeInUp.duration(250)} style={styles.quotaBanner}>
-      <Text style={styles.quotaText}>{t('subscription.quotaReachedIllustrations')}</Text>
+    <Animated.View entering={FadeInUp.duration(250)}>
+      <Pressable
+        onPress={() => router.push('/subscription/quota' as never)}
+        accessibilityRole="button"
+        accessibilityLabel={t('quotaBanner.getCredits')}
+        style={({ pressed }) => [styles.quotaBanner, { opacity: pressed ? 0.85 : 1 }]}
+      >
+        <Text style={styles.quotaText}>{t('subscription.quotaReachedIllustrations')}</Text>
+        <Text style={styles.quotaLink}>{t('quotaBanner.getCredits')} →</Text>
+      </Pressable>
     </Animated.View>
   ) : null;
 
@@ -889,7 +908,7 @@ export default function IllustrateStory() {
         <View style={styles.actionRow}>
           <Pressable
             onPress={() => {
-              void onRegenerate(focusedUnit.key, focusedUnit.selected);
+              setRegenConfirm({ rowKey: focusedUnit.key, illustration: focusedUnit.selected });
             }}
             disabled={regen != null}
             accessibilityRole="button"
@@ -901,6 +920,12 @@ export default function IllustrateStory() {
           >
             <Text style={styles.actionEmoji}>🔄</Text>
             <Text style={styles.actionLabel}>{t('illustrate.regenerateAction')}</Text>
+            {/* Transparent pricing: every regenerate is a metered render. */}
+            <View style={styles.costChip}>
+              <Text style={styles.costChipText}>
+                {t('credits.regenerateCost', { count: ILLUSTRATION_REGENERATE_CREDIT_COST })}
+              </Text>
+            </View>
           </Pressable>
           <Pressable
             onPress={() => {
@@ -1072,6 +1097,20 @@ export default function IllustrateStory() {
           </View>
         </View>
       ) : null}
+
+      <ConfirmSheet
+        visible={regenConfirm != null}
+        title={t('illustrate.regenerateConfirmTitle')}
+        body={t('illustrate.regenerateConfirmBody', { count: ILLUSTRATION_REGENERATE_CREDIT_COST })}
+        confirmLabel={t('illustrate.regenerateConfirmCta')}
+        cancelLabel={t('common.cancel')}
+        onConfirm={() => {
+          const target = regenConfirm;
+          setRegenConfirm(null);
+          if (target != null) void onRegenerate(target.rowKey, target.illustration);
+        }}
+        onCancel={() => setRegenConfirm(null)}
+      />
     </View>
   );
 }
@@ -1286,6 +1325,17 @@ const styles = StyleSheet.create({
     fontSize: fontSizes.base,
     color: colors.foreground,
   },
+  costChip: {
+    backgroundColor: colors.secondary,
+    borderRadius: radius.chip,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+  },
+  costChipText: {
+    fontFamily: fontFamilies.bodyBold,
+    fontSize: fontSizes.xs,
+    color: colors.secondaryForeground,
+  },
 
   // Regenerating overlay (design Illustration/05)
   regenOverlay: {
@@ -1401,6 +1451,13 @@ const styles = StyleSheet.create({
     color: colors.secondaryForeground,
     textAlign: 'center',
     lineHeight: 19,
+  },
+  quotaLink: {
+    fontFamily: fontFamilies.bodyBold,
+    fontSize: fontSizes.md,
+    color: colors.primary,
+    textAlign: 'center',
+    marginTop: 4,
   },
   inlineError: {
     fontFamily: fontFamilies.bodySemiBold,

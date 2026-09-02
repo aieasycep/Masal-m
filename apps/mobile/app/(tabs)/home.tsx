@@ -194,7 +194,22 @@ export default function Home() {
     >
       <View style={styles.headerRow}>
         <View style={styles.headerText}>
-          <Text style={styles.greeting}>{t(greetingKey())}</Text>
+          <View style={styles.greetingRow}>
+            <Text style={styles.greeting}>{t(greetingKey())}</Text>
+            {/* Always-visible wallet entry (all plans) — the banner below only
+                appears when credits run low. */}
+            {quotaRemaining != null ? (
+              <Pressable
+                onPress={() => router.push('/subscription/quota' as never)}
+                accessibilityRole="button"
+                accessibilityLabel={t('home.creditsChip', { count: quotaRemaining })}
+                hitSlop={6}
+                style={({ pressed }) => [styles.creditPill, { opacity: pressed ? 0.8 : 1 }]}
+              >
+                <Text style={styles.creditPillText}>🎟 {quotaRemaining}</Text>
+              </Pressable>
+            ) : null}
+          </View>
           <Text style={styles.headline} accessibilityRole="header">
             {t('home.headline')}
           </Text>
@@ -437,6 +452,21 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
   },
   headerText: { flex: 1, paddingRight: spacing.sm },
+  greetingRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  creditPill: {
+    backgroundColor: colors.card,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.round,
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+    marginBottom: 4,
+  },
+  creditPillText: {
+    fontFamily: fontFamilies.bodyBold,
+    fontSize: fontSizes.sm,
+    color: colors.primary,
+  },
   greeting: {
     fontFamily: fontFamilies.body,
     fontSize: fontSizes.base,
