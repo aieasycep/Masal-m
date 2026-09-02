@@ -121,6 +121,12 @@ jobs:
             adb shell am start -W -a android.intent.action.VIEW -d "masalim://debug/player-smoke" $REVIEW_PACKAGE || echo "deep link start failed"
             sleep 30
             adb logcat -d > logcat-smoke.txt
+            if ! grep -q "player-smoke" logcat-smoke.txt; then
+              echo "no smoke markers after 30s — re-firing the deep link once (JS may still have been busy)"
+              adb shell am start -W -a android.intent.action.VIEW -d "masalim://debug/player-smoke" $REVIEW_PACKAGE || echo "deep link start failed"
+              sleep 25
+              adb logcat -d > logcat-smoke.txt
+            fi
             if adb shell pidof $REVIEW_PACKAGE > /dev/null 2>&1; then echo "SMOKE_ALIVE=yes" | tee smoke-alive.txt; else echo "SMOKE_ALIVE=no (process died)" | tee smoke-alive.txt; fi
 
       - name: Upload full logcat
@@ -142,7 +148,25 @@ jobs:
           echo "================ FATAL EXCEPTION (startup) ================"
           grep -n -B 2 -A 120 "FATAL EXCEPTION" logcat-full.txt || echo "no FATAL EXCEPTION found"
           echo "================ PLAYER SMOKE ALIVE? ================"; cat smoke-alive.txt || true
+          echo "================ ReactNativeJS (startup) ================"
+          grep -n "ReactNativeJS" logcat-full.txt | tail -n 80 || true
           echo "================ PLAYER SMOKE markers ================"
-          grep -n "player-smoke" logcat-smoke.txt | tail -n 60 || echo "no player-smoke markers found"
+          grep -n "player-smoke" logcat-smoke.txt | tail -n 60 || true
+          grep -q "player-smoke" logcat-smoke.txt || echo "no player-smoke markers found"
+          echo "================ ReactNativeJS (player smoke) ================"
+          grep -n "ReactNativeJS" logcat-smoke.txt | tail -n 80 || true
+          echo "================ Activity / intent lines (player smoke) ================"
+          grep -n "ActivityTaskManager\|ActivityManager\|Displayed" logcat-smoke.txt | grep -i "masalim" | tail -n 40 || true
           echo "================ FATAL EXCEPTION (player smoke) ================"
           grep -n -B 2 -A 160 "FATAL EXCEPTION" logcat-smoke.txt || echo "no FATAL EXCEPTION found"
+          echo "================ AndroidRuntime lines (player smoke) ================"
+          grep -n "AndroidRuntime" logcat-smoke.txt | tail -n 80 || true
+
+      - name: Verdict (fail the job unless the app survived startup AND the player smoke ran to the end)
+        if: always()
+        run: |
+          status=0
+          grep -q "APP_ALIVE=yes" app-alive.txt || { echo "::error::app process died during startup"; status=1; }
+          grep -q "SMOKE_ALIVE=yes" smoke-alive.txt || { echo "::error::app process died during the player smoke"; status=1; }
+          grep -q "\[player-smoke\] DONE" logcat-smoke.txt || { echo "::error::player smoke did not reach DONE (no marker in logcat)"; status=1; }
+          exit $status
