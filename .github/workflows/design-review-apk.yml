@@ -1,0 +1,148 @@
+# Masalım — Design Review APK (yan yana kurulabilen inceleme sürümü).
+# Yalnızca `design-review` dalında yaşar. Kimlik (paket adı + uygulama adı)
+# SADECE runner'da app.json'a yazılır — git'teki app.json değişmez, bu yüzden
+# inceleme kimliği asla üretime sızamaz. İkinci iş aynı APK'yı emülatörde
+# kurup açılış + oynatma dumanı testinden geçirir.
+name: Design Review APK
+
+on:
+  workflow_dispatch:
+    inputs:
+      api_url:
+        description: "API adresi. Boş bırakılırsa canlı sunucu (VPS) kullanılır."
+        required: false
+        default: ""
+  push:
+    branches: [design-review]
+    paths:
+      - ".github/workflows/design-review-apk.yml"
+      - "apps/mobile/**"
+      - "patches/**"
+      - "packages/**"
+      - "pnpm-lock.yaml"
+      - "package.json"
+
+env:
+  REVIEW_PACKAGE: com.masalim.app.designreview
+  REVIEW_NAME: "Masalım — Design Review"
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      EXPO_PUBLIC_API_URL: ${{ inputs.api_url != '' && inputs.api_url || 'https://api.57-129-6-57.sslip.io' }}
+      EXPO_PUBLIC_PURCHASES_PROVIDER: mock
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build workspace packages (mobile dependencies)
+        run: pnpm turbo build --filter='@masalim/mobile^...'
+
+      - name: Apply review identity (runner-only, never committed)
+        working-directory: apps/mobile
+        run: |
+          node -e '
+            const fs = require("fs");
+            const p = "app.json";
+            const j = JSON.parse(fs.readFileSync(p, "utf8"));
+            j.expo.name = process.env.REVIEW_NAME;
+            j.expo.android.package = process.env.REVIEW_PACKAGE;
+            j.expo.ios.bundleIdentifier = process.env.REVIEW_PACKAGE;
+            fs.writeFileSync(p, JSON.stringify(j, null, 2));
+          '
+          grep -n '"name"\|"package"' app.json
+
+      - name: Generate native Android project
+        working-directory: apps/mobile
+        run: npx expo prebuild --platform android --no-install
+
+      - name: Raise Gradle JVM memory
+        working-directory: apps/mobile/android
+        run: sed -i 's/^org.gradle.jvmargs=.*/org.gradle.jvmargs=-Xmx6g -XX:MaxMetaspaceSize=1g/' gradle.properties
+
+      - name: Build release APK
+        working-directory: apps/mobile/android
+        run: ./gradlew assembleRelease --no-daemon
+
+      - name: Rename APK
+        run: cp apps/mobile/android/app/build/outputs/apk/release/app-release.apk Masalim-Design-Review.apk
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: masalim-design-review-apk
+          path: Masalim-Design-Review.apk
+          retention-days: 14
+
+  smoke:
+    needs: apk
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: masalim-design-review-apk
+          path: apk
+
+      - name: Enable KVM for emulator
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Launch app in emulator and capture logcat
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          arch: x86_64
+          target: google_apis
+          disable-animations: true
+          script: |
+            adb install -r apk/Masalim-Design-Review.apk
+            adb logcat -c || true
+            adb shell monkey -p $REVIEW_PACKAGE -c android.intent.category.LAUNCHER 1
+            sleep 45
+            adb logcat -d > logcat-full.txt
+            if adb shell pidof $REVIEW_PACKAGE > /dev/null 2>&1; then echo "APP_ALIVE=yes" | tee app-alive.txt; else echo "APP_ALIVE=no (process died)" | tee app-alive.txt; fi
+            adb logcat -c || true
+            adb shell am start -W -a android.intent.action.VIEW -d "masalim://debug/player-smoke" $REVIEW_PACKAGE || echo "deep link start failed"
+            sleep 30
+            adb logcat -d > logcat-smoke.txt
+            if adb shell pidof $REVIEW_PACKAGE > /dev/null 2>&1; then echo "SMOKE_ALIVE=yes" | tee smoke-alive.txt; else echo "SMOKE_ALIVE=no (process died)" | tee smoke-alive.txt; fi
+
+      - name: Upload full logcat
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: design-review-logcat
+          path: |
+            logcat-full.txt
+            app-alive.txt
+            logcat-smoke.txt
+            smoke-alive.txt
+          retention-days: 14
+
+      - name: Extract crash summary
+        if: always()
+        run: |
+          echo "================ APP ALIVE? ================"; cat app-alive.txt || true
+          echo "================ FATAL EXCEPTION (startup) ================"
+          grep -n -B 2 -A 120 "FATAL EXCEPTION" logcat-full.txt || echo "no FATAL EXCEPTION found"
+          echo "================ PLAYER SMOKE ALIVE? ================"; cat smoke-alive.txt || true
+          echo "================ PLAYER SMOKE markers ================"
+          grep -n "player-smoke" logcat-smoke.txt | tail -n 60 || echo "no player-smoke markers found"
+          echo "================ FATAL EXCEPTION (player smoke) ================"
+          grep -n -B 2 -A 160 "FATAL EXCEPTION" logcat-smoke.txt || echo "no FATAL EXCEPTION found"
