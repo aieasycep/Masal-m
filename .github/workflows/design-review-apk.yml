@@ -121,12 +121,8 @@ jobs:
             adb shell am start -W -a android.intent.action.VIEW -d "masalim://debug/player-smoke" $REVIEW_PACKAGE || echo "deep link start failed"
             sleep 30
             adb logcat -d > logcat-smoke.txt
-            if ! grep -q "player-smoke" logcat-smoke.txt; then
-              echo "no smoke markers after 30s — re-firing the deep link once (JS may still have been busy)"
-              adb shell am start -W -a android.intent.action.VIEW -d "masalim://debug/player-smoke" $REVIEW_PACKAGE || echo "deep link start failed"
-              sleep 25
-              adb logcat -d > logcat-smoke.txt
-            fi
+            # android-emulator-runner runs EVERY script line as its own `sh -c` — compound statements must stay on ONE line.
+            grep -q "player-smoke" logcat-smoke.txt || { echo "no smoke markers after 30s - re-firing the deep link once (JS may still have been busy)"; adb shell am start -W -a android.intent.action.VIEW -d "masalim://debug/player-smoke" $REVIEW_PACKAGE || echo "deep link start failed"; sleep 25; adb logcat -d > logcat-smoke.txt; }
             if adb shell pidof $REVIEW_PACKAGE > /dev/null 2>&1; then echo "SMOKE_ALIVE=yes" | tee smoke-alive.txt; else echo "SMOKE_ALIVE=no (process died)" | tee smoke-alive.txt; fi
 
       - name: Upload full logcat

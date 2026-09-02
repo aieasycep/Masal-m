@@ -397,6 +397,10 @@ Local `.env` = `.env.example` + generated JWT secrets (already present, gitignor
   emitDecoratorMetadata → DI breaks). eslint consistent-type-imports is OFF in
   apps/api for the same reason.
 - Integration tests: `NODE_ENV=test` skips throttling (shared Redis buckets).
+- reactivecircus/android-emulator-runner executes EVERY `script` line as a separate
+  `sh -c` — multi-line `if … fi` blocks fail with "expecting fi"; keep compound
+  commands on one line (`a || { b; c; }`). Blob-storage artifact downloads are
+  egress-blocked here: the job log itself must print the evidence.
 
 ## Verification checklist per phase
 
