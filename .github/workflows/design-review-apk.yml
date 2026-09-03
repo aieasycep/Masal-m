@@ -91,6 +91,8 @@ jobs:
     needs: apk
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    permissions:
+      contents: write # publish the verified APK as the fixed 'design-review-latest' release
     steps:
       - uses: actions/download-artifact@v4
         with:
@@ -166,3 +168,21 @@ jobs:
           grep -q "SMOKE_ALIVE=yes" smoke-alive.txt || { echo "::error::app process died during the player smoke"; status=1; }
           grep -q "\[player-smoke\] DONE" logcat-smoke.txt || { echo "::error::player smoke did not reach DONE (no marker in logcat)"; status=1; }
           exit $status
+
+      # Fixed, phone-friendly download: the release page always carries the LAST
+      # VERIFIED review build as a direct .apk asset (no zip, no expiry).
+      - name: Publish the verified APK as the fixed "design-review-latest" release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          {
+            echo "**Doğrulanmış inceleme APK'sı** (paket \`${REVIEW_PACKAGE}\`, kararlı uygulamanın yanına kurulur) — telefonda aşağıdaki \`Masalim-Design-Review.apk\` dosyasına dokun, indir, kur."
+            echo
+            echo "- Commit: \`${GITHUB_SHA}\` (design-review)"
+            echo "- Derleme + emülatör doğrulaması: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          } > release-notes.md
+          gh release delete design-review-latest --repo "$GITHUB_REPOSITORY" --cleanup-tag --yes || true
+          gh release create design-review-latest apk/Masalim-Design-Review.apk --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --prerelease \
+            --title "Masalım — Design Review APK (doğrulanmış)" --notes-file release-notes.md
+          echo "Release: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/releases/tag/design-review-latest"
