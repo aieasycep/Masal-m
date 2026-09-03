@@ -8,6 +8,7 @@ import {
   StyleSheet,
   Text,
   View,
+  useWindowDimensions,
   type StyleProp,
   type ViewStyle,
 } from 'react-native';
@@ -60,6 +61,7 @@ import {
   usePositionPersistence,
 } from '../../../src/lib/player';
 import { Button } from '../../../src/components/Button';
+import { KeepScreenAwake } from '../../../src/components/KeepScreenAwake';
 import { Starfield } from '../../../src/components/Starfield';
 import { Waveform } from '../../../src/components/Waveform';
 import {
@@ -262,6 +264,12 @@ function SeekSlider({ position, duration, onSeek }: SeekSliderProps) {
 export default function StoryPlayer() {
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
+  const { width: windowWidth, height: windowHeight } = useWindowDimensions();
+  // The cover is the hero of this screen: fill the width on tall phones, but
+  // never so tall that the transport drops below the fold on short ones.
+  const coverSize = Math.round(
+    Math.max(220, Math.min(windowWidth - spacing.pageXWide * 2, windowHeight * 0.36, 340)),
+  );
   const { id, narrationId } = useLocalSearchParams<{ id: string; narrationId?: string }>();
 
   const storyQuery = useQuery({
@@ -540,6 +548,8 @@ export default function StoryPlayer() {
 
   return (
     <NightScreen>
+      {/* Text panel / cover stay visible while the narration plays; a paused player may sleep. */}
+      {isPlaying ? <KeepScreenAwake /> : null}
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={[
@@ -574,7 +584,7 @@ export default function StoryPlayer() {
         {/* Floating cover */}
         <View style={styles.coverSection}>
           <Animated.View style={[styles.coverWrap, floatStyle]}>
-            <View style={styles.cover}>
+            <View style={[styles.cover, { width: coverSize, height: coverSize }]}>
               {story.coverImageUrl != null ? (
                 <Image
                   source={{ uri: story.coverImageUrl }}
@@ -847,9 +857,10 @@ const styles = StyleSheet.create({
     color: night.muted,
     letterSpacing: letterSpacing.eyebrow,
   },
-  coverSection: { alignItems: 'center', paddingTop: spacing.xxxl, paddingBottom: 36 },
+  coverSection: { alignItems: 'center', paddingTop: spacing.xl, paddingBottom: spacing.xl + 4 },
   coverWrap: { borderRadius: radius.cover, ...shadows.playerCover },
   cover: {
+    // Size comes from coverSize (responsive); 220 is the floor for short phones.
     width: 220,
     height: 220,
     borderRadius: radius.cover,
