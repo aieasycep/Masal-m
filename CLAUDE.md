@@ -296,6 +296,12 @@ Local `.env` = `.env.example` + generated JWT secrets (already present, gitignor
   runs) → Render still spins down after 15 idle min; user advised UptimeRobot
   free 5-min monitor on /health (or Render Starter). Manual dispatch works.
 - Artifact downloads need a logged-in GitHub tab (incognito hides the link).
+- **Phone-friendly APK links (Sep 3)**: the crash-log workflow now FAILS on a bad
+  verdict and, on success, republishes the verified APK as the moving pre-release
+  `test-latest` (asset `Masalim.apk`, direct download, no zip/expiry):
+  https://github.com/aieasycep/Masal-m/releases/tag/test-latest — the review
+  workflow's smoke job does the same as `design-review-latest`
+  (`Masalim-Design-Review.apk`). Hand THESE links to the user, not run links.
   APK builds: android-apk.yml (push on claude/* + workflow_dispatch on main).
   Verify EVERY handed-over APK via android-crash-log.yml (input apk_run_id).
 
