@@ -1,9 +1,11 @@
+import type { ReactNode } from 'react';
 import { Pressable, StyleSheet, Switch, Text, View } from 'react-native';
 import { colors, fontFamilies, fontSizes, radius } from '@masalim/ui';
 import { ChevronRightIcon } from './icons';
 
 interface ListRowProps {
-  icon?: string;
+  /** Emoji string (decorative) or an <AppIcon /> element. */
+  icon?: string | ReactNode;
   label: string;
   sub?: string;
   badge?: string;
@@ -38,7 +40,7 @@ export function ListRow({
     <View style={[styles.row, disabled ? styles.disabled : null]}>
       {icon ? (
         <View style={[styles.iconTile, destructive ? styles.iconTileDestructive : null]}>
-          <Text style={styles.iconEmoji}>{icon}</Text>
+          {typeof icon === 'string' ? <Text style={styles.iconEmoji}>{icon}</Text> : icon}
         </View>
       ) : null}
       <View style={styles.textCol}>

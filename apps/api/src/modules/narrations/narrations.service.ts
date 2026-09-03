@@ -10,7 +10,12 @@ import {
   VoiceProfileStatus,
 } from '@masalim/types';
 import type { StorageProvider } from '@masalim/storage';
-import type { CreateNarrationInput, Narration as NarrationDto, NarrationTiming } from '@masalim/validation';
+import type {
+  CreateNarrationInput,
+  Narration as NarrationDto,
+  NarrationTiming,
+  NarrationWordTimings,
+} from '@masalim/validation';
 import type { Prisma } from '@masalim/database';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AppException } from '../../common/errors/app.exception';
@@ -227,6 +232,7 @@ export class NarrationsService {
       audioUrl: row.audioKey ? await this.storage.getSignedUrl(row.audioKey, 3600) : null,
       duration: row.duration,
       timings: (row.timings as NarrationTiming[] | null) ?? null,
+      wordTimings: (row.wordTimings as NarrationWordTimings | null) ?? null,
       status: row.status,
       createdAt: row.createdAt.toISOString(),
       jobId: activeJob?.id ?? null,

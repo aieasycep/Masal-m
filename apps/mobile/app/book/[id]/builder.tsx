@@ -30,6 +30,7 @@ import {
   shadows,
   spacing,
 } from '@masalim/ui';
+import { AppIcon, type AppIconName } from '../../../src/components/AppIcon';
 import { api } from '../../../src/lib/api';
 import { Button } from '../../../src/components/Button';
 import { Input } from '../../../src/components/Input';
@@ -327,18 +328,18 @@ export default function BookBuilder() {
   const openCover = () => router.push(`/book/${book.id}/cover` as never);
   const openPreview = () => router.push(`/book/${book.id}/preview` as never);
 
-  const toolActions: { key: EditorPanel; emoji: string; label: string; disabled: boolean }[] = [
-    { key: 'layout', emoji: '📐', label: t('book.layoutLabel'), disabled: currentPage == null },
+  const toolActions: { key: EditorPanel; icon: AppIconName; label: string; disabled: boolean }[] = [
+    { key: 'layout', icon: 'layout', label: t('book.layoutLabel'), disabled: currentPage == null },
     {
       key: 'alternatives',
-      emoji: '🔄',
+      icon: 'image',
       label: t('illustrate.chooseAlternative'),
       disabled:
         currentPage == null ||
         currentPage.layout === BookPageLayout.TEXT_ONLY ||
         alternatives.length === 0,
     },
-    { key: 'text', emoji: '✏️', label: t('book.editText'), disabled: currentPage == null },
+    { key: 'text', icon: 'edit', label: t('book.editText'), disabled: currentPage == null },
   ];
 
   return (
@@ -621,7 +622,7 @@ export default function BookBuilder() {
                     pressed && styles.pressed,
                   ]}
                 >
-                  <Text style={styles.toolEmoji}>{action.emoji}</Text>
+                  <AppIcon name={action.icon} size={20} color={colors.foreground} />
                   <Text
                     style={[styles.toolLabel, active && styles.toolLabelActive]}
                     numberOfLines={2}
@@ -635,7 +636,7 @@ export default function BookBuilder() {
 
           <Button
             label={t('book.previewBookCta')}
-            leading={<Text style={styles.ctaEmoji}>📦</Text>}
+            leading={<AppIcon name="show" size={18} color={colors.primaryForeground} />}
             onPress={openPreview}
           />
         </View>
@@ -803,7 +804,6 @@ const styles = StyleSheet.create({
   },
   toolButtonActive: { borderColor: colors.primary, backgroundColor: colors.secondary },
   toolButtonDisabled: { opacity: 0.4 },
-  toolEmoji: { fontSize: fontSizes.h4 },
   toolLabel: {
     fontFamily: fontFamilies.bodyBold,
     fontSize: fontSizes.xxs,

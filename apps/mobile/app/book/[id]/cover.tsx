@@ -30,6 +30,7 @@ import {
   spacing,
   type CoverPaletteKey,
 } from '@masalim/ui';
+import { AppIcon } from '../../../src/components/AppIcon';
 import { api } from '../../../src/lib/api';
 import { useJobProgress } from '../../../src/lib/job-stream';
 import { ConfirmSheet } from '../../../src/components/ConfirmSheet';
@@ -562,7 +563,10 @@ export default function CoverEditor() {
                   <ActivityIndicator size="small" color={colors.primary} />
                 ) : (
                   <View style={styles.changeButtonInner}>
-                    <Text style={styles.changeButtonText}>🔄 {t('book.regenerateCover')}</Text>
+                    <View style={styles.changeButtonLabelRow}>
+                      <AppIcon name="retry" size={16} color={colors.foreground} />
+                      <Text style={styles.changeButtonText}>{t('book.regenerateCover')}</Text>
+                    </View>
                     <Text style={styles.changeButtonCost}>
                       {t('credits.regenerateCost', { count: ILLUSTRATION_REGENERATE_CREDIT_COST })}
                     </Text>
@@ -583,7 +587,10 @@ export default function CoverEditor() {
                   { opacity: pressed ? 0.85 : 1 },
                 ]}
               >
-                <Text style={styles.changeButtonText}>🖼 {t('book.pickFromAlternatives')}</Text>
+                <View style={styles.changeButtonLabelRow}>
+                  <AppIcon name="image" size={16} color={colors.foreground} />
+                  <Text style={styles.changeButtonText}>{t('book.pickFromAlternatives')}</Text>
+                </View>
               </Pressable>
             </View>
             {regenError != null ? (
@@ -797,6 +804,7 @@ const styles = StyleSheet.create({
   },
   changeButtonDisabled: { opacity: 0.5 },
   changeButtonInner: { alignItems: 'center', gap: 2 },
+  changeButtonLabelRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   changeButtonCost: {
     fontFamily: fontFamilies.bodyBold,
     fontSize: fontSizes.xs,

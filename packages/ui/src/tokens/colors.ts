@@ -12,7 +12,7 @@ export const colors = {
   secondary: '#EDE8F8',
   secondaryForeground: '#5A4190',
   muted: '#F2EDE6',
-  mutedForeground: '#71655B',
+  mutedForeground: '#7A6D62',
   accent: '#B94F35',
   accentForeground: '#FFFFFF',
   border: '#E8E0D4',
@@ -26,16 +26,20 @@ export const colors = {
   peach: '#F5C4A8',
   sage: '#8DB89A',
   /** Readable text-on-tint counterpart of sage (status pills). */
-  sageText: '#456E52',
+  sageText: '#22683B',
   coral: '#B94F35',
   /** Original light coral, kept ONLY for dark/night backgrounds. */
   coralOnDark: '#F08B6E',
   cream: '#FAF8F4',
   warmWhite: '#FFF9F2',
   gold: '#FFD97D',
-  destructive: '#E05454',
+  // Status colors (Claude Design Foundations, WCAG AA on cream/white).
+  success: '#22683B',
+  warning: '#805408',
+  error: '#A32F2F',
+  destructive: '#A32F2F',
   /** Darker destructive for text/buttons on light surfaces (contrast). */
-  destructiveDeep: '#B42318',
+  destructiveDeep: '#A32F2F',
 
   purpleDeep: '#2D1B69',
   purpleDarkest: '#1A0F3C',
@@ -51,6 +55,9 @@ export const night = {
   muted: '#91A1B8',
   purple: '#9B7FD4',
   blue: '#4A7FB5',
+  border: '#2C3D5C',
+  /** Karaoke active-word highlight (amber) — readable on every night surface. */
+  highlight: '#FFD27D',
 } as const;
 
 /** Cover tint swatches used by story cards in the design. */

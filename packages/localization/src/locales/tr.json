@@ -298,7 +298,8 @@
     "previous": "Önceki",
     "next": "Sonraki",
     "autoFollowOn": "Otomatik takip açık",
-    "autoFollowOff": "Otomatik takip kapalı"
+    "autoFollowOff": "Otomatik takip kapalı",
+    "scrollHint": "Devamı için kaydır"
   },
   "library": {
     "title": "Hikâyelerim",
@@ -840,7 +841,25 @@
     "packsSubPremium": "Üyelere özel fiyatla ekstra kredi — kota bitince masallara devam.",
     "packCredits": "{{count}} kredi",
     "buyPack": "Satın Al",
-    "creditsAdded": "Krediler hesabına eklendi!"
+    "creditsAdded": "Krediler hesabına eklendi!",
+    "manageTitle": "Aboneliğim",
+    "manageStatusActive": "Aktif · sonraki yenileme: {{date}}",
+    "manageStatusActiveNoDate": "Aktif",
+    "manageStatusEnding": "İptal edildi · {{date}} tarihine kadar geçerli",
+    "manageStatusEndingSoon": "İptal edildi · dönem sonuna kadar geçerli",
+    "managePaymentMock": "Ödeme: test sürümü (sahte mağaza)",
+    "managePaymentStore": "Ödeme: mağaza aboneliği",
+    "manageUsageTitle": "Bu ay",
+    "manageStoriesThisMonth": "Oluşturulan masal",
+    "manageVoices": "Hazır aile sesi",
+    "manageBooks": "Dijital kitap",
+    "manageCreditsLeft": "Kullanılabilir kredi",
+    "manageCreditsSub": "Kota, bakiye ve kredi paketleri",
+    "manageChangePlan": "Planı Değiştir",
+    "manageChangePlanSub": "Plan seçeneklerini gör",
+    "manageStoreSub": "Yenileme ve iptal mağaza hesabından yapılır",
+    "manageStoreMock": "Test sürümünde mağaza aboneliği yok",
+    "manageFootnote": "Abonelik her ay otomatik yenilenir; iptal ettiğinde dönem sonuna kadar Premium kalır."
   },
   "notificationsScreen": {
     "title": "Bildirimler",
@@ -982,5 +1001,27 @@
     "costsHint": "Kısa masal 3 · Orta 6 · Uzun 10 kredi. Masalın ilk seslendirmesi ve ilk görsel seti dahildir; farklı bir sesle ya da stille yeni üretim yarı fiyattır. Tek bir görseli yeniden oluşturmak 1 kredidir.",
     "regenerateCost": "{{count}} kredi",
     "premiumCta": "Premium’a Geç — ayda 30 kredi"
+  },
+  "recommendations": {
+    "title": "Öneriler",
+    "lead": "İlgi alanlarına göre hazırlandı — birine dokun, masal sihirbazı dolu gelsin.",
+    "emptyTitle": "Şimdilik yeni öneri yok.",
+    "emptyBody": "Çocuğunun ilgi alanlarını profilinden ekledikçe öneriler çoğalır."
+  },
+  "jobs": {
+    "story": "Masalın hazırlanıyor…",
+    "narration": "Seslendirme hazırlanıyor…",
+    "illustration": "Görseller hazırlanıyor…",
+    "ready": "Hazır ✨",
+    "failed": "Bir sorun oluştu",
+    "open": "Aç",
+    "hide": "Gizle",
+    "background": "Arka planda devam et",
+    "leaveHint": "Uygulamadan ayrılsan da devam eder"
+  },
+  "miniPlayer": {
+    "open": "Oynatıcıyı aç",
+    "play": "Oynat",
+    "pause": "Duraklat"
   }
 }

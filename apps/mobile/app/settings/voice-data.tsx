@@ -7,6 +7,7 @@ import { VoiceOwnerType, VoiceProfileStatus } from '@masalim/types';
 import type { VoiceProfile } from '@masalim/validation';
 import { ApiError, NetworkError } from '@masalim/api-client';
 import { colors, fontFamilies, fontSizes, radius, spacing } from '@masalim/ui';
+import { AppIcon } from '../../src/components/AppIcon';
 import { AudioPreviewButton } from '../../src/components/AudioPreviewButton';
 import { Avatar } from '../../src/components/Avatar';
 import { ConfirmSheet } from '../../src/components/ConfirmSheet';
@@ -83,7 +84,8 @@ export default function VoiceDataSettings() {
 
       {/* Privacy note — primary-tinted info banner. */}
       <View style={styles.infoBanner}>
-        <Text style={styles.infoText}>{`🔒 ${t('settings.voiceDataInfo')}`}</Text>
+        <AppIcon name="lock" size={16} color={colors.primary} />
+        <Text style={styles.infoText}>{t('settings.voiceDataInfo')}</Text>
       </View>
 
       {voicesQuery.isError ? (
@@ -190,6 +192,9 @@ export default function VoiceDataSettings() {
 
 const styles = StyleSheet.create({
   infoBanner: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
     // Primary-tinted banner (rgba of colors.primary #7C5CBF).
     backgroundColor: 'rgba(124, 92, 191, 0.08)',
     borderWidth: 1,
@@ -200,6 +205,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing.lg,
   },
   infoText: {
+    flex: 1,
     fontFamily: fontFamilies.body,
     fontSize: fontSizes.md,
     color: colors.foreground,

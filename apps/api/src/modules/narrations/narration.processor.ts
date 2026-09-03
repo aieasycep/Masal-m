@@ -12,7 +12,7 @@ import type { NarrationDirector, TextToSpeechProvider } from '@masalim/ai';
 import type { StorageProvider } from '@masalim/storage';
 import { StorageKeys } from '@masalim/storage';
 import { PushRoutes } from '@masalim/notifications';
-import type { NarrationTiming } from '@masalim/validation';
+import type { NarrationTiming, NarrationWordTimings } from '@masalim/validation';
 import { PrismaService } from '../../prisma/prisma.service';
 import { REDIS } from '../../redis/redis.module';
 import { ENV } from '../../config/config.module';
@@ -21,6 +21,7 @@ import { NARRATION_DIRECTOR, STORAGE, TTS } from '../../providers/providers.modu
 import { JobsService } from '../../jobs/jobs.service';
 import { EntitlementService } from '../subscription/entitlement.service';
 import { QueueName, type QueueJobData } from '../../jobs/queues';
+import { estimateWordTimings, fullStoryText, wordTimingsFromAlignment } from '../../audio/word-timings';
 import { NotificationsService } from '../notifications/notifications.service';
 import {
   chunkStoryPages,
@@ -158,6 +159,12 @@ export class NarrationProcessor implements OnModuleInit, OnApplicationShutdown {
         narration.id,
       );
       await this.storage.putObject(audioKey, concat.audio, concat.contentType);
+      await this.jobs.setProgress(aiJob.id, 93);
+
+      // Karaoke timeline: forced alignment of the FINAL file against the clean
+      // story text (audio tags never reach it); any failure degrades to an
+      // estimate spread from the measured chunk durations. Never fails the job.
+      const wordTimings = await this.buildWordTimings(narration.story.pages, concat, timings);
       await this.jobs.setProgress(aiJob.id, 97);
 
       await this.prisma.narration.update({
@@ -166,6 +173,7 @@ export class NarrationProcessor implements OnModuleInit, OnApplicationShutdown {
           audioKey,
           duration: round2(concat.totalDurationSeconds),
           timings,
+          wordTimings: wordTimings ?? undefined,
           status: NarrationStatus.READY,
           error: null,
         },
@@ -190,6 +198,28 @@ export class NarrationProcessor implements OnModuleInit, OnApplicationShutdown {
       }
       throw error;
     }
+  }
+
+  private async buildWordTimings(
+    pages: Array<{ pageNumber: number; text: string }>,
+    concat: { audio: Buffer; contentType: string },
+    timings: NarrationTiming[],
+  ): Promise<NarrationWordTimings | null> {
+    if (this.tts.alignWords != null) {
+      try {
+        const alignment = await this.tts.alignWords({
+          audio: concat.audio,
+          contentType: concat.contentType,
+          text: fullStoryText(pages),
+        });
+        const aligned = wordTimingsFromAlignment(pages, alignment);
+        if (aligned != null) return aligned;
+        this.logger.warn('word alignment too sparse — using estimated timeline');
+      } catch (error) {
+        this.logger.warn({ err: error }, 'word alignment failed — using estimated timeline');
+      }
+    }
+    return estimateWordTimings(pages, timings);
   }
 
   private async finalizeFailure(aiJobId: string, narrationId: string, message: string): Promise<void> {

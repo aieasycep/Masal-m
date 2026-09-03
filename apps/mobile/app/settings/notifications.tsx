@@ -9,6 +9,7 @@ import { NotificationType } from '@masalim/types';
 import type { NotificationItem, NotificationPrefs } from '@masalim/validation';
 import { ApiError, NetworkError } from '@masalim/api-client';
 import { colors, fontFamilies, fontSizes, letterSpacing, radius, spacing } from '@masalim/ui';
+import { AppIcon, type AppIconName } from '../../src/components/AppIcon';
 import { Button } from '../../src/components/Button';
 import { ListRow } from '../../src/components/ListRow';
 import { Screen } from '../../src/components/Screen';
@@ -26,42 +27,42 @@ const ALL_NOTIFICATION_TYPES = Object.values(NotificationType);
  * toggle governs both ILLUSTRATIONS_READY and BOOK_READY. */
 const PREF_ROWS: ReadonlyArray<{
   key: string;
-  icon: string;
+  icon: AppIconName;
   labelKey: string;
   subKey: string;
   types: NotificationType[];
 }> = [
   {
     key: 'story',
-    icon: '📖',
+    icon: 'story',
     labelKey: 'settings.notifStory',
     subKey: 'settings.notifStorySub',
     types: [NotificationType.STORY_READY],
   },
   {
     key: 'voice',
-    icon: '🎙',
+    icon: 'mic',
     labelKey: 'settings.notifVoice',
     subKey: 'settings.notifVoiceSub',
     types: [NotificationType.VOICE_READY],
   },
   {
     key: 'illustrations',
-    icon: '🎨',
+    icon: 'palette',
     labelKey: 'settings.notifIllustrations',
     subKey: 'settings.notifIllustrationsSub',
     types: [NotificationType.ILLUSTRATIONS_READY, NotificationType.BOOK_READY],
   },
   {
     key: 'orders',
-    icon: '📦',
+    icon: 'order',
     labelKey: 'settings.notifOrders',
     subKey: 'settings.notifOrdersSub',
     types: [NotificationType.ORDER_SHIPPED],
   },
   {
     key: 'updates',
-    icon: '✨',
+    icon: 'sparkle',
     labelKey: 'settings.notifUpdates',
     subKey: 'settings.notifUpdatesSub',
     types: [NotificationType.GENERIC],
@@ -225,7 +226,7 @@ export default function NotificationSettings() {
             {PREF_ROWS.map((row, index) => (
               <ListRow
                 key={row.key}
-                icon={row.icon}
+                icon={<AppIcon name={row.icon} size={20} color={colors.primary} />}
                 label={t(row.labelKey)}
                 sub={t(row.subKey)}
                 variant="toggle"

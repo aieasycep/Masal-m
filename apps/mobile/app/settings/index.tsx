@@ -7,6 +7,7 @@ import { useTranslation } from 'react-i18next';
 import { VoiceProfileStatus } from '@masalim/types';
 import { colors, fontFamilies, fontSizes, letterSpacing, radius, spacing } from '@masalim/ui';
 import { ConfirmSheet } from '../../src/components/ConfirmSheet';
+import { AppIcon } from '../../src/components/AppIcon';
 import { ListRow } from '../../src/components/ListRow';
 import { Screen } from '../../src/components/Screen';
 import { ScreenHeader } from '../../src/components/ScreenHeader';
@@ -36,7 +37,7 @@ function ExpandableRow({
   body,
   showDivider = true,
 }: {
-  icon: string;
+  icon: string | ReactNode;
   label: string;
   body: string;
   showDivider?: boolean;
@@ -52,7 +53,7 @@ function ExpandableRow({
         style={({ pressed }) => [styles.expandRow, pressed && styles.expandRowPressed]}
       >
         <View style={styles.expandIconTile}>
-          <Text style={styles.expandIcon}>{icon}</Text>
+          {typeof icon === 'string' ? <Text style={styles.expandIcon}>{icon}</Text> : icon}
         </View>
         <Text style={styles.expandLabel} numberOfLines={1}>
           {label}
@@ -107,19 +108,19 @@ export default function SettingsIndex() {
 
       <SectionCard title={t('settings.account')}>
         <ListRow
-          icon="👤"
+          icon={<AppIcon name="user" size={20} color={colors.primary} />}
           label={t('settings.accountInfo')}
           sub={me?.name}
           onPress={() => router.push('/settings/account' as never)}
         />
         <ListRow
-          icon="🧒"
+          icon={<AppIcon name="child" size={20} color={colors.primary} />}
           label={t('profile.childrenSection')}
           sub={childCount == null ? undefined : t('settings.childrenSub', { count: childCount })}
           onPress={() => router.push('/children' as never)}
         />
         <ListRow
-          icon="🎙"
+          icon={<AppIcon name="mic" size={20} color={colors.primary} />}
           label={t('settings.voices')}
           sub={
             voiceCount == null
@@ -135,24 +136,24 @@ export default function SettingsIndex() {
 
       <SectionCard title={t('settings.sectionPreferences')}>
         <ListRow
-          icon="🔔"
+          icon={<AppIcon name="bell" size={20} color={colors.primary} />}
           label={t('settings.notifications')}
           onPress={() => router.push('/settings/notifications' as never)}
         />
         <ListRow
-          icon="🌍"
+          icon={<AppIcon name="globe" size={20} color={colors.primary} />}
           label={t('settings.language')}
           sub={t(`settings.languages.${languageCode}`)}
           onPress={() => router.push('/settings/language' as never)}
         />
         <ListRow
-          icon="🔊"
+          icon={<AppIcon name="volume" size={20} color={colors.primary} />}
           label={t('settings.audio')}
           sub={t('settings.audioSub', { rate: rateLabel })}
           onPress={() => router.push('/settings/audio' as never)}
         />
         <ListRow
-          icon="🧭"
+          icon={<AppIcon name="compass" size={20} color={colors.primary} />}
           label={t('settings.replayTour')}
           sub={t('settings.replayTourSub')}
           onPress={() => {
@@ -165,14 +166,14 @@ export default function SettingsIndex() {
 
       <SectionCard title={t('settings.sectionPrivacy')}>
         <ListRow
-          icon="🔒"
+          icon={<AppIcon name="lock" size={20} color={colors.primary} />}
           label={t('settings.voiceData')}
           onPress={() => router.push('/settings/voice-data' as never)}
         />
-        <ExpandableRow icon="📄" label={t('settings.privacy')} body={t('settings.privacyBody')} />
-        <ExpandableRow icon="📋" label={t('settings.terms')} body={t('settings.termsBody')} />
+        <ExpandableRow icon={<AppIcon name="file" size={20} color={colors.primary} />} label={t('settings.privacy')} body={t('settings.privacyBody')} />
+        <ExpandableRow icon={<AppIcon name="terms" size={20} color={colors.primary} />} label={t('settings.terms')} body={t('settings.termsBody')} />
         <ExpandableRow
-          icon="🤖"
+          icon={<AppIcon name="robot" size={20} color={colors.primary} />}
           label={t('settings.aiInfo')}
           body={t('settings.aiInfoBody')}
           showDivider={false}
@@ -180,9 +181,9 @@ export default function SettingsIndex() {
       </SectionCard>
 
       <SectionCard title={t('settings.account')}>
-        <ListRow icon="🚪" label={t('profile.signOut')} onPress={() => setConfirmSignOut(true)} />
+        <ListRow icon={<AppIcon name="logout" size={20} color={colors.primary} />} label={t('profile.signOut')} onPress={() => setConfirmSignOut(true)} />
         <ListRow
-          icon="🗑"
+          icon={<AppIcon name="delete" size={20} color={colors.error} />}
           label={t('settings.deleteAccount')}
           variant="destructive"
           onPress={() => router.push('/settings/account?delete=1' as never)}

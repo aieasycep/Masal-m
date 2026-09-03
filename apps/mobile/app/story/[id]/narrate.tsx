@@ -31,8 +31,10 @@ import type {
   VoiceProfile,
 } from '@masalim/validation';
 import { colors, fontFamilies, fontSizes, gradients, radius, spacing } from '@masalim/ui';
+import { AppIcon } from '../../../src/components/AppIcon';
 import { api } from '../../../src/lib/api';
 import { useJobProgress } from '../../../src/lib/job-stream';
+import { useJobsStore } from '../../../src/stores/jobs';
 import { stopPreview, usePreviewPlayer } from '../../../src/lib/preview-player';
 import { AudioPreviewButton } from '../../../src/components/AudioPreviewButton';
 import { KeepScreenAwake } from '../../../src/components/KeepScreenAwake';
@@ -223,7 +225,7 @@ function NarrationRow({ narration, onOpen, onRetry, retryDisabled }: NarrationRo
   if (narration.status === NarrationStatus.FAILED) {
     return (
       <View style={[styles.narrationRow, styles.narrationRowFailed]}>
-        <Text style={styles.failedEmoji}>⚠️</Text>
+        <AppIcon name="alert" size={20} color={colors.error} />
         <View style={styles.narrationBody}>
           <Text style={styles.narrationName} numberOfLines={1}>
             {narration.narratorName}
@@ -686,6 +688,26 @@ export default function NarrateStory() {
             </Text>
           </View>
           <NightProgress percent={percent} />
+          <Pressable
+            onPress={() => {
+              // Keep waiting in the background: the row keeps its live pill and
+              // the dock above the tab bar tracks the same job.
+              useJobsStore.getState().track({
+                jobId: activeJob.jobId,
+                kind: 'narration',
+                storyId: id,
+                title: story?.title ?? null,
+                route: `/story/${id}/narrate`,
+              });
+              setActiveJob(null);
+            }}
+            accessibilityRole="button"
+            accessibilityLabel={t('jobs.background')}
+            hitSlop={8}
+            style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}
+          >
+            <Text style={styles.nightSecondary}>{t('jobs.background')}</Text>
+          </Pressable>
         </View>
       </View>
     );
@@ -811,7 +833,7 @@ export default function NarrateStory() {
               style={({ pressed }) => [styles.addVoiceCard, { opacity: pressed ? 0.8 : 1 }]}
             >
               <View style={styles.mutedAvatar}>
-                <Text style={styles.mutedAvatarEmoji}>🎙</Text>
+                <AppIcon name="mic" size={22} color={colors.mutedForeground} />
               </View>
               <View style={styles.voiceTextBlock}>
                 <Text style={styles.addVoiceTitle}>{t('voice.emptyCta')}</Text>
@@ -1017,7 +1039,6 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   rowFill: { height: '100%', borderRadius: 2, backgroundColor: colors.primary },
-  failedEmoji: { fontSize: 18 },
   failedText: {
     fontFamily: fontFamilies.body,
     fontSize: fontSizes.sm,

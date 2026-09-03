@@ -33,6 +33,7 @@ import {
   spacing,
   type CoverPaletteKey,
 } from '@masalim/ui';
+import { AppIcon } from '../../../src/components/AppIcon';
 import { api } from '../../../src/lib/api';
 import { useJobProgress } from '../../../src/lib/job-stream';
 import { Button } from '../../../src/components/Button';
@@ -512,7 +513,10 @@ export default function BookPreview() {
             end={{ x: 1, y: 1 }}
             style={styles.printGradient}
           >
-            <Text style={styles.printText}>🖨 {t('book.printCta')}</Text>
+            <View style={styles.printIcon}>
+              <AppIcon name="printer" size={18} color={colors.primaryForeground} />
+            </View>
+            <Text style={styles.printText}>{t('book.printCta')}</Text>
             <View style={styles.printSoonBadge}>
               <Text style={styles.printSoonBadgeText}>{t('book.printSoonBadge')}</Text>
             </View>
@@ -821,6 +825,7 @@ const styles = StyleSheet.create({
     shadowRadius: 24,
     elevation: 6,
   },
+  printIcon: { marginRight: 8 },
   printGradient: {
     flexDirection: 'row',
     paddingVertical: 18,

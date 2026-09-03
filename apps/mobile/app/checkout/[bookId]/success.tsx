@@ -20,6 +20,7 @@ import {
   shadows,
   spacing,
 } from '@masalim/ui';
+import { AppIcon } from '../../../src/components/AppIcon';
 import { api } from '../../../src/lib/api';
 import { Button } from '../../../src/components/Button';
 import { Screen } from '../../../src/components/Screen';
@@ -133,7 +134,7 @@ export default function CheckoutSuccess() {
           <Button
             label={t('checkout.trackOrder')}
             variant="secondary"
-            leading={<Text style={styles.buttonEmoji}>📦</Text>}
+            leading={<AppIcon name="order" size={18} color={colors.primary} />}
             style={styles.trackButton}
             onPress={() => router.replace(`/orders/${orderId}` as never)}
           />
@@ -215,5 +216,4 @@ const styles = StyleSheet.create({
   },
   buttons: { gap: 10 },
   trackButton: { backgroundColor: colors.secondary, borderColor: colors.secondary },
-  buttonEmoji: { fontSize: fontSizes.xl },
 });

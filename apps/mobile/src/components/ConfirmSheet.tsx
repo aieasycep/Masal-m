@@ -1,5 +1,6 @@
 import { StyleSheet, Text, View } from 'react-native';
 import { colors, fontFamilies, fontSizes, spacing } from '@masalim/ui';
+import { AppIcon } from './AppIcon';
 import { Button } from './Button';
 import { SheetContainer } from './SheetContainer';
 
@@ -32,7 +33,7 @@ export function ConfirmSheet({
     <SheetContainer visible={visible} onDismiss={onCancel}>
       {destructive ? (
         <View style={styles.trashCircle}>
-          <Text style={styles.trashEmoji}>🗑</Text>
+          <AppIcon name="delete" size={26} color={colors.error} />
         </View>
       ) : null}
       <Text style={styles.title}>{title}</Text>
@@ -60,7 +61,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginBottom: spacing.md,
   },
-  trashEmoji: { fontSize: 26 },
   title: {
     fontFamily: fontFamilies.display,
     fontSize: 20,

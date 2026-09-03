@@ -61,6 +61,12 @@ export const childSchema = z.object({
 });
 export type Child = z.infer<typeof childSchema>;
 
+/** `?limit=` for GET /children/:id/recommendations — Home shows 3, the full list up to 12. */
+export const recommendationsQuerySchema = z.object({
+  limit: z.coerce.number().int().min(1).max(12).default(3),
+});
+export type RecommendationsQuery = z.infer<typeof recommendationsQuerySchema>;
+
 export const recommendationSchema = z.object({
   title: z.string(),
   themes: z.array(z.string()),

@@ -24,6 +24,7 @@ import {
   radius,
   spacing,
 } from '@masalim/ui';
+import { AppIcon } from '../../../src/components/AppIcon';
 import { api } from '../../../src/lib/api';
 import { Input } from '../../../src/components/Input';
 import { Screen } from '../../../src/components/Screen';
@@ -266,7 +267,8 @@ export default function StoryEdit() {
                 accessibilityLabel={t('storyResult.editIllustrationCta')}
                 style={({ pressed }) => [styles.regenButton, { opacity: pressed ? 0.7 : 1 }]}
               >
-                <Text style={styles.regenLabel}>🎨 {t('storyResult.editIllustrationCta')}</Text>
+                <AppIcon name="palette" size={14} color={colors.primary} />
+                <Text style={styles.regenLabel}>{t('storyResult.editIllustrationCta')}</Text>
               </Pressable>
             </View>
 
@@ -378,6 +380,9 @@ const styles = StyleSheet.create({
   },
   illustrationEmoji: { fontSize: 60 },
   regenButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
     position: 'absolute',
     bottom: spacing.sm,
     right: spacing.sm,

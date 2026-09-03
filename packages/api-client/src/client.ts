@@ -101,8 +101,10 @@ export class MasalimApiClient {
     update: (id: string, input: UpdateChildInput) =>
       this.http.patch<Child>(`/children/${id}`, input),
     remove: (id: string) => this.http.delete<void>(`/children/${id}`),
-    recommendations: (id: string) =>
-      this.http.get<Recommendation[]>(`/children/${id}/recommendations`),
+    recommendations: (id: string, limit?: number) =>
+      this.http.get<Recommendation[]>(
+        `/children/${id}/recommendations${limit != null ? `?limit=${limit}` : ''}`,
+      ),
   };
 
   readonly stories = {

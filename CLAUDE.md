@@ -359,6 +359,30 @@ Local `.env` = `.env.example` + generated JWT secrets (already present, gitignor
   orders quote/create throw FEATURE_DISABLED server-side; mobile preview
   print CTA shows YAKINDA badge + note instead of checkout. Digital
   books/preview untouched.
+- **DESIGN REVIEW PROGRAM (Sep 2)** — user's Claude Design export
+  (scratchpad/claude-design/, 11 artboards, "design constitution") → gap
+  analysis → user chose ALL packages on an isolated branch like uiux-review:
+  `design-review` branch + PR #18 ([BİRLEŞTİRME — Design Review], DO NOT
+  merge until user approves) + `.github/workflows/design-review-apk.yml`
+  (branch-only; runner-only app.json identity `com.masalim.app.designreview`
+  / "Masalım — Design Review", artifact `masalim-design-review-apk`, second
+  job = emulator smoke). Backend prerequisites went to main via PR #17
+  (Narration.wordTimings via ElevenLabs forced alignment of the FINAL mp3 +
+  clean text — estimated fallback from chunk durations; recommendations
+  ?limit=). Packages on the branch: A tokens (success/warning/error,
+  mutedForeground #7A6D62, night.border/highlight, fontSizes base 15 /
+  xs 12) + /subscription/manage (Premium "Aboneliğim") + /recommendations
+  ("Tümü"); B MiniPlayer above tabs (src/stores/player.ts mirrors the loaded
+  narration; previews/sign-out clear it) + JobProgressDock (src/stores/jobs.ts,
+  "Arka planda devam et" on story/narration/illustration takeovers; Screen
+  reserves dock height via src/lib/dock.ts); C lucide-react-native icon family
+  (src/components/AppIcon.tsx, strokeWidth 1.8; emoji only decorative now;
+  ListRow/ExpandableRow accept element icons) + karaoke (KaraokeText,
+  narration-sync activeWord/activeWordIndexOnPage/wordStartSeconds; player
+  text panel + reader highlight active word in night.highlight, tap word →
+  seek; page-level fallback when wordTimings null). Promotion = merge PR #18
+  after the user says the review APK is good; then delete the workflow like
+  uiux-review-apk.yml was.
 - **Illustration style fix**: STYLE_TEMPLATES rewritten as mutually exclusive
   medium specs with negatives; style now LEADS sheet+edit prompts; edit
   prompt carries "reference = identity only" + quality tier. Root cause of
@@ -373,6 +397,10 @@ Local `.env` = `.env.example` + generated JWT secrets (already present, gitignor
   emitDecoratorMetadata → DI breaks). eslint consistent-type-imports is OFF in
   apps/api for the same reason.
 - Integration tests: `NODE_ENV=test` skips throttling (shared Redis buckets).
+- reactivecircus/android-emulator-runner executes EVERY `script` line as a separate
+  `sh -c` — multi-line `if … fi` blocks fail with "expecting fi"; keep compound
+  commands on one line (`a || { b; c; }`). Blob-storage artifact downloads are
+  egress-blocked here: the job log itself must print the evidence.
 
 ## Verification checklist per phase
 

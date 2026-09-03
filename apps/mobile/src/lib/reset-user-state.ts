@@ -1,6 +1,8 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { queryClient } from './query';
 import { useAppPrefs } from '../stores/app-prefs';
+import { useJobsStore } from '../stores/jobs';
+import { usePlayerStore } from '../stores/player';
 
 /**
  * Wipe everything that belongs to the signed-in account, not the device.
@@ -13,6 +15,8 @@ import { useAppPrefs } from '../stores/app-prefs';
 export async function resetPerUserState(): Promise<void> {
   queryClient.clear();
   useAppPrefs.getState().setSelectedChildId(null);
+  useJobsStore.getState().clear();
+  usePlayerStore.getState().clearNowPlaying();
   try {
     await AsyncStorage.removeItem('masalim.query-cache');
   } catch {

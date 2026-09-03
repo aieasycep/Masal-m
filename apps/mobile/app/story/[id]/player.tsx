@@ -8,6 +8,7 @@ import {
   StyleSheet,
   Text,
   View,
+  useWindowDimensions,
   type StyleProp,
   type ViewStyle,
 } from 'react-native';
@@ -45,8 +46,13 @@ import {
   spacing,
 } from '@masalim/ui';
 import { api } from '../../../src/lib/api';
-import { activePageNumber } from '../../../src/lib/narration-sync';
+import {
+  activePageNumber,
+  activeWordIndexOnPage,
+  wordStartSeconds,
+} from '../../../src/lib/narration-sync';
 import { useAppPrefs } from '../../../src/stores/app-prefs';
+import { usePlayerStore } from '../../../src/stores/player';
 import {
   jumpBack,
   jumpForward,
@@ -59,7 +65,9 @@ import {
   usePlayerProgress,
   usePositionPersistence,
 } from '../../../src/lib/player';
+import { KaraokeText } from '../../../src/components/KaraokeText';
 import { Button } from '../../../src/components/Button';
+import { KeepScreenAwake } from '../../../src/components/KeepScreenAwake';
 import { Starfield } from '../../../src/components/Starfield';
 import { Waveform } from '../../../src/components/Waveform';
 import {
@@ -72,6 +80,9 @@ import {
   ShareIcon,
   Skip15Icon,
 } from '../../../src/components/icons';
+
+/** Height of the sing-along text panel (px). */
+const TEXT_PANEL_HEIGHT = 260;
 
 const RATES = [0.8, 1, 1.2, 1.5] as const;
 const SLEEP_MINUTE_OPTIONS = [5, 10, 15, 30] as const;
@@ -262,6 +273,12 @@ function SeekSlider({ position, duration, onSeek }: SeekSliderProps) {
 export default function StoryPlayer() {
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
+  const { width: windowWidth, height: windowHeight } = useWindowDimensions();
+  // The cover is the hero of this screen: fill the width on tall phones, but
+  // never so tall that the transport drops below the fold on short ones.
+  const coverSize = Math.round(
+    Math.max(220, Math.min(windowWidth - spacing.pageXWide * 2, windowHeight * 0.36, 340)),
+  );
   const { id, narrationId } = useLocalSearchParams<{ id: string; narrationId?: string }>();
 
   const storyQuery = useQuery({
@@ -318,10 +335,12 @@ export default function StoryPlayer() {
   const fadeTokenRef = useRef(0);
   const textScrollRef = useRef<ScrollView>(null);
   const paragraphYRef = useRef<Record<number, number>>({});
+  const paragraphHeightRef = useRef<Record<number, number>>({});
 
   const { playing } = useIsPlaying();
   const isPlaying = playing === true;
-  const { position, duration: liveDuration } = usePlayerProgress();
+  // 250ms ticks so the karaoke word highlight keeps up with speech.
+  const { position, duration: liveDuration } = usePlayerProgress(250);
 
   usePositionPersistence(id, loadedNarrationId ?? undefined);
 
@@ -352,6 +371,14 @@ export default function StoryPlayer() {
         artworkUrl: storyValue.coverImageUrl ?? undefined,
       });
       setLoadedNarrationId(narrationValue.id);
+      // Mirror the loaded narration for the mini player (RNTP tracks carry no storyId).
+      usePlayerStore.getState().setNowPlaying({
+        storyId: storyValue.id,
+        narrationId: narrationValue.id,
+        title: storyValue.title,
+        subtitle: narratorLabel(narrationValue),
+        artworkUrl: storyValue.coverImageUrl ?? null,
+      });
       const saved = storyValue.playbackPosition;
       if (saved != null && saved.narrationId === narrationValue.id && saved.positionSeconds > 1) {
         await seekTo(saved.positionSeconds);
@@ -443,14 +470,29 @@ export default function StoryPlayer() {
     return activePageNumber(timings, position);
   }, [narration, position]);
 
+  // Word-level progress through the active paragraph (0..1) — with a word
+  // timeline the panel glides down the paragraph as the words are read.
+  const activeWordFraction = useMemo(() => {
+    if (activePage == null || narration?.wordTimings == null) return null;
+    const index = activeWordIndexOnPage(narration.wordTimings, position, activePage);
+    if (index == null) return null;
+    let max = -1;
+    for (const word of narration.wordTimings.words) {
+      if (word.p === activePage && word.i > max) max = word.i;
+    }
+    return max < 0 ? null : Math.min(1, (index + 0.5) / (max + 1));
+  }, [activePage, narration, position]);
+
   useEffect(() => {
     // "Sonraki sayfaya otomatik geç" pref gates the follow-along scroll.
     if (!showText || !autoFollowPage || activePage == null) return;
     const y = paragraphYRef.current[activePage];
-    if (y != null) {
-      textScrollRef.current?.scrollTo({ y: Math.max(0, y - 32), animated: true });
-    }
-  }, [showText, autoFollowPage, activePage]);
+    if (y == null) return;
+    const height = paragraphHeightRef.current[activePage] ?? 0;
+    // Paragraphs taller than the panel: follow the word instead of parking at the top.
+    const lead = activeWordFraction != null && height > TEXT_PANEL_HEIGHT ? activeWordFraction * (height - TEXT_PANEL_HEIGHT * 0.6) : 0;
+    textScrollRef.current?.scrollTo({ y: Math.max(0, y - 32 + lead), animated: true });
+  }, [showText, autoFollowPage, activePage, activeWordFraction]);
 
   const selectRate = (value: number) => {
     setRateState(value);
@@ -540,6 +582,8 @@ export default function StoryPlayer() {
 
   return (
     <NightScreen>
+      {/* Text panel / cover stay visible while the narration plays; a paused player may sleep. */}
+      {isPlaying ? <KeepScreenAwake /> : null}
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={[
@@ -574,7 +618,7 @@ export default function StoryPlayer() {
         {/* Floating cover */}
         <View style={styles.coverSection}>
           <Animated.View style={[styles.coverWrap, floatStyle]}>
-            <View style={styles.cover}>
+            <View style={[styles.cover, { width: coverSize, height: coverSize }]}>
               {story.coverImageUrl != null ? (
                 <Image
                   source={{ uri: story.coverImageUrl }}
@@ -734,12 +778,25 @@ export default function StoryPlayer() {
                     key={page.id}
                     onLayout={(event) => {
                       paragraphYRef.current[page.pageNumber] = event.nativeEvent.layout.y;
+                      paragraphHeightRef.current[page.pageNumber] = event.nativeEvent.layout.height;
                     }}
                     style={[styles.paragraph, highlighted && styles.paragraphActive]}
                   >
-                    <Text style={[styles.paragraphText, highlighted && styles.paragraphTextActive]}>
-                      {page.text}
-                    </Text>
+                    <KaraokeText
+                      text={page.text}
+                      activeIndex={
+                        highlighted
+                          ? activeWordIndexOnPage(narration?.wordTimings, position, page.pageNumber)
+                          : null
+                      }
+                      style={[styles.paragraphText, highlighted && styles.paragraphTextActive]}
+                      activeStyle={styles.wordActive}
+                      readStyle={styles.wordRead}
+                      onWordPress={(index) => {
+                        const seconds = wordStartSeconds(narration?.wordTimings, page.pageNumber, index);
+                        if (seconds != null) void seekTo(seconds).catch(() => {});
+                      }}
+                    />
                   </View>
                 );
               })}
@@ -847,9 +904,10 @@ const styles = StyleSheet.create({
     color: night.muted,
     letterSpacing: letterSpacing.eyebrow,
   },
-  coverSection: { alignItems: 'center', paddingTop: spacing.xxxl, paddingBottom: 36 },
+  coverSection: { alignItems: 'center', paddingTop: spacing.xl, paddingBottom: spacing.xl + 4 },
   coverWrap: { borderRadius: radius.cover, ...shadows.playerCover },
   cover: {
+    // Size comes from coverSize (responsive); 220 is the floor for short phones.
     width: 220,
     height: 220,
     borderRadius: radius.cover,
@@ -980,7 +1038,7 @@ const styles = StyleSheet.create({
     backgroundColor: night.card,
     overflow: 'hidden',
   },
-  textPanelScroll: { maxHeight: 260 },
+  textPanelScroll: { maxHeight: TEXT_PANEL_HEIGHT },
   textPanelContent: { padding: spacing.md, gap: spacing.xs },
   paragraph: { borderRadius: radius.sm, padding: 10 },
   paragraphActive: { backgroundColor: 'rgba(155,127,212,0.18)' },
@@ -992,6 +1050,13 @@ const styles = StyleSheet.create({
     opacity: 0.75,
   },
   paragraphTextActive: { color: colors.card, opacity: 1 },
+  wordActive: {
+    color: night.highlight,
+    fontFamily: fontFamilies.bodyBold,
+    backgroundColor: 'rgba(255,210,125,0.22)',
+    borderRadius: 4,
+  },
+  wordRead: { color: night.text },
   pressedDim: { opacity: 0.7 },
   sheetBackdrop: { flex: 1, backgroundColor: 'rgba(4,8,16,0.55)' },
   sheet: {
