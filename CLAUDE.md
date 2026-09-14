@@ -292,9 +292,13 @@ Local `.env` = `.env.example` + generated JWT secrets (already present, gitignor
   (Android fires momentum-end for programmatic scrolls too — the reader's own
   page turn was mistaken for a swipe), follow re-engages per new narration,
   chip shows explicit açık/kapalı states.
-- **GitHub cron NEVER fires keepalive.yml** (state active, zero scheduled
-  runs) → Render still spins down after 15 idle min; user advised UptimeRobot
-  free 5-min monitor on /health (or Render Starter). Manual dispatch works.
+- **keepalive.yml REMOVED (Sep 14)**. The repo's DEFAULT BRANCH is the claude
+  branch (`git ls-remote --symref origin HEAD`), so GitHub cron ran it there
+  every ~2–4 h (never the 10-min schedule) and reported a `ping` check on PR
+  #17's head. Render stopped answering Sep 12 19:26Z → 12 consecutive red
+  `ping` checks, each waking this session. User then asked to cancel the PR
+  subscriptions (#17/#18 unsubscribed) and the keep-warm → file deleted. No
+  Render pinger anywhere now; Render service deletion is the user's manual step.
 - Artifact downloads need a logged-in GitHub tab (incognito hides the link).
 - **Phone-friendly APK links (Sep 3)**: the crash-log workflow now FAILS on a bad
   verdict and, on success, republishes the verified APK as the moving pre-release
@@ -326,8 +330,8 @@ Local `.env` = `.env.example` + generated JWT secrets (already present, gitignor
   from this container — server access ONLY via GitHub Actions. VPS DB started
   EMPTY (fresh seed: monetization_v1 config, physical_books OFF; Render test
   data not migrated unless asked). android-apk.yml default EXPO_PUBLIC_API_URL
-  now the VPS URL (3a532f4). REMAINING: user tests the VPS APK a few days →
-  then delete Render services + keepalive.yml (+ UptimeRobot). User reminded
+  now the VPS URL (3a532f4). REMAINING: user deletes the Render services
+  (+ UptimeRobot if set up); keepalive.yml already gone (Sep 14). User reminded
   to rotate server password + regenerate the SSH deploy key (private key was
   visible in a screenshot).
 

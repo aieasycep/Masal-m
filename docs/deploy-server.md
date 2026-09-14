@@ -143,5 +143,7 @@ gerekmez, silebilirsin.
   volume'larındadır. Basit yedek almak için sunucuda:
   `docker exec masalim-postgres-1 pg_dump -U masalim masalim > yedek.sql`
   (otomatik yedekleme istersen kurarım).
-- GitHub tarafındaki `keepalive.yml` Render uykusu içindi; Render
-  kapatılınca kaldırılacak.
+- GitHub tarafındaki `keepalive.yml` (Render'ı uyanık tutan zamanlanmış ping)
+  14 Eylül'de kaldırıldı: Render artık cevap vermediği için her koşu kırmızıya
+  düşüyordu ve uygulama zaten VPS'i kullanıyor. Adım 6'da yalnızca Render
+  servislerini (ve varsa UptimeRobot'u) silmek kalıyor.
