@@ -1,5 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk';
 import OpenAI from 'openai';
+import { DEFAULT_ANTHROPIC_FAST_MODEL, effortConfig, textOf } from '../shared/anthropic';
 
 export interface NarrationDirectorConfig {
   provider: 'openai' | 'anthropic';
@@ -50,14 +51,41 @@ export const applyDirectorOutput = (original: string, modelOutput: string): stri
  */
 export class NarrationDirector {
   readonly name: string;
-  private readonly config: NarrationDirectorConfig;
   private readonly model: string;
+  private readonly complete: (prompt: string) => Promise<string>;
 
   constructor(config: NarrationDirectorConfig) {
-    this.config = config;
     this.name = config.provider;
-    this.model =
-      config.model ?? (config.provider === 'openai' ? 'gpt-4o-mini' : 'claude-haiku-4-5-20251001');
+    if (config.provider === 'openai') {
+      this.model = config.model ?? 'gpt-4o-mini';
+      const client = new OpenAI({ apiKey: config.apiKey });
+      this.complete = async (prompt) => {
+        const completion = await client.chat.completions.create({
+          model: this.model,
+          max_completion_tokens: 2048,
+          messages: [
+            { role: 'system', content: DIRECTOR_SYSTEM },
+            { role: 'user', content: prompt },
+          ],
+        });
+        return completion.choices[0]?.message?.content ?? '';
+      };
+      return;
+    }
+    this.model = config.model ?? DEFAULT_ANTHROPIC_FAST_MODEL;
+    const client = new Anthropic({ apiKey: config.apiKey });
+    this.complete = async (prompt) => {
+      const response = await client.messages.create({
+        model: this.model,
+        // The reply echoes the chunk (≤2,500 chars ≈ 1k tokens) plus a few tags;
+        // thinking shares this budget on Claude 5.5, hence the headroom.
+        max_tokens: 4096,
+        system: DIRECTOR_SYSTEM,
+        messages: [{ role: 'user', content: prompt }],
+        output_config: effortConfig(this.model, 'low'),
+      });
+      return textOf(response);
+    };
   }
 
   async annotate(text: string, language: 'tr' | 'en'): Promise<string> {
@@ -69,31 +97,5 @@ export class NarrationDirector {
     } catch {
       return text;
     }
-  }
-
-  private async complete(prompt: string): Promise<string> {
-    if (this.config.provider === 'openai') {
-      const client = new OpenAI({ apiKey: this.config.apiKey });
-      const completion = await client.chat.completions.create({
-        model: this.model,
-        max_completion_tokens: 2048,
-        messages: [
-          { role: 'system', content: DIRECTOR_SYSTEM },
-          { role: 'user', content: prompt },
-        ],
-      });
-      return completion.choices[0]?.message?.content ?? '';
-    }
-    const client = new Anthropic({ apiKey: this.config.apiKey });
-    const response = await client.messages.create({
-      model: this.model,
-      max_tokens: 2048,
-      system: DIRECTOR_SYSTEM,
-      messages: [{ role: 'user', content: prompt }],
-    });
-    return response.content
-      .filter((block): block is Anthropic.TextBlock => block.type === 'text')
-      .map((block) => block.text)
-      .join('');
   }
 }

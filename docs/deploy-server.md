@@ -71,19 +71,20 @@ Ekranın sonunda `-----BEGIN OPENSSH PRIVATE KEY-----` ile başlayıp
 GitHub'a yapıştıracağız. (Bu anahtar yalnızca senin ekranında görünür;
 sohbete yapıştırma.)
 
-## Adım 2 — GitHub'a 5 gizli değer ekle
+## Adım 2 — GitHub'a gizli değerleri ekle
 
 Tarayıcıda: **github.com/aieasycep/Masal-m → Settings → Secrets and
-variables → Actions → New repository secret**. Sırayla şu 5 kaydı oluştur
+variables → Actions → New repository secret**. Sırayla şu kayıtları oluştur
 (Name kısmını aynen yaz):
 
-| Name | Value (nereden?) |
-|---|---|
-| `SERVER_SSH_KEY` | Adım 1'de kopyaladığın anahtar metni |
-| `AI_API_KEY` | Render → masalim-api → Environment → AI_API_KEY değeri |
-| `TTS_API_KEY` | Render → masalim-api → Environment → TTS_API_KEY değeri |
-| `VOICE_CLONE_API_KEY` | Render → aynı yerden |
-| `IMAGE_API_KEY` | Render → aynı yerden |
+| Name | Ne için? | Value (nereden?) |
+|---|---|---|
+| `SERVER_SSH_KEY` | Sunucuya giriş | Adım 1'de kopyaladığın anahtar metni |
+| `ANTHROPIC_API_KEY` | **Claude** — hikâye + güvenlik denetimi + seslendirme yönetmeni | Adım 7'deki gibi platform.claude.com'dan |
+| `TTS_API_KEY` | ElevenLabs seslendirme | ElevenLabs → API Keys |
+| `VOICE_CLONE_API_KEY` | ElevenLabs ses klonlama | ElevenLabs → aynı anahtar olabilir |
+| `IMAGE_API_KEY` | OpenAI görseller (Claude görsel üretmez) | platform.openai.com → API keys |
+| `AI_API_KEY` | *(isteğe bağlı)* OpenAI'ye geri dönüş anahtarı | platform.openai.com → API keys |
 
 > Render'daki değerleri görmek için: dashboard.render.com → masalim-api →
 > Environment sekmesi → değerin yanındaki göz simgesi.
@@ -121,6 +122,43 @@ silebilirsin (dashboard.render.com → servis → Settings → Delete). Acele
 etme; ikisi bir süre yan yana çalışabilir. UptimeRobot kurduysan artık
 gerekmez, silebilirsin.
 
+## Adım 7 — Claude API anahtarı (hikâyeler Claude ile yazılsın)
+
+Hikâye metni, güvenlik denetimi ve seslendirme yönetmeni artık **Claude**
+kullanıyor (hikâye: `claude-opus-5-5`, diğer ikisi: `claude-haiku-5-5`).
+Görseller Claude ile üretilemez; onlar OpenAI gpt-image-1'de kalır
+(`IMAGE_API_KEY`), ama her sayfanın çizim yönergesini artık Claude yazar.
+
+> **Önemli:** claude.ai'daki Max/Pro aboneliğin API'yi KAPSAMAZ. API için
+> ayrı bir geliştirici hesabı ve ön ödemeli kredi gerekir. Bir masal yaklaşık
+> ₺3–6 tutar (uzunluğa göre); ilk yükleme için 20–40 $ rahat yeter.
+
+1. Tarayıcıda **https://platform.claude.com** → Sign up (claude.ai e-postanla
+   girebilirsin; "Claude Developer Platform"/Console hesabı ayrıdır).
+2. Sol menüde **Billing** → **Add credits** → kart ekle, 20–40 $ yükle.
+   (İstersen *Auto-reload* kapalı kalsın — kredi bitince hikâye üretimi
+   "Sorun oluştu" der, sen yükleyince kendiliğinden düzelir.)
+3. Sol menüde **API Keys** → **Create Key** → ad: `masalim-sunucu` → oluştur →
+   `sk-ant-...` ile başlayan metni **hemen kopyala** (bir daha gösterilmez).
+4. GitHub'da **github.com/aieasycep/Masal-m → Settings → Secrets and
+   variables → Actions → New repository secret** → Name: `ANTHROPIC_API_KEY`,
+   Value: kopyaladığın anahtar → Add secret. (Anahtarı sohbete/ekran
+   görüntüsüne koyma; GitHub ekledikten sonra sana da göstermez, normaldir.)
+5. Dağıtım: **Actions → Deploy Server → Run workflow**. İlk adım "LLM
+   sağlayıcı anahtarını seç ve doğrula" anahtarı ve model adlarını kontrol
+   eder — anahtar yoksa/yanlışsa dağıtım sunucuya dokunmadan Türkçe bir
+   hata ile durur (sunucu eski hâlinde çalışmaya devam eder). Yeşil bitince
+   hikâyeler Claude'dan gelir.
+6. İstersen aynı ekranda **story_smoke** kutusunu işaretle: dağıtım sonunda
+   canlı sunucuda gerçek bir KISA masal üretilir ve başlığı/sayfa sayısı
+   log'a yazılır (bir masal kadar kredi harcar).
+
+**Geri dönüş (OpenAI'ye):** `.github/workflows/deploy-server.yml` içindeki
+`AI_VENDOR: anthropic` satırını `AI_VENDOR: openai` yapıp main'e it — `AI_API_KEY`
+secret'ındaki OpenAI anahtarıyla gpt-4o / gpt-4o-mini'ye döner. Model veya
+"düşünme derinliği" değiştirmek de aynı dosyada (`ANTHROPIC_STORY_MODEL`,
+`ANTHROPIC_EFFORT`: low/medium/high).
+
 ---
 
 ## Teknik notlar (meraklısına)
@@ -135,8 +173,9 @@ gerekmez, silebilirsin.
   Masalım o nginx'in ARKASINA yerleşir; dağıtım nginx'i asla restart etmez,
   `nginx -t` başarılıysa yalnızca reload eder.
 - Sırlar sunucuda `/opt/masalim/.env` (üretilmiş; git'e girmez) ve
-  `/opt/masalim/providers.env` (GitHub Secrets'tan her dağıtımda yazılır)
-  dosyalarındadır.
+  `/opt/masalim/providers.env` (GitHub Secrets'tan her dağıtımda yazılır;
+  LLM sağlayıcı seçimi — `AI_PROVIDER`, `AI_MODEL`, `AI_EFFORT`,
+  `MODERATION_*` — de buradadır ve `.env`'dekini ezer) dosyalarındadır.
 - `NODE_ENV=staging`: ödeme/abonelik hâlâ mock (gerçek mağaza kurulumları
   yapılana dek) — üretim modu mock sağlayıcıları bilerek reddeder.
 - Yedekleme: veritabanı `postgres-data`, medya `minio-data` Docker

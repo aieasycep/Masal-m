@@ -45,10 +45,14 @@ STORAGE_SECRET_KEY=${MINIO_PASSWORD}
 MINIO_ROOT_USER=masalim
 MINIO_ROOT_PASSWORD=${MINIO_PASSWORD}
 
-AI_PROVIDER=openai
-AI_MODEL=gpt-4o
-MODERATION_PROVIDER=openai
-MODERATION_MODEL=gpt-4o-mini
+# LLM seçimi (AI_PROVIDER/AI_MODEL/MODERATION_*) her dağıtımda providers.env
+# tarafından EZİLİR (.github/workflows/deploy-server.yml, AI_VENDOR); buradaki
+# değerler yalnızca providers.env yokken geçerli varsayılanlardır.
+AI_PROVIDER=anthropic
+AI_MODEL=claude-opus-5-5
+AI_EFFORT=medium
+MODERATION_PROVIDER=llm
+MODERATION_MODEL=claude-haiku-5-5
 TTS_PROVIDER=elevenlabs
 VOICE_CLONE_PROVIDER=elevenlabs
 IMAGE_PROVIDER=openai

@@ -10,8 +10,9 @@
 # Sunucuda /opt/masalim düzeni:
 #   /opt/masalim/app            → repo kopyası (deploy workflow rsync'ler)
 #   /opt/masalim/.env           → üretilmiş sırlar (deploy/remote-setup.sh yazar)
-#   /opt/masalim/providers.env  → AI sağlayıcı anahtarları (GitHub Secrets'tan
-#                                 her dağıtımda yazılır)
+#   /opt/masalim/providers.env  → AI sağlayıcı seçimi + anahtarları (deploy
+#                                 workflow her dağıtımda yazar; .env'den sonra
+#                                 yüklendiği için oradaki LLM ayarlarını ezer)
 #
 # Çalıştırma (deploy workflow'un yaptığı):
 #   docker compose -f /opt/masalim/app/deploy/docker-compose.server.yml \

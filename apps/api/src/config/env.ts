@@ -30,9 +30,11 @@ const envSchema = z
 
     AI_PROVIDER: providerEnum(['mock', 'anthropic', 'openai']).default('mock'),
     AI_API_KEY: z.string().default(''),
-    AI_MODEL: z.string().default('claude-opus-5'),
+    AI_MODEL: z.string().default('claude-opus-5-5'),
+    /** Claude thinking depth for story generation (ignored by other vendors). */
+    AI_EFFORT: providerEnum(['low', 'medium', 'high']).default('medium'),
     MODERATION_PROVIDER: providerEnum(['mock', 'llm', 'openai']).default('mock'),
-    MODERATION_MODEL: z.string().default('claude-opus-5'),
+    MODERATION_MODEL: z.string().default('claude-haiku-5-5'),
     TTS_PROVIDER: providerEnum(['mock', 'elevenlabs']).default('mock'),
     TTS_API_KEY: z.string().default(''),
     TTS_MODEL: z.string().default('eleven_v3'),

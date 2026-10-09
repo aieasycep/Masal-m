@@ -272,10 +272,10 @@ Local `.env` = `.env.example` + generated JWT secrets (already present, gitignor
   pre-review rollback) left in place. VOICE_RECORDING 45s floor now enforced
   by the API too (shared constant landed via the merge).
 - **Post-review fix train (all MERGED to main, Aug 29–Sep 1)**: PR #5 OpenAI
-  moderation provider (staging is now ALL-GPT: AI_PROVIDER=openai,
+  moderation provider (staging was ALL-GPT Aug 29 → Oct 9: AI_PROVIDER=openai,
   AI_MODEL=gpt-4o via cross-vendor model guard in providers.module.ts,
-  MODERATION_PROVIDER=openai/gpt-4o-mini; AI_API_KEY holds the OpenAI key —
-  reverting to Claude = flip those 3 env values back). PR #6 expressive
+  MODERATION_PROVIDER=openai/gpt-4o-mini; AI_API_KEY secret = OpenAI key —
+  superseded by the Claude switch below). PR #6 expressive
   narration: TTS_MODEL defaults to eleven_v3 + NarrationDirector LLM pass
   inserts v3 audio tags per chunk (tag-only guard — story words never change;
   auto-fallback to eleven_multilingual_v2 + plain text; v2 path uses
@@ -292,6 +292,30 @@ Local `.env` = `.env.example` + generated JWT secrets (already present, gitignor
   (Android fires momentum-end for programmatic scrolls too — the reader's own
   page turn was mistaken for a swipe), follow re-engages per new narration,
   chip shows explicit açık/kapalı states.
+- **STORY/MODERATION/DIRECTOR → CLAUDE (Oct 9, on PR #17)** — user: "görüntü ve
+  hikaye oluşturmak için claude kullanalım". Claude has NO image generation →
+  images stay OpenAI gpt-image-1 (IMAGE_API_KEY); Claude now writes the per-page
+  illustration prompts (part of the story JSON). Models verified against
+  platform.claude.com (Oct 2026): story `claude-opus-5-5` ($4/$20, effort
+  medium via new env AI_EFFORT), moderation + narration director
+  `claude-haiku-5-5` ($0.10/$0.50, effort low). Claude 5.5 facts baked into
+  packages/ai/src/shared/anthropic.ts: thinking ALWAYS on (can't disable;
+  tokens billed as output, share max_tokens → story 16k / classifier 512 /
+  director 4096), `temperature` rejected, text blocks selected by type
+  (thinking blocks come first), effort omitted for pre-4.6 models. Story
+  provider now `messages.create` + manual parse (stop_reason checked FIRST:
+  refusal→REFUSED, max_tokens→INVALID_OUTPUT), one schema-repair round + one
+  length-expand round, usage summed over all calls; 20 new vitest cases mock
+  the SDK. Deploy: deploy-server.yml `AI_VENDOR: anthropic` (rollback = the
+  word `openai`), pre-deploy step validates the key + both model ids via
+  GET /v1/models (no tokens) and FAILS before touching the server if secret
+  `ANTHROPIC_API_KEY` is missing; providers.env now carries AI_PROVIDER/
+  AI_MODEL/AI_EFFORT/MODERATION_* (overrides the server's one-time .env);
+  workflow_dispatch input `story_smoke` runs deploy/smoke-story.sh (fresh
+  account → SHORT story → job poll → title/pages in the log). USER HAD NO
+  Anthropic API key at hand-over → docs/deploy-server.md "Adım 7" (Console →
+  Billing credits → API Keys → GitHub secret). Until the secret exists the
+  deploy stops at step 1 and the VPS keeps running GPT.
 - **keepalive.yml REMOVED (Sep 14)**. The repo's DEFAULT BRANCH is the claude
   branch (`git ls-remote --symref origin HEAD`), so GitHub cron ran it there
   every ~2–4 h (never the 10-min schedule) and reported a `ping` check on PR

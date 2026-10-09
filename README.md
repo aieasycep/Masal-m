@@ -60,9 +60,10 @@ Every external service is provider-abstracted (`AI_PROVIDER`, `TTS_PROVIDER`,
 `PAYMENT_PROVIDER`, …) with `mock` defaults; production boot **refuses mock
 providers**. Details and real-adapter setup: [docs/providers.md](docs/providers.md).
 
-Recommended production stack: Anthropic (stories), ElevenLabs (TTS + voice
-clone), OpenAI gpt-image-1 (illustrations), iyzico (payments), RevenueCat
-(IAP), S3/R2 (storage), Expo Push. Print provider is an open interface —
+Recommended production stack: Anthropic Claude (stories `claude-opus-5-5`,
+moderation + narration director `claude-haiku-5-5`), ElevenLabs (TTS + voice
+clone), OpenAI gpt-image-1 (illustrations — Claude does not generate images),
+iyzico (payments), RevenueCat (IAP), S3/R2 (storage), Expo Push. Print provider is an open interface —
 no Turkish print API is integrated yet (mock ships the full order lifecycle).
 
 ## Architecture highlights

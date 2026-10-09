@@ -1,3 +1,10 @@
+// Anthropic defaults shared by the story / moderation / narration-director wiring
+export {
+  DEFAULT_ANTHROPIC_FAST_MODEL,
+  DEFAULT_ANTHROPIC_STORY_MODEL,
+  type AnthropicEffort,
+} from './shared/anthropic';
+
 // Story generation
 export * from './story/types';
 export { buildSystemPrompt, buildUserPrompt, UNSAFE_SENTINEL } from './story/prompt-engine';

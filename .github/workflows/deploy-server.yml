@@ -5,15 +5,23 @@
 #
 # Gerekli GitHub Secrets (Settings → Secrets and variables → Actions):
 #   SERVER_SSH_KEY       — sunucudaki ~/.ssh/masalim_deploy ÖZEL anahtarı
-#   AI_API_KEY           — OpenAI anahtarı (hikâye + denetim)
+#   ANTHROPIC_API_KEY    — Claude anahtarı (hikâye + denetim + seslendirme
+#                          yönetmeni) — AI_VENDOR=anthropic iken ZORUNLU
+#   AI_API_KEY           — OpenAI anahtarı (aynı üç iş) — yalnızca
+#                          AI_VENDOR=openai (geri dönüş) iken kullanılır
 #   TTS_API_KEY          — ElevenLabs anahtarı (seslendirme)
 #   VOICE_CLONE_API_KEY  — ElevenLabs anahtarı (ses klonlama)
-#   IMAGE_API_KEY        — OpenAI anahtarı (görseller)
+#   IMAGE_API_KEY        — OpenAI anahtarı (görseller — Claude görsel üretmez)
 # Kurulum adımları: docs/deploy-server.md (Türkçe, adım adım).
 name: Deploy Server
 
 on:
   workflow_dispatch:
+    inputs:
+      story_smoke:
+        description: "Dağıtımdan sonra canlı API'de gerçek bir KISA masal üret (LLM kredisi harcar)"
+        type: boolean
+        default: false
   push:
     branches: [main]
     paths:
@@ -31,6 +39,15 @@ concurrency:
 env:
   SERVER: ubuntu@57.129.6.57
   API_URL: https://api.57-129-6-57.sslip.io
+  # Hikâye / güvenlik denetimi / seslendirme yönetmeni LLM'i: anthropic | openai.
+  # Üçü tek anahtarı paylaşır, o yüzden birlikte geçer. Geri dönüş = bu tek
+  # kelimeyi "openai" yapıp main'e itmek (AI_API_KEY secret'ı OpenAI'da kalır).
+  AI_VENDOR: anthropic
+  ANTHROPIC_STORY_MODEL: claude-opus-5-5
+  ANTHROPIC_MODERATION_MODEL: claude-haiku-5-5
+  ANTHROPIC_EFFORT: medium
+  OPENAI_STORY_MODEL: gpt-4o
+  OPENAI_MODERATION_MODEL: gpt-4o-mini
 
 jobs:
   deploy:
@@ -38,6 +55,58 @@ jobs:
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
+
+      # Sunucuya dokunmadan ÖNCE: seçili sağlayıcının anahtarı var mı ve model
+      # adları o anahtarla gerçekten açılıyor mu? (GET /models — token harcamaz.)
+      # Eksik/geçersiz anahtarla dağıtım yapılmaz; canlı sunucu olduğu gibi kalır.
+      - name: LLM sağlayıcı anahtarını seç ve doğrula
+        id: llm
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.AI_API_KEY }}
+        run: |
+          set -euo pipefail
+          case "$AI_VENDOR" in
+            anthropic)
+              KEY="$ANTHROPIC_API_KEY"; SECRET_NAME="ANTHROPIC_API_KEY"
+              STORY_MODEL="$ANTHROPIC_STORY_MODEL"; MOD_MODEL="$ANTHROPIC_MODERATION_MODEL"
+              PROVIDER="anthropic"; MOD_PROVIDER="llm" ;;
+            openai)
+              KEY="$OPENAI_API_KEY"; SECRET_NAME="AI_API_KEY"
+              STORY_MODEL="$OPENAI_STORY_MODEL"; MOD_MODEL="$OPENAI_MODERATION_MODEL"
+              PROVIDER="openai"; MOD_PROVIDER="openai" ;;
+            *) echo "::error::AI_VENDOR geçersiz: $AI_VENDOR (anthropic | openai)"; exit 1 ;;
+          esac
+          if [ -z "$KEY" ]; then
+            echo "::error::GitHub Secrets'ta $SECRET_NAME yok ya da boş. github.com/${GITHUB_REPOSITORY} → Settings → Secrets and variables → Actions → New repository secret → Name: $SECRET_NAME. Nasıl alınır: docs/deploy-server.md, Adım 7."
+            exit 1
+          fi
+          check_model() {
+            local model="$1" code
+            if [ "$AI_VENDOR" = anthropic ]; then
+              code=$(curl -sS -o /tmp/model.json -w '%{http_code}' \
+                -H "x-api-key: $KEY" -H "anthropic-version: 2023-06-01" \
+                "https://api.anthropic.com/v1/models/$model")
+            else
+              code=$(curl -sS -o /tmp/model.json -w '%{http_code}' \
+                -H "Authorization: Bearer $KEY" "https://api.openai.com/v1/models/$model")
+            fi
+            case "$code" in
+              200) echo "✓ $model bu anahtarla erişilebilir" ;;
+              401|403) echo "::error::$SECRET_NAME anahtarı reddedildi (HTTP $code). Anahtarı yeniden oluşturup secret'ı güncelle."; exit 1 ;;
+              404) echo "::error::Model bulunamadı: $model (HTTP 404). Workflow'daki model adını kontrol et."; exit 1 ;;
+              *) echo "::error::Model kontrolü başarısız: $model → HTTP $code: $(head -c 300 /tmp/model.json)"; exit 1 ;;
+            esac
+          }
+          check_model "$STORY_MODEL"
+          check_model "$MOD_MODEL"
+          {
+            echo "provider=$PROVIDER"
+            echo "mod_provider=$MOD_PROVIDER"
+            echo "story_model=$STORY_MODEL"
+            echo "mod_model=$MOD_MODEL"
+          } >> "$GITHUB_OUTPUT"
+          echo "LLM: $PROVIDER / $STORY_MODEL (denetim: $MOD_PROVIDER / $MOD_MODEL)"
 
       - name: SSH anahtarını hazırla
         run: |
@@ -56,15 +125,23 @@ jobs:
       - name: Sunucu hazırlığı (.env üretimi, ilk seferde)
         run: ssh "$SERVER" 'bash /opt/masalim/app/deploy/remote-setup.sh'
 
-      - name: Sağlayıcı anahtarlarını yaz
+      # providers.env her dağıtımda yeniden yazılır ve compose'da /opt/masalim/.env
+      # dosyasından SONRA yüklenir → buradaki sağlayıcı seçimi .env'dekini ezer
+      # (.env yalnızca ilk kurulumda üretilir, bkz. deploy/remote-setup.sh).
+      - name: Sağlayıcı seçimini ve anahtarlarını yaz
         env:
-          AI_API_KEY: ${{ secrets.AI_API_KEY }}
+          LLM_KEY: ${{ env.AI_VENDOR == 'anthropic' && secrets.ANTHROPIC_API_KEY || secrets.AI_API_KEY }}
           TTS_API_KEY: ${{ secrets.TTS_API_KEY }}
           VOICE_CLONE_API_KEY: ${{ secrets.VOICE_CLONE_API_KEY }}
           IMAGE_API_KEY: ${{ secrets.IMAGE_API_KEY }}
         run: |
           {
-            echo "AI_API_KEY=$AI_API_KEY"
+            echo "AI_PROVIDER=${{ steps.llm.outputs.provider }}"
+            echo "AI_MODEL=${{ steps.llm.outputs.story_model }}"
+            echo "AI_EFFORT=$ANTHROPIC_EFFORT"
+            echo "MODERATION_PROVIDER=${{ steps.llm.outputs.mod_provider }}"
+            echo "MODERATION_MODEL=${{ steps.llm.outputs.mod_model }}"
+            echo "AI_API_KEY=$LLM_KEY"
             echo "TTS_API_KEY=$TTS_API_KEY"
             echo "VOICE_CLONE_API_KEY=$VOICE_CLONE_API_KEY"
             echo "IMAGE_API_KEY=$IMAGE_API_KEY"
@@ -112,3 +189,10 @@ jobs:
           curl --retry 40 --retry-delay 10 --retry-all-errors -fsS "$API_URL/health"
           echo
           echo "API canlı: $API_URL"
+          echo "LLM: ${{ steps.llm.outputs.provider }} / ${{ steps.llm.outputs.story_model }} — denetim: ${{ steps.llm.outputs.mod_provider }} / ${{ steps.llm.outputs.mod_model }}"
+
+      # İsteğe bağlı uçtan uca kanıt: canlı API'de taze bir hesapla KISA masal
+      # üretilir ve sonucu (başlık, sayfa sayısı, çizim yönergesi) log'a yazılır.
+      - name: Canlı masal üretimi (story_smoke)
+        if: github.event_name == 'workflow_dispatch' && inputs.story_smoke
+        run: bash deploy/smoke-story.sh "$API_URL"
