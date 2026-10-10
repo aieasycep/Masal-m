@@ -1,5 +1,5 @@
 import { createHmac, randomBytes, randomUUID } from 'node:crypto';
-import { promises as fs } from 'node:fs';
+import { promises as fs, type Dirent } from 'node:fs';
 import path from 'node:path';
 import { SIGNED_URL_DEFAULT_TTL_SECONDS } from '@masalim/types';
 import type {
@@ -152,7 +152,7 @@ export class LocalStorageProvider implements StorageProvider {
     const stack = [startDir];
     while (stack.length > 0) {
       const dir = stack.pop() as string;
-      let entries: import('node:fs').Dirent[];
+      let entries: Dirent[];
       try {
         entries = await fs.readdir(dir, { withFileTypes: true });
       } catch {
