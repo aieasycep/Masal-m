@@ -128,7 +128,11 @@ jobs:
           # `latest` imajının kendi sürüm damgası = quay.io'da kesin var olan bir RELEASE etiketi.
           for repo in minio/minio minio/mc; do
             printf 'quay.io/%s:latest sürümü: ' "$repo"
-            docker run --rm "quay.io/$repo:latest" --version 2>&1 | head -n 1 || true
+            if docker pull -q "quay.io/$repo:latest" >/dev/null 2>&1; then
+              docker run --rm "quay.io/$repo:latest" --version 2>&1 | grep -m1 -i 'version' || echo '(sürüm satırı yok)'
+            else
+              echo '(latest çekilemedi)'
+            fi
           done
           docker manifest inspect postgres:16-alpine >/dev/null && echo "manifest inspect çalışıyor (postgres:16-alpine)" || true
           for img in $(grep -hE '^\s*image:\s*quay.io/minio/' deploy/docker-compose.server.yml | awk '{print $2}'); do
