@@ -121,14 +121,17 @@ jobs:
           echo "✓ compose dosyaları geçerli"
 
       # Bilgi: en yeni MinIO/mc sürümleri (etiket sabitlerken bak); asla düşürmez.
-      - name: Newest MinIO/mc releases (info)
+      # Bilgi: MinIO imajları artık yalnızca quay.io'da (Docker Hub deposu kaldırıldı);
+      # etiket sabitlerken buradaki listeye bak. Bu adım asla düşürmez.
+      - name: Newest MinIO/mc releases on quay.io (info)
         run: |
-          docker run --rm minio/minio:latest --version 2>&1 | head -n 2 || true
-          docker run --rm minio/mc:latest --version 2>&1 | head -n 2 || true
-          curl -sS --max-time 20 "https://hub.docker.com/v2/repositories/minio/minio/tags/?page_size=3&ordering=last_updated" | head -c 600 || true
-          echo
+          for repo in minio/minio minio/mc; do
+            printf 'quay.io/%s etiketleri: ' "$repo"
+            curl -sS --max-time 20 "https://quay.io/api/v1/repository/$repo/tag/?limit=6&onlyActiveTags=true" \
+              | python3 -c "import sys,json;print(', '.join(t['name'] for t in json.load(sys.stdin).get('tags',[])))" || echo '?'
+          done
           docker manifest inspect postgres:16-alpine >/dev/null && echo "manifest inspect çalışıyor (postgres:16-alpine)" || true
-          for img in $(grep -hE '^\s*image:\s*minio/' deploy/docker-compose.server.yml | awk '{print $2}'); do
+          for img in $(grep -hE '^\s*image:\s*quay.io/minio/' deploy/docker-compose.server.yml | awk '{print $2}'); do
             docker manifest inspect "$img" >/dev/null 2>/tmp/mi.err && echo "✓ $img" || echo "✗ $img: $(tr '\n' ' ' </tmp/mi.err | head -c 200)"
           done
 
@@ -145,7 +148,6 @@ jobs:
             docker manifest inspect "$img" >/dev/null
             echo "✓ $img"
           done
-          echo "Bilgi — güncel MinIO sürümü: $(docker run --rm minio/minio:latest --version 2>/dev/null | head -n1 || echo '?')"
 
       - name: Nginx template renders and parses
         run: |
