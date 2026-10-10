@@ -1,5 +1,6 @@
 import { Controller, Get, Header, Param, Sse, MessageEvent } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
+import { Throttle, seconds } from '@nestjs/throttler';
 import {
   defer,
   endWith,
@@ -40,6 +41,10 @@ export class JobsController {
     private readonly jobEvents: JobEventsService,
   ) {}
 
+  // Ownership-checked single-row read that the app polls every 3s per active
+  // job (SSE fallback): the global 120/min budget would starve a user who has
+  // a story, narration and illustration set in flight at once.
+  @Throttle({ default: { ttl: seconds(60), limit: 300 } })
   @Get(':id')
   async get(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string): Promise<AIJob> {
     const row = await this.jobsService.getOwned(user.id, id);

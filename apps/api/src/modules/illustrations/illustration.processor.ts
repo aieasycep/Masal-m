@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import {
   Inject,
   Injectable,
@@ -31,6 +32,13 @@ type SetWithStory = Prisma.IllustrationSetGetPayload<{
     illustrations: true;
   };
 }>;
+
+/**
+ * Placeholder imageKey older builds wrote before the upload finished. Rows
+ * are now created only after the image is in storage, so any such row is a
+ * leftover of an interrupted attempt and is removed before continuing.
+ */
+export const PENDING_IMAGE_KEY = 'pending';
 
 /**
  * Illustration worker (§26–§27): character-sheet-first. Step 1 renders the
@@ -124,6 +132,27 @@ export class IllustrationProcessor implements OnModuleInit, OnApplicationShutdow
       doneUnits += 1;
       await this.jobs.setProgress(aiJob.id, Math.round((doneUnits / totalUnits) * 97));
     };
+    // Images the provider actually rendered in THIS attempt (what the usage log bills).
+    let generatedUnits = 0;
+    const logUsage = (success: boolean) =>
+      this.prisma.aIUsageLog
+        .create({
+          data: {
+            userId: story.userId,
+            jobId: aiJob.id,
+            provider: this.imageAi.name,
+            type: 'ILLUSTRATION_GENERATION',
+            success,
+            units: generatedUnits,
+          },
+        })
+        .catch((error: unknown) => this.logger.warn({ err: error }, 'usage log write failed'));
+
+    // Rows without a stored image (interrupted older attempts) would otherwise
+    // count as finished targets and ship a READY set with a hole in it.
+    await this.prisma.illustration.deleteMany({
+      where: { illustrationSetId: set.id, imageKey: PENDING_IMAGE_KEY },
+    });
 
     try {
       // 1. Character sheet → provider reference reused by every later call.
@@ -136,6 +165,7 @@ export class IllustrationProcessor implements OnModuleInit, OnApplicationShutdow
           quality: 'standard',
           isCharacterSheet: true,
         });
+        generatedUnits += 1;
         characterRef = sheet.characterRef ?? null;
         await this.prisma.illustrationSet.update({
           where: { id: set.id },
@@ -145,11 +175,16 @@ export class IllustrationProcessor implements OnModuleInit, OnApplicationShutdow
       await tick();
 
       // 2. Cover (skip targets that already exist — retries stay idempotent).
-      const existingTargets = new Set(set.illustrations.map((item) => item.storyPageId ?? 'cover'));
+      const existingTargets = new Set(
+        set.illustrations
+          .filter((item) => item.imageKey !== PENDING_IMAGE_KEY)
+          .map((item) => item.storyPageId ?? 'cover'),
+      );
       if (!existingTargets.has('cover')) {
         const coverPrompt =
           story.coverIllustrationPrompt ?? `book cover illustration for the story "${story.title}"`;
         await this.renderTarget(set.id, story, null, coverPrompt, set.style, bible, characterRef);
+        generatedUnits += 1;
       }
       await tick();
 
@@ -158,6 +193,7 @@ export class IllustrationProcessor implements OnModuleInit, OnApplicationShutdow
         if (!existingTargets.has(page.id)) {
           const prompt = page.illustrationPrompt ?? `illustration of: ${page.text.slice(0, 240)}`;
           await this.renderTarget(set.id, story, page.id, prompt, set.style, bible, characterRef);
+          generatedUnits += 1;
         }
         await tick();
       }
@@ -166,16 +202,7 @@ export class IllustrationProcessor implements OnModuleInit, OnApplicationShutdow
         where: { id: set.id },
         data: { status: IllustrationSetStatus.READY },
       });
-      await this.prisma.aIUsageLog.create({
-        data: {
-          userId: story.userId,
-          jobId: aiJob.id,
-          provider: this.imageAi.name,
-          type: 'ILLUSTRATION_GENERATION',
-          success: true,
-          units: totalUnits,
-        },
-      });
+      await logUsage(true);
       await this.jobs.complete(aiJob.id, set.id);
       await this.notifications.notify(
         story.userId,
@@ -185,6 +212,7 @@ export class IllustrationProcessor implements OnModuleInit, OnApplicationShutdow
         { storyId: story.id, illustrationSetId: set.id },
       );
     } catch (error) {
+      await logUsage(false);
       const isLastAttempt = job.attemptsMade + 1 >= (job.opts.attempts ?? 1);
       if (isLastAttempt) {
         await this.prisma.illustrationSet.update({
@@ -272,40 +300,31 @@ export class IllustrationProcessor implements OnModuleInit, OnApplicationShutdow
       characterRef: characterRef ?? undefined,
       quality: 'standard',
     });
-    const row = await this.prisma.illustration.create({
-      data: {
-        illustrationSetId: setId,
-        storyPageId,
-        imageKey: 'pending',
-        prompt,
-        selected: false,
-      },
-    });
-    const imageKey = StorageKeys.illustration(story.userId, story.id, row.id);
+    // Upload first, then one atomic write: the row only ever exists with a
+    // real image behind it, so an interrupted attempt leaves nothing half-done
+    // (an orphaned object in storage at worst).
+    const id = randomUUID();
+    const imageKey = StorageKeys.illustration(story.userId, story.id, id);
     await this.storage.putObject(imageKey, image.image, image.contentType);
-    await this.prisma.illustration.update({ where: { id: row.id }, data: { imageKey } });
-    if (select) {
+    await this.prisma.$transaction([
+      this.prisma.illustration.create({
+        data: { id, illustrationSetId: setId, storyPageId, imageKey, prompt, selected: select },
+      }),
       // First render of a target becomes the selected image for reader/book.
-      if (storyPageId != null) {
-        await this.prisma.illustration.update({
-          where: { id: row.id },
-          data: { selected: true },
-        });
-        await this.prisma.storyPage.update({
-          where: { id: storyPageId },
-          data: { illustrationKey: imageKey },
-        });
-      } else {
-        await this.prisma.illustration.update({
-          where: { id: row.id },
-          data: { selected: true },
-        });
-        await this.prisma.story.update({
-          where: { id: story.id },
-          data: { coverImageKey: imageKey },
-        });
-      }
-    }
+      ...(select
+        ? [
+            storyPageId != null
+              ? this.prisma.storyPage.update({
+                  where: { id: storyPageId },
+                  data: { illustrationKey: imageKey },
+                })
+              : this.prisma.story.update({
+                  where: { id: story.id },
+                  data: { coverImageKey: imageKey },
+                }),
+          ]
+        : []),
+    ]);
   }
 
   async onApplicationShutdown(): Promise<void> {

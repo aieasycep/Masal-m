@@ -18,6 +18,14 @@ export const DEFAULT_ANTHROPIC_FAST_MODEL = 'claude-haiku-5-5';
  */
 export const FAST_CLIENT_OPTIONS = { timeout: 30_000, maxRetries: 1 } as const;
 
+/**
+ * Story-writer client options: a 16k-token non-streaming Opus call (thinking
+ * included) can sit close to the SDK's 10-minute default, so the ceiling is
+ * raised and transient failures get two SDK-level retries before the job's
+ * own retry (which would bill the whole generation again) kicks in.
+ */
+export const STORY_CLIENT_OPTIONS = { timeout: 15 * 60_000, maxRetries: 2 } as const;
+
 // Models that reject the `effort` parameter: everything before the 4.5
 // generation plus Haiku 4.5 / Sonnet 4.5 (Opus 4.5 and the 4.6+ line accept
 // it). Listed explicitly — a loose prefix once swallowed Sonnet 4.6, which

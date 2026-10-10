@@ -6,6 +6,7 @@ import {
   type AnthropicEffort,
   DEFAULT_ANTHROPIC_STORY_MODEL,
   effortConfig,
+  STORY_CLIENT_OPTIONS,
   textOf,
 } from '../shared/anthropic';
 import {
@@ -70,7 +71,7 @@ export class AnthropicStoryProvider implements StoryGenerationProvider {
   private readonly effort: AnthropicEffort;
 
   constructor(config: AnthropicStoryProviderConfig) {
-    this.client = new Anthropic({ apiKey: config.apiKey });
+    this.client = new Anthropic({ apiKey: config.apiKey, ...STORY_CLIENT_OPTIONS });
     this.model = config.model ?? DEFAULT_ANTHROPIC_STORY_MODEL;
     this.effort = config.effort ?? 'medium';
   }

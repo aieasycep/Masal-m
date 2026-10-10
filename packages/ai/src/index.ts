@@ -11,6 +11,7 @@ export { buildSystemPrompt, buildUserPrompt, UNSAFE_SENTINEL } from './story/pro
 export { AnthropicStoryProvider } from './story/anthropic-provider';
 export { OpenAIStoryProvider } from './story/openai-provider';
 export { MockStoryProvider } from './story/mock-provider';
+export { normalizeGeneratedStory, MAX_PAGE_TEXT_CHARS } from './story/normalize';
 
 // Moderation
 export * from './moderation/types';
@@ -18,6 +19,11 @@ export { LlmContentModerator } from './moderation/llm-moderator';
 export { OpenAIContentModerator } from './moderation/openai-moderator';
 export { MockContentModerator } from './moderation/mock-moderator';
 export { hitsBlocklist } from './moderation/blocklist';
+export {
+  MODERATION_TEXT_WINDOW,
+  moderateWindows,
+  splitForModeration,
+} from './moderation/classifier';
 
 // Text to speech
 export * from './tts/types';

@@ -6,7 +6,7 @@ import {
   textOf,
 } from '../shared/anthropic';
 import { hitsBlocklist } from './blocklist';
-import { CLASSIFIER_SYSTEM, MODERATION_TEXT_WINDOW, parseVerdict } from './classifier';
+import { CLASSIFIER_SYSTEM, moderateWindows, parseVerdict, splitForModeration } from './classifier';
 import type { ContentModerator, ModerationVerdict } from './types';
 
 export interface LlmModeratorConfig {
@@ -38,8 +38,10 @@ export class LlmContentModerator implements ContentModerator {
 
   async checkStoryText(text: string, language: 'tr' | 'en'): Promise<ModerationVerdict> {
     if (hitsBlocklist(text)) return { safe: false, category: 'blocklist' };
-    return this.classify(
-      `Generated children's story (${language}):\n${text.slice(0, MODERATION_TEXT_WINDOW)}`,
+    // Every character is classified: long stories go through sentence-bounded
+    // windows instead of a single truncating slice.
+    return moderateWindows(splitForModeration(text), (window) =>
+      this.classify(`Generated children's story (${language}):\n${window}`),
     );
   }
 

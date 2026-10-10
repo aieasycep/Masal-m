@@ -91,16 +91,39 @@ describe('LlmContentModerator', () => {
     expect(create).not.toHaveBeenCalled();
   });
 
-  it('sends a whole LONG story (≈10.5k chars) and caps at the 20k window', async () => {
-    create.mockResolvedValueOnce(reply('SAFE')).mockResolvedValueOnce(reply('SAFE'));
+  it('sends a whole LONG story (≈10.5k chars) in one call and windows anything beyond 20k', async () => {
+    create
+      .mockResolvedValueOnce(reply('SAFE'))
+      .mockResolvedValueOnce(reply('SAFE'))
+      .mockResolvedValueOnce(reply('SAFE'));
     const moderator = new LlmContentModerator({ apiKey: 'k' });
 
     await moderator.checkStoryText('a'.repeat(10_500), 'en');
-    await moderator.checkStoryText('b'.repeat(25_000), 'en');
+    const sentence = 'b'.repeat(999) + '. ';
+    const long = sentence.repeat(25); // ≈25k chars → two sentence-bounded windows
+    await moderator.checkStoryText(long, 'en');
 
+    expect(create).toHaveBeenCalledTimes(3);
     const whole = create.mock.calls[0]![0].messages[0].content as string;
-    const capped = create.mock.calls[1]![0].messages[0].content as string;
     expect(whole.length).toBeGreaterThan(10_500);
-    expect(capped.length).toBeLessThan(20_100);
+    const prefix = "Generated children's story (en):\n";
+    const windows = create.mock.calls
+      .slice(1)
+      .map((call) => (call[0].messages[0].content as string).slice(prefix.length));
+    expect(windows.every((window) => window.length <= 20_000)).toBe(true);
+    expect(windows.join('')).toBe(long); // nothing is dropped any more
+  });
+
+  it('reports the first unsafe window without sending the rest', async () => {
+    create.mockResolvedValueOnce(reply('SAFE')).mockResolvedValueOnce(reply('UNSAFE:violence'));
+    const moderator = new LlmContentModerator({ apiKey: 'k' });
+    const sentence = 'c'.repeat(999) + '. ';
+    const long = sentence.repeat(45); // three windows
+
+    await expect(moderator.checkStoryText(long, 'en')).resolves.toEqual({
+      safe: false,
+      category: 'violence',
+    });
+    expect(create).toHaveBeenCalledTimes(2);
   });
 });

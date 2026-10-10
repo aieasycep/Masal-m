@@ -26,6 +26,12 @@ import { StoriesService } from '../stories/stories.service';
 /** Ledger ref type for per-attempt regenerate spends (refId = `${illustrationId}:${uuid}`). */
 export const REGENERATE_CREDIT_REF_TYPE = 'illustration_regen';
 
+/**
+ * Placeholder imageKey of rows older worker builds created before uploading;
+ * the processor deletes them on its next attempt — never show them meanwhile.
+ */
+const PENDING_IMAGE_KEY = 'pending';
+
 type SetWithIllustrations = Prisma.IllustrationSetGetPayload<{
   include: { illustrations: true };
 }>;
@@ -240,7 +246,8 @@ export class IllustrationsService {
     pageCount: number,
     _userId: string,
   ): Promise<IllustrationSetDto> {
-    const targetsDone = new Set(set.illustrations.map((item) => item.storyPageId ?? 'cover')).size;
+    const items = set.illustrations.filter((item) => item.imageKey !== PENDING_IMAGE_KEY);
+    const targetsDone = new Set(items.map((item) => item.storyPageId ?? 'cover')).size;
     return {
       id: set.id,
       storyId: set.storyId,
@@ -248,7 +255,7 @@ export class IllustrationsService {
       style: set.style,
       status: set.status,
       progress: { completed: targetsDone, total: pageCount + 1 },
-      illustrations: await Promise.all(set.illustrations.map((item) => this.illustrationDto(item))),
+      illustrations: await Promise.all(items.map((item) => this.illustrationDto(item))),
       createdAt: set.createdAt.toISOString(),
       jobId: await this.activeJobFor(set.id),
     };

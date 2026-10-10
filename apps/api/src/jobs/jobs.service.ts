@@ -3,7 +3,7 @@ import { Queue, JobsOptions } from 'bullmq';
 import type Redis from 'ioredis';
 import { AIJobStatus, AIJobType, ErrorCode } from '@masalim/types';
 import type { AIJob as AIJobDto, JobStreamEvent } from '@masalim/validation';
-import type { AIJob as AIJobRow, Prisma } from '@masalim/database';
+import { Prisma, type AIJob as AIJobRow } from '@masalim/database';
 import { PrismaService } from '../prisma/prisma.service';
 import { AppException } from '../common/errors/app.exception';
 import { REDIS } from '../redis/redis.module';
@@ -14,6 +14,9 @@ const JOB_CHANNEL_PREFIX = 'masalim:job-events:';
 export function jobChannel(aiJobId: string): string {
   return `${JOB_CHANNEL_PREFIX}${aiJobId}`;
 }
+
+const isUniqueViolation = (error: unknown): boolean =>
+  error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002';
 
 const DEFAULT_JOB_OPTIONS: JobsOptions = {
   attempts: 3,
@@ -80,22 +83,60 @@ export class JobsService implements OnApplicationShutdown {
         data: { queueJobId: null },
       });
     }
-    const row = await this.prisma.aIJob.create({
-      data: {
-        userId: input.userId,
-        type: input.type,
-        entityId: input.entityId,
-        status: AIJobStatus.QUEUED,
-        payload: input.payload ?? {},
-        queueJobId: input.queueJobId,
-      },
-    });
+    let row: AIJobRow;
+    try {
+      row = await this.prisma.aIJob.create({
+        data: {
+          userId: input.userId,
+          type: input.type,
+          entityId: input.entityId,
+          status: AIJobStatus.QUEUED,
+          payload: input.payload ?? {},
+          queueJobId: input.queueJobId,
+        },
+      });
+    } catch (error) {
+      // Two callers raced past the read above (double tap, parallel clients):
+      // the unique key picks one winner, the loser returns the winner's job.
+      if (!isUniqueViolation(error)) throw error;
+      const winner = await this.prisma.aIJob.findUnique({
+        where: { queueJobId: input.queueJobId },
+      });
+      if (
+        winner != null &&
+        (winner.status === AIJobStatus.QUEUED || winner.status === AIJobStatus.RUNNING)
+      ) {
+        return winner;
+      }
+      throw error;
+    }
 
     const queueName = QUEUE_FOR_JOB_TYPE[input.type];
     const data: QueueJobData = { aiJobId: row.id };
     // BullMQ retains terminal jobs for a while, so the queue-level id is the
     // (unique) AIJob row id; concurrent dedupe happens app-level above.
-    await this.getQueue(queueName).add(queueName, data, { jobId: row.id });
+    try {
+      await this.getQueue(queueName).add(queueName, data, { jobId: row.id });
+    } catch (error) {
+      // A row that never reached the queue must not look like a live job to
+      // the dedupe read above (it would swallow every later submit).
+      await this.prisma.aIJob
+        .update({
+          where: { id: row.id },
+          data: {
+            status: AIJobStatus.FAILED,
+            errorCode: ErrorCode.INTERNAL,
+            errorMessage: 'enqueue failed',
+          },
+        })
+        .catch((updateError: unknown) =>
+          this.logger.error(
+            { err: updateError, aiJobId: row.id },
+            'could not mark enqueue failure',
+          ),
+        );
+      throw error;
+    }
     return row;
   }
 
@@ -163,6 +204,8 @@ export class JobsService implements OnApplicationShutdown {
   }
 
   async onApplicationShutdown(): Promise<void> {
-    await Promise.all([...this.queues.values()].map((queue) => queue.close().catch(() => undefined)));
+    await Promise.all(
+      [...this.queues.values()].map((queue) => queue.close().catch(() => undefined)),
+    );
   }
 }

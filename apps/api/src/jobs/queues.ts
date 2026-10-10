@@ -10,6 +10,8 @@ export const QueueName = {
   PRINT_FILE: 'print-file',
   ORDER_SNAPSHOT: 'order-snapshot',
   DELETION: 'deletion',
+  /** Scheduled housekeeping (auth-row pruning, push receipts, orphan sweeps) — no AIJob mirror. */
+  MAINTENANCE: 'maintenance',
 } as const;
 export type QueueName = (typeof QueueName)[keyof typeof QueueName];
 

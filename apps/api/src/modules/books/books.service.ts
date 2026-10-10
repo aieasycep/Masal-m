@@ -1,5 +1,5 @@
 import { HttpStatus, Inject, Injectable } from '@nestjs/common';
-import { AIJobType, BookStatus, ErrorCode, StoryStatus } from '@masalim/types';
+import { AIJobType, BookStatus, EntitlementKey, ErrorCode, StoryStatus } from '@masalim/types';
 import type { StorageProvider } from '@masalim/storage';
 import type {
   Book as BookDto,
@@ -13,6 +13,7 @@ import { AppException } from '../../common/errors/app.exception';
 import { STORAGE } from '../../providers/providers.module';
 import { JobsService } from '../../jobs/jobs.service';
 import { StoriesService } from '../stories/stories.service';
+import { EntitlementService } from '../subscription/entitlement.service';
 
 type BookWithPages = Prisma.BookGetPayload<{ include: { pages: true } }>;
 
@@ -26,6 +27,7 @@ export class BooksService {
     private readonly prisma: PrismaService,
     private readonly jobs: JobsService,
     private readonly stories: StoriesService,
+    private readonly entitlements: EntitlementService,
     @Inject(STORAGE) private readonly storage: StorageProvider,
   ) {}
 
@@ -165,6 +167,12 @@ export class BooksService {
           },
         });
       }
+      // Any edit invalidates the rendered print file: ordering requires a
+      // printPdfKey, so an edited book has to be rendered again first.
+      await tx.book.update({
+        where: { id: bookId },
+        data: { printPdfKey: null, status: BookStatus.DRAFT },
+      });
     });
 
     const updated = await this.findOwned(userId, bookId);
@@ -193,25 +201,38 @@ export class BooksService {
     });
   }
 
-  /** Render job (§32): digital preview or the 206mm/300DPI print PDF. */
-  async render(
-    userId: string,
-    bookId: string,
-    input: RenderBookInput,
-  ): Promise<{ jobId: string }> {
+  /**
+   * Render job (§32): digital preview (free) or the 206mm/300DPI print PDF
+   * (Premium — `hd_book_export`). The queue key is stable per (book, kind) so
+   * a double tap joins the running job instead of rendering twice; it is not
+   * tied to `updatedAt`, which the RENDERING write itself moves.
+   */
+  async render(userId: string, bookId: string, input: RenderBookInput): Promise<{ jobId: string }> {
     const book = await this.findOwned(userId, bookId);
+    if (input.kind === 'print_pdf') {
+      await this.entitlements.requireFeature(userId, EntitlementKey.HD_BOOK_EXPORT);
+    }
+    const previousStatus = book.status;
     await this.prisma.book.update({
       where: { id: book.id },
       data: { status: BookStatus.RENDERING },
     });
-    const job = await this.jobs.enqueue({
-      userId,
-      type: AIJobType.BOOK_RENDER,
-      entityId: book.id,
-      queueJobId: `book:${book.id}:render:${input.kind}:${book.updatedAt.getTime()}`,
-      payload: { kind: input.kind },
-    });
-    return { jobId: job.id };
+    try {
+      const job = await this.jobs.enqueue({
+        userId,
+        type: AIJobType.BOOK_RENDER,
+        entityId: book.id,
+        queueJobId: `book:${book.id}:render:${input.kind}`,
+        payload: { kind: input.kind },
+      });
+      return { jobId: job.id };
+    } catch (error) {
+      // No job exists, so nothing would ever move the book out of RENDERING.
+      await this.prisma.book
+        .update({ where: { id: book.id }, data: { status: previousStatus } })
+        .catch(() => undefined);
+      throw error;
+    }
   }
 
   async findOwned(userId: string, bookId: string): Promise<BookWithPages> {
@@ -232,9 +253,7 @@ export class BooksService {
       title: row.title,
       subtitle: row.subtitle,
       dedication: row.dedication,
-      coverImageUrl: row.coverImageKey
-        ? await this.storage.getSignedUrl(row.coverImageKey)
-        : null,
+      coverImageUrl: row.coverImageKey ? await this.storage.getSignedUrl(row.coverImageKey) : null,
       coverIllustrationId: row.coverIllustrationId,
       coverPalette: row.coverPalette,
       backCoverText: row.backCoverText,
