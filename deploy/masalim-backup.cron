@@ -1,0 +1,5 @@
+# Masalım — gece yedeği (deploy/backup.sh). Deploy workflow bu dosyayı
+# /etc/cron.d/masalim-backup olarak kurar. Log: /var/log/masalim-backup.log
+SHELL=/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+30 3 * * * root /opt/masalim/app/deploy/backup.sh >> /var/log/masalim-backup.log 2>&1

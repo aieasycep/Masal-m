@@ -24,12 +24,21 @@ export type LoginInput = z.infer<typeof loginSchema>;
 
 export const appleAuthSchema = z.object({
   identityToken: z.string().min(10),
-  /** Raw nonce used when requesting the credential (hashed nonce lives inside the token). */
-  nonce: z.string().min(1).max(256).optional(),
+  /**
+   * Server-issued raw nonce (`POST /auth/apple/nonce`). The client sends Apple
+   * its SHA-256 hex; the token carries that hash and the server re-derives it.
+   * Required: a token without a live nonce is a replay.
+   */
+  nonce: z.string().min(16).max(256),
   /** Apple only provides the name on the FIRST authorization — client forwards it once. */
   fullName: personNameSchema.optional(),
 });
 export type AppleAuthInput = z.infer<typeof appleAuthSchema>;
+
+export const appleNonceResponseSchema = z.object({
+  nonce: z.string().min(16),
+});
+export type AppleNonceResponse = z.infer<typeof appleNonceResponseSchema>;
 
 export const googleAuthSchema = z.object({
   idToken: z.string().min(10),
@@ -57,6 +66,27 @@ export const resetPasswordSchema = z.object({
   newPassword: passwordSchema,
 });
 export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>;
+
+/** E-mail verification (active only while the server mails for real). */
+export const verifyEmailSchema = z.object({
+  code: z.string().length(6).regex(/^\d+$/),
+});
+export type VerifyEmailInput = z.infer<typeof verifyEmailSchema>;
+
+export const emailVerificationSendResponseSchema = z.object({
+  /** false = nothing to do (already verified, or verification is off). */
+  sent: z.boolean(),
+  /** Seconds until another code may be requested. */
+  cooldownSeconds: z.number().int().min(0),
+});
+export type EmailVerificationSendResponse = z.infer<typeof emailVerificationSendResponseSchema>;
+
+export const verifyEmailResponseSchema = z.object({
+  verified: z.literal(true),
+  /** Whether this verification released the signup gift credits. */
+  giftGranted: z.boolean(),
+});
+export type VerifyEmailResponse = z.infer<typeof verifyEmailResponseSchema>;
 
 export const authTokensSchema = z.object({
   accessToken: z.string(),

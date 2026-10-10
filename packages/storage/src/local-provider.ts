@@ -2,7 +2,15 @@ import { createHmac, randomBytes, randomUUID } from 'node:crypto';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { SIGNED_URL_DEFAULT_TTL_SECONDS } from '@masalim/types';
-import type { SignedUpload, StorageConfig, StorageObjectMeta, StorageProvider } from './types';
+import type {
+  SignedUpload,
+  StorageConfig,
+  StorageObjectEntry,
+  StorageObjectMeta,
+  StorageProvider,
+} from './types';
+
+const META_SUFFIX = '.meta.json';
 
 /**
  * Local-disk storage for development without MinIO/S3. Objects live under
@@ -69,7 +77,7 @@ export class LocalStorageProvider implements StorageProvider {
   }
 
   private metaPath(objectKey: string): string {
-    return `${this.filePath(objectKey)}.meta.json`;
+    return `${this.filePath(objectKey)}${META_SUFFIX}`;
   }
 
   async createSignedUpload(input: {
@@ -128,6 +136,41 @@ export class LocalStorageProvider implements StorageProvider {
 
   async deletePrefix(prefix: string): Promise<void> {
     await fs.rm(this.filePath(prefix), { recursive: true, force: true });
+  }
+
+  /**
+   * Prefixes are key prefixes, not directories (`users/ab` matches `users/abc/x`):
+   * walk from the deepest directory that can contain matches and filter by key.
+   */
+  async *listObjects(prefix: string): AsyncIterable<StorageObjectEntry> {
+    const startDir =
+      prefix === '' || prefix.endsWith('/')
+        ? prefix === ''
+          ? this.rootDir
+          : this.filePath(prefix)
+        : path.dirname(this.filePath(prefix));
+    const stack = [startDir];
+    while (stack.length > 0) {
+      const dir = stack.pop() as string;
+      let entries: import('node:fs').Dirent[];
+      try {
+        entries = await fs.readdir(dir, { withFileTypes: true });
+      } catch {
+        continue;
+      }
+      for (const entry of entries) {
+        const full = path.join(dir, entry.name);
+        if (entry.isDirectory()) {
+          stack.push(full);
+          continue;
+        }
+        if (!entry.isFile() || entry.name.endsWith(META_SUFFIX)) continue;
+        const key = path.relative(this.rootDir, full).split(path.sep).join('/');
+        if (!key.startsWith(prefix)) continue;
+        const stat = await fs.stat(full);
+        yield { key, size: stat.size, lastModified: stat.mtime };
+      }
+    }
   }
 
   async exists(objectKey: string): Promise<boolean> {

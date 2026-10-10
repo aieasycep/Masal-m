@@ -1,4 +1,4 @@
-import type { AgeRange, StoryDuration } from './enums';
+import type { AgeRange, OrderStatus, StoryDuration } from './enums';
 
 /** Domain constants — kept central so no magic numbers/strings spread through the codebase. */
 
@@ -8,7 +8,14 @@ export const VOICE_RECORDING = {
   MAX_DURATION_SECONDS: 90,
   TARGET_DURATION_SECONDS: 60,
   MAX_UPLOAD_BYTES: 25 * 1024 * 1024,
-  ACCEPTED_MIME_TYPES: ['audio/m4a', 'audio/x-m4a', 'audio/mp4', 'audio/aac', 'audio/wav', 'audio/mpeg'],
+  ACCEPTED_MIME_TYPES: [
+    'audio/m4a',
+    'audio/x-m4a',
+    'audio/mp4',
+    'audio/aac',
+    'audio/wav',
+    'audio/mpeg',
+  ],
 } as const;
 
 export const AVATAR_UPLOAD = {
@@ -17,7 +24,10 @@ export const AVATAR_UPLOAD = {
 } as const;
 
 /** Approximate spoken duration per target; drives page/word budgets in the prompt engine. */
-export const DURATION_TARGETS: Record<StoryDuration, { minutes: number; pages: number; wordsPerPage: number }> = {
+export const DURATION_TARGETS: Record<
+  StoryDuration,
+  { minutes: number; pages: number; wordsPerPage: number }
+> = {
   SHORT: { minutes: 3, pages: 6, wordsPerPage: 70 },
   MEDIUM: { minutes: 6, pages: 10, wordsPerPage: 85 },
   LONG: { minutes: 10, pages: 14, wordsPerPage: 100 },
@@ -49,3 +59,33 @@ export const DEEP_LINK = {
   SCHEME: 'masalim',
   WEB_HOST: 'masalim.app',
 } as const;
+
+/**
+ * Legal order status transitions (admin panel + processors). CANCELLED and
+ * REFUNDED are terminal; a refund is possible from any paid state.
+ */
+export const ORDER_STATUS_TRANSITIONS: Record<OrderStatus, readonly OrderStatus[]> = {
+  PENDING: ['PAID', 'CANCELLED'],
+  PAID: ['IN_PRODUCTION', 'CANCELLED', 'REFUNDED'],
+  IN_PRODUCTION: ['SHIPPED', 'REFUNDED'],
+  SHIPPED: ['DELIVERED', 'REFUNDED'],
+  DELIVERED: ['REFUNDED'],
+  CANCELLED: [],
+  REFUNDED: [],
+};
+
+/** E-mail verification codes (only enforced while the server mails for real). */
+export const EMAIL_VERIFICATION = {
+  CODE_TTL_SECONDS: 15 * 60,
+  RESEND_COOLDOWN_SECONDS: 60,
+  MAX_ATTEMPTS: 5,
+} as const;
+
+/** Oldest push tokens beyond this count are dropped on registration. */
+export const PUSH_DEVICES_PER_USER_MAX = 10;
+
+/** Cached narration chunks older than this are swept even if a retry never came. */
+export const NARRATION_CACHE_RETENTION_DAYS = 7;
+
+/** Client uploads that nothing references after this long are deleted. */
+export const ORPHAN_UPLOAD_GRACE_HOURS = 24;

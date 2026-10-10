@@ -39,10 +39,10 @@ export const meSchema = z.object({
   timezone: z.string().nullable(),
   onboardingCompleted: z.boolean(),
   subscriptionPlan: z.enum(['FREE', 'PREMIUM']),
+  /** True once the address was confirmed (always true for social-only accounts). */
+  emailVerified: z.boolean(),
   notificationPrefs: notificationPrefsSchema,
-  pendingDeletion: z
-    .object({ requestedAt: z.string(), effectiveAt: z.string() })
-    .nullable(),
+  pendingDeletion: z.object({ requestedAt: z.string(), effectiveAt: z.string() }).nullable(),
   createdAt: z.string(),
 });
 export type Me = z.infer<typeof meSchema>;

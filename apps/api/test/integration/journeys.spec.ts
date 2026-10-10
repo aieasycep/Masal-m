@@ -1,18 +1,9 @@
-import { Test } from '@nestjs/testing';
 import type { INestApplication } from '@nestjs/common';
-import request from 'supertest';
-import { AppModule } from '../../src/app.module';
+import type request from 'supertest';
 import { PrismaService } from '../../src/prisma/prisma.service';
+import { createApp, V, type Session, type TestApp } from './helpers';
 
 jest.setTimeout(120_000);
-
-const V = ['x-app-version', '0.1.0'] as const;
-
-interface Session {
-  token: string;
-  refresh: string;
-  userId: string;
-}
 
 /**
  * Integration journeys (§12) against the real module graph with mock
@@ -20,50 +11,19 @@ interface Session {
  * CI services) with migrations + seed applied.
  */
 describe('critical journeys (integration)', () => {
+  let testApp: TestApp;
   let app: INestApplication;
   let http: () => request.Agent;
-
-  const register = async (tag: string): Promise<Session> => {
-    const res = await http()
-      .post('/auth/register')
-      .set(...V)
-      .send({
-        email: `it-${tag}-${Date.now()}@test.local`,
-        password: 'parola-123456',
-        name: 'Test Ebeveyn',
-      })
-      .expect(201);
-    return {
-      token: res.body.tokens.accessToken,
-      refresh: res.body.tokens.refreshToken,
-      userId: res.body.user.id,
-    };
-  };
-
-  const waitForJob = async (session: Session, jobId: string): Promise<string> => {
-    for (let i = 0; i < 40; i++) {
-      const res = await http()
-        .get(`/jobs/${jobId}`)
-        .set(...V)
-        .set('Authorization', `Bearer ${session.token}`)
-        .expect(200);
-      if (['SUCCEEDED', 'FAILED', 'CANCELLED'].includes(res.body.status)) {
-        return res.body.status;
-      }
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-    }
-    return 'TIMEOUT';
-  };
+  let register: (tag: string) => Promise<Session>;
+  let waitForJob: (session: Session, jobId: string) => Promise<string>;
 
   beforeAll(async () => {
-    const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
-    app = moduleRef.createNestApplication();
-    await app.init();
-    http = () => request(app.getHttpServer());
+    testApp = await createApp();
+    ({ app, http, register, waitForJob } = testApp);
   });
 
   afterAll(async () => {
-    await app.close();
+    await testApp.close();
   });
 
   it('registers, reads /users/me, rotates refresh tokens and rejects reuse', async () => {

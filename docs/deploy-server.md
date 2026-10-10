@@ -88,6 +88,15 @@ variables → Actions → New repository secret**. Sırayla şu kayıtları olu�
 | `SMOKE_EMAIL` / `SMOKE_PASSWORD` | _(isteğe bağlı)_ `story_smoke` dağıtım testinin kullandığı sabit test hesabı (yoksa her çalıştırmada yeni hesap açılır) | Uygulamada kendin açtığın bir test hesabı  |
 | `SMTP_URL` / `MAIL_FROM`         | _(canlıya geçişte)_ Gerçek e-posta: varsa sunucu `MAIL_PROVIDER=smtp` ile çalışır — bkz. `docs/go-live.md` §2           | E-posta servisin (Resend/Brevo) SMTP ayarı |
 
+Aynı sayfanın **Variables** sekmesinde (secret değil, düz değişken) isteğe
+bağlı üç kayıt var; hiçbirini eklemezsen bugünkü sslip.io adresi kullanılır:
+
+| Name                   | Ne için?                                                                                                    | Varsayılan             |
+| ---------------------- | ----------------------------------------------------------------------------------------------------------- | ---------------------- |
+| `MASALIM_DOMAIN`       | Alan adı tabanı — `api.`, `storage.`, `admin.` alt alanları bundan türetilir (nginx, sertifika, APK adresi) | `57-129-6-57.sslip.io` |
+| `MASALIM_SERVER_HOST`  | Sunucunun IP'si                                                                                             | `57.129.6.57`          |
+| `MASALIM_SSH_HOST_KEY` | `ssh-keyscan 57.129.6.57` çıktısındaki `ssh-ed25519` satırı — verilirse dağıtım sunucu kimliğini sabitler   | boş (ilk-güven)        |
+
 > Render'daki değerleri görmek için: dashboard.render.com → masalim-api →
 > Environment sekmesi → değerin yanındaki göz simgesi.
 
@@ -183,10 +192,35 @@ secret'ındaki OpenAI anahtarıyla gpt-4o / gpt-4o-mini'ye döner. Model veya
 - Canlıya geçiş (test modundan çıkış) adımları: `docs/go-live.md`.
 - `NODE_ENV=staging`: ödeme/abonelik hâlâ mock (gerçek mağaza kurulumları
   yapılana dek) — üretim modu mock sağlayıcıları bilerek reddeder.
-- Yedekleme: veritabanı `postgres-data`, medya `minio-data` Docker
-  volume'larındadır. Basit yedek almak için sunucuda:
-  `docker exec masalim-postgres-1 pg_dump -U masalim masalim > yedek.sql`
-  (otomatik yedekleme istersen kurarım).
+- **Yedekleme (otomatik):** her gece 03:30'da `deploy/backup.sh` çalışır
+  (`/etc/cron.d/masalim-backup`, deploy workflow kurar). Veritabanı dökümü
+  `/opt/masalim/backups/db/masalim-YYYY-MM-DD.dump`, medya aynası
+  `/opt/masalim/backups/media/mirror`, günlük hard-link kopyası
+  `media/snapshots/YYYY-MM-DD`; 14 günden eskiler silinir. Log:
+  `/var/log/masalim-backup.log`. Elle almak ya da doğrulamak için:
+  `sudo /opt/masalim/app/deploy/backup.sh` ve
+  `sudo /opt/masalim/app/deploy/backup.sh --check`; GitHub'dan: Deploy Server →
+  Run workflow → `run_backup` işaretli. Yedek sunucunun kendi diskindedir —
+  sunucu tamamen kaybolursa yedek de gider (dış depo sonraki adım).
+- **Yedekten geri dönme:** `sudo docker compose -f
+/opt/masalim/app/deploy/docker-compose.server.yml --project-directory
+/opt/masalim stop api` → veritabanı:
+  `cat /opt/masalim/backups/db/masalim-GÜN.dump | sudo docker compose ... exec -T
+postgres pg_restore -U masalim -d masalim --clean --if-exists` → medya:
+  `sudo docker compose ... run --rm --no-deps --entrypoint /bin/sh -v
+/opt/masalim/backups/media/snapshots/GÜN:/backup:ro minio-init -c 'mc alias set
+local http://minio:9000 "$MINIO_ROOT_USER" "$MINIO_ROOT_PASSWORD" && mc mirror
+--overwrite /backup local/masalim-media'` → `... start api`.
+- **Sertleştirme:** api/admin konteynerleri `node` kullanıcısıyla (root değil),
+  yetki yükseltme kapalı, api tüm Linux yeteneklerini düşürür ve salt-okunur
+  kökle çalışır; postgres/minio yalnızca kendi şifrelerini görür; konteyner
+  logları 20 MB × 5 ile sınırlı. Dağıtım sonunda "Dağıtım sonrası doğrulama"
+  adımı bunları log'a yazar.
+- **nginx/certbot:** sanal sunucu şablonu (`deploy/nginx-masalim.conf.tpl`)
+  alan adıyla render edilir; render değişmediyse ve sertifika yerindeyse dosyaya
+  dokunulmaz. Değiştiyse dosya yazılır ama reload edilmez — TLS bloklarını
+  certbot aynı dosyaya işleyip nginx'i kendisi yükler; hata olursa önceki dosya
+  geri gelir (HTTPS hiçbir an düşmez).
 - GitHub tarafındaki `keepalive.yml` (Render'ı uyanık tutan zamanlanmış ping)
   14 Eylül'de kaldırıldı: Render artık cevap vermediği için her koşu kırmızıya
   düşüyordu ve uygulama zaten VPS'i kullanıyor. Adım 6'da yalnızca Render

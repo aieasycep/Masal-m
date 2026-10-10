@@ -83,3 +83,72 @@ jobs:
 
       - name: Integration tests
         run: pnpm test:integration
+
+  # Dağıtım dosyalarının (betikler, compose, nginx şablonu, imaj etiketleri)
+  # sunucuya varmadan önce sağlamlığı — deploy workflow'u yalnızca main'de koşar.
+  infra-checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Shell scripts (bash -n + shellcheck)
+        run: |
+          sudo apt-get update -y >/dev/null
+          sudo apt-get install -y shellcheck >/dev/null
+          for f in deploy/*.sh; do bash -n "$f"; done
+          shellcheck -S warning deploy/*.sh
+
+      - name: Compose files validate (with substitution)
+        run: |
+          set -e
+          TMP=$(mktemp -d)
+          cat > "$TMP/.env" <<'EOF'
+          POSTGRES_USER=x
+          POSTGRES_PASSWORD=x
+          POSTGRES_DB=x
+          MINIO_ROOT_USER=x
+          MINIO_ROOT_PASSWORD=x
+          MASALIM_DOMAIN=example.test
+          EOF
+          touch "$TMP/providers.env"
+          mkdir -p "$TMP/app/apps/api" "$TMP/app/deploy"
+          cp apps/api/Dockerfile "$TMP/app/apps/api/Dockerfile"
+          cp deploy/admin.Dockerfile "$TMP/app/deploy/admin.Dockerfile"
+          sed "s#/opt/masalim#$TMP#g" deploy/docker-compose.server.yml > "$TMP/compose.server.yml"
+          docker compose -f "$TMP/compose.server.yml" --project-directory "$TMP" config -q
+          docker compose -f docker-compose.yml config -q
+          echo "✓ compose dosyaları geçerli"
+
+      - name: Pinned images exist (no :latest, no untagged)
+        run: |
+          set -e
+          images=$(grep -hE '^\s*image:' deploy/docker-compose.server.yml docker-compose.yml | awk '{print $2}' | sort -u)
+          for img in $images; do
+            tag="${img##*:}"
+            if [ "$tag" = "$img" ] || [ "$tag" = "latest" ]; then
+              echo "::error::Sürüme sabitlenmemiş imaj: $img"
+              exit 1
+            fi
+            docker manifest inspect "$img" >/dev/null
+            echo "✓ $img"
+          done
+          echo "Bilgi — güncel MinIO sürümü: $(docker run --rm minio/minio:latest --version 2>/dev/null | head -n1 || echo '?')"
+
+      - name: Nginx template renders and parses
+        run: |
+          sed 's/__DOMAIN__/example.test/g' deploy/nginx-masalim.conf.tpl > /tmp/masalim.conf
+          grep -q 'server_name api.example.test' /tmp/masalim.conf
+          docker run --rm -v /tmp/masalim.conf:/etc/nginx/conf.d/masalim.conf:ro nginx:1.27-alpine nginx -t
+
+      - name: Backup script dry run (local postgres, dir media)
+        run: |
+          set -e
+          sudo apt-get install -y postgresql-client >/dev/null 2>&1 || true
+          docker run -d --name pgdry -e POSTGRES_PASSWORD=x -e POSTGRES_USER=masalim -e POSTGRES_DB=masalim -p 55432:5432 postgres:16-alpine
+          for i in $(seq 1 30); do docker exec pgdry pg_isready -U masalim >/dev/null 2>&1 && break; sleep 1; done
+          mkdir -p /tmp/media-src && echo hello > /tmp/media-src/a.txt
+          PG_DUMP_CMD="pg_dump postgresql://masalim:x@localhost:55432/masalim -Fc" MEDIA_MODE=dir MEDIA_SOURCE_DIR=/tmp/media-src BACKUP_DIR=/tmp/backups bash deploy/backup.sh
+          MEDIA_MODE=dir BACKUP_DIR=/tmp/backups bash deploy/backup.sh --check
+          ls -R /tmp/backups | head -n 20
+          docker rm -f pgdry >/dev/null

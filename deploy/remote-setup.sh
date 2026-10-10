@@ -2,11 +2,12 @@
 # Masalım sunucu hazırlığı — deploy workflow her dağıtımda çalıştırır.
 # İlk çalıştırmada /opt/masalim/.env dosyasını rastgele sırlarla üretir;
 # sonraki çalıştırmalarda mevcut dosyaya DOKUNMAZ (sırlar sabit kalır).
+# Alan adına bağlı satırları deploy/set-domain.sh her dağıtımda günceller.
 set -euo pipefail
 
 BASE=/opt/masalim
 ENV_FILE="$BASE/.env"
-DOMAIN_BASE="57-129-6-57.sslip.io"
+DOMAIN_BASE="${MASALIM_DOMAIN:-57-129-6-57.sslip.io}"
 
 mkdir -p "$BASE"
 
@@ -18,11 +19,12 @@ if [ ! -f "$ENV_FILE" ]; then
 
   cat > "$ENV_FILE" <<EOF
 # Masalım sunucu ortamı — deploy/remote-setup.sh tarafından üretildi.
-# Bu dosya sunucuda kalır, git'e girmez. Alan adı değişikliğinde buradaki
-# URL'ler + deploy/nginx-masalim.conf + compose'daki admin build arg birlikte
-# güncellenir.
+# Bu dosya sunucuda kalır, git'e girmez. Alan adına bağlı satırları
+# (MASALIM_DOMAIN, API_PUBLIC_URL, CORS_ORIGINS, STORAGE_ENDPOINT) deploy
+# workflow'u repo değişkeni MASALIM_DOMAIN'den her dağıtımda günceller.
 NODE_ENV=staging
 API_PORT=3001
+MASALIM_DOMAIN=${DOMAIN_BASE}
 API_PUBLIC_URL=https://api.${DOMAIN_BASE}
 CORS_ORIGINS=https://admin.${DOMAIN_BASE}
 

@@ -922,6 +922,29 @@
     "explorePremium": "Explore Premium",
     "getCredits": "Buy Credits"
   },
+  "emailVerify": {
+    "bannerTitle": "Verify your e-mail",
+    "bannerBody": "Confirm your e-mail address for password resets and account safety.",
+    "bannerCta": "Verify",
+    "title": "E-mail verification",
+    "body": "We’ll send a 6-digit code to {{email}}. Enter it below.",
+    "sendCode": "Send Code",
+    "resend": "Resend Code",
+    "sentTo": "A code was sent to {{email}}.",
+    "codeLabel": "Verification code",
+    "verify": "Verify",
+    "verifying": "Verifying…",
+    "success": "Your e-mail is verified.",
+    "successGift": "Your e-mail is verified — {{n}} gift credits were added to your account!",
+    "cooldown": "You can resend in {{s}} seconds.",
+    "alreadyVerified": "Your e-mail is already verified."
+  },
+  "updateRequired": {
+    "title": "Update required",
+    "body": "This version of Masalım is no longer supported. Update the app to continue.",
+    "cta": "Go to Store",
+    "noStoreBody": "This version of Masalım is no longer supported. Open the app again after installing the new version."
+  },
   "states": {
     "error": {
       "network": {

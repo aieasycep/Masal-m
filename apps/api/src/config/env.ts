@@ -16,7 +16,8 @@ const envSchema = z
     REDIS_URL: z.string().min(1).default('redis://localhost:6379'),
 
     JWT_SECRET: z.string().min(16),
-    JWT_REFRESH_SECRET: z.string().min(16),
+    /** Legacy — refresh tokens are opaque random strings; kept so existing .env files stay valid. */
+    JWT_REFRESH_SECRET: z.string().min(16).optional(),
     APPLE_BUNDLE_ID: z.string().default('com.masalim.app'),
     GOOGLE_CLIENT_ID: z.string().default(''),
 
@@ -26,7 +27,11 @@ const envSchema = z
     STORAGE_ENDPOINT: z.string().optional(),
     STORAGE_ACCESS_KEY: z.string().optional(),
     STORAGE_SECRET_KEY: z.string().optional(),
-    STORAGE_FORCE_PATH_STYLE: z.coerce.boolean().default(false),
+    // z.coerce.boolean() would turn the string "false" into true.
+    STORAGE_FORCE_PATH_STYLE: z
+      .enum(['true', 'false', '1', '0', ''])
+      .default('false')
+      .transform((value) => value === 'true' || value === '1'),
     SIGNED_URL_TTL_SECONDS: z.coerce.number().int().default(900),
     STORAGE_LOCAL_DIR: z.string().default('.local-storage'),
 
@@ -116,6 +121,67 @@ const envSchema = z
       });
       // PRINT_PROVIDER intentionally allows mock everywhere until a Turkish
       // print API is selected (§33); the flow is feature-flagged.
+    }
+    // A real provider with an empty credential would only fail at the first
+    // paid call (and refund the user's credits) — refuse to boot instead.
+    const requiredKeys: Array<{ when: boolean; key: string; value: string; because: string }> = [
+      {
+        when: env.AI_PROVIDER !== 'mock',
+        key: 'AI_API_KEY',
+        value: env.AI_API_KEY,
+        because: `AI_PROVIDER=${env.AI_PROVIDER}`,
+      },
+      {
+        when: env.MODERATION_PROVIDER !== 'mock',
+        key: 'AI_API_KEY',
+        value: env.AI_API_KEY,
+        because: `MODERATION_PROVIDER=${env.MODERATION_PROVIDER}`,
+      },
+      {
+        when: env.TTS_PROVIDER === 'elevenlabs',
+        key: 'TTS_API_KEY',
+        value: env.TTS_API_KEY,
+        because: 'TTS_PROVIDER=elevenlabs',
+      },
+      {
+        when: env.VOICE_CLONE_PROVIDER === 'elevenlabs',
+        key: 'VOICE_CLONE_API_KEY',
+        value: env.VOICE_CLONE_API_KEY,
+        because: 'VOICE_CLONE_PROVIDER=elevenlabs',
+      },
+      {
+        when: env.IMAGE_PROVIDER === 'openai',
+        key: 'IMAGE_API_KEY',
+        value: env.IMAGE_API_KEY,
+        because: 'IMAGE_PROVIDER=openai',
+      },
+      {
+        when: env.SUBSCRIPTION_PROVIDER === 'revenuecat',
+        key: 'REVENUECAT_WEBHOOK_SECRET',
+        value: env.REVENUECAT_WEBHOOK_SECRET,
+        because: 'SUBSCRIPTION_PROVIDER=revenuecat',
+      },
+      {
+        when: env.PAYMENT_PROVIDER === 'iyzico',
+        key: 'IYZICO_API_KEY',
+        value: env.IYZICO_API_KEY,
+        because: 'PAYMENT_PROVIDER=iyzico',
+      },
+      {
+        when: env.PAYMENT_PROVIDER === 'iyzico',
+        key: 'IYZICO_SECRET',
+        value: env.IYZICO_SECRET,
+        because: 'PAYMENT_PROVIDER=iyzico',
+      },
+    ];
+    for (const { when, key, value, because } of requiredKeys) {
+      if (when && value === '') {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: [key],
+          message: `${key} is required when ${because}`,
+        });
+      }
     }
   });
 

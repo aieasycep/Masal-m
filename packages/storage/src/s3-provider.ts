@@ -11,7 +11,13 @@ import {
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { SIGNED_URL_DEFAULT_TTL_SECONDS } from '@masalim/types';
-import type { SignedUpload, StorageConfig, StorageObjectMeta, StorageProvider } from './types';
+import type {
+  SignedUpload,
+  StorageConfig,
+  StorageObjectEntry,
+  StorageObjectMeta,
+  StorageProvider,
+} from './types';
 
 /** S3-compatible storage (AWS S3, Cloudflare R2, MinIO). */
 export class S3StorageProvider implements StorageProvider {
@@ -57,9 +63,18 @@ export class S3StorageProvider implements StorageProvider {
     };
   }
 
-  async putObject(objectKey: string, body: Buffer | Uint8Array, contentType: string): Promise<void> {
+  async putObject(
+    objectKey: string,
+    body: Buffer | Uint8Array,
+    contentType: string,
+  ): Promise<void> {
     await this.client.send(
-      new PutObjectCommand({ Bucket: this.bucket, Key: objectKey, Body: body, ContentType: contentType }),
+      new PutObjectCommand({
+        Bucket: this.bucket,
+        Key: objectKey,
+        Body: body,
+        ContentType: contentType,
+      }),
     );
   }
 
@@ -101,9 +116,7 @@ export class S3StorageProvider implements StorageProvider {
           ContinuationToken: continuationToken,
         }),
       );
-      const keys = (listed.Contents ?? [])
-        .map((o) => o.Key)
-        .filter((k): k is string => k != null);
+      const keys = (listed.Contents ?? []).map((o) => o.Key).filter((k): k is string => k != null);
       if (keys.length > 0) {
         await this.client.send(
           new DeleteObjectsCommand({
@@ -111,6 +124,28 @@ export class S3StorageProvider implements StorageProvider {
             Delete: { Objects: keys.map((Key) => ({ Key })) },
           }),
         );
+      }
+      continuationToken = listed.IsTruncated ? listed.NextContinuationToken : undefined;
+    } while (continuationToken != null);
+  }
+
+  async *listObjects(prefix: string): AsyncIterable<StorageObjectEntry> {
+    let continuationToken: string | undefined;
+    do {
+      const listed = await this.client.send(
+        new ListObjectsV2Command({
+          Bucket: this.bucket,
+          Prefix: prefix,
+          ContinuationToken: continuationToken,
+        }),
+      );
+      for (const object of listed.Contents ?? []) {
+        if (object.Key == null) continue;
+        yield {
+          key: object.Key,
+          size: object.Size ?? 0,
+          lastModified: object.LastModified ?? new Date(0),
+        };
       }
       continuationToken = listed.IsTruncated ? listed.NextContinuationToken : undefined;
     } while (continuationToken != null);

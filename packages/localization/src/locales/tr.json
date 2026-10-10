@@ -922,6 +922,29 @@
     "explorePremium": "Premium'u İncele",
     "getCredits": "Kredi Al"
   },
+  "emailVerify": {
+    "bannerTitle": "E-postanı doğrula",
+    "bannerBody": "Şifre sıfırlama ve hesap güvenliği için e-posta adresini doğrula.",
+    "bannerCta": "Doğrula",
+    "title": "E-posta doğrulama",
+    "body": "{{email}} adresine 6 haneli bir kod göndereceğiz. Kodu aşağıya yaz.",
+    "sendCode": "Kod Gönder",
+    "resend": "Kodu Yeniden Gönder",
+    "sentTo": "Kod {{email}} adresine gönderildi.",
+    "codeLabel": "Doğrulama kodu",
+    "verify": "Doğrula",
+    "verifying": "Doğrulanıyor…",
+    "success": "E-postan doğrulandı.",
+    "successGift": "E-postan doğrulandı — {{n}} hediye kredi hesabına yüklendi!",
+    "cooldown": "{{s}} saniye sonra yeniden gönderebilirsin.",
+    "alreadyVerified": "E-postan zaten doğrulanmış."
+  },
+  "updateRequired": {
+    "title": "Güncelleme gerekli",
+    "body": "Masalım’ın bu sürümü artık desteklenmiyor. Devam etmek için uygulamayı güncelle.",
+    "cta": "Mağazaya Git",
+    "noStoreBody": "Masalım’ın bu sürümü artık desteklenmiyor. Yeni sürümü kurduktan sonra tekrar aç."
+  },
   "states": {
     "error": {
       "network": {
