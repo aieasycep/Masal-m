@@ -30,7 +30,9 @@ import {
   registerForPush,
 } from '../src/lib/push';
 import { queryClient, queryPersister } from '../src/lib/query';
+import { UpdateRequired } from '../src/components/UpdateRequired';
 import { useAuthStore } from '../src/stores/auth';
+import { useUpdateGate } from '../src/stores/update-gate';
 
 void SplashScreen.preventAutoHideAsync();
 
@@ -51,6 +53,7 @@ export default function RootLayout() {
   });
   const authStatus = useAuthStore((state) => state.status);
   const restore = useAuthStore((state) => state.restore);
+  const updateRequired = useUpdateGate((state) => state.required);
   const coldStartTapHandled = useRef(false);
 
   useEffect(() => {
@@ -110,12 +113,17 @@ export default function RootLayout() {
           persistOptions={{ persister: queryPersister, maxAge: 24 * 60 * 60 * 1000 }}
         >
           <StatusBar style="dark" />
-          <Stack
-            screenOptions={{
-              headerShown: false,
-              contentStyle: { backgroundColor: colors.background },
-            }}
-          />
+          {/* Version gate (426): the whole navigator yields to the update screen. */}
+          {updateRequired ? (
+            <UpdateRequired />
+          ) : (
+            <Stack
+              screenOptions={{
+                headerShown: false,
+                contentStyle: { backgroundColor: colors.background },
+              }}
+            />
+          )}
         </PersistQueryClientProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>

@@ -18,6 +18,7 @@ import Svg, { Circle } from 'react-native-svg';
 import {
   AIJobStatus,
   DURATION_TARGETS,
+  ErrorCode,
   NarrationStatus,
   VoiceProfileStatus,
   type SystemVoiceCategory,
@@ -535,9 +536,14 @@ export default function NarrateStory() {
       setDone(false);
       setActiveJob({ jobId, narrationId: narration.id, narratorName: narration.narratorName });
     } catch (err) {
-      if (err instanceof ApiError && err.code === 'INSUFFICIENT_CREDITS') {
+      if (err instanceof ApiError && err.code === ErrorCode.INSUFFICIENT_CREDITS) {
         // Second-voice narration costs credits — send them to the wallet.
         router.push('/subscription/quota' as never);
+      } else if (err instanceof ApiError && err.code === ErrorCode.ENTITLEMENT_REQUIRED) {
+        // Narrating with a cloned parent voice is Premium at narration time too
+        // (lapsed subscriber) — same gate sheet as the premium storytellers.
+        setPremiumGate(input.voiceProfileId != null ? 'voiceClone' : 'premiumVoice');
+        void queryClient.invalidateQueries({ queryKey: ['entitlements'] });
       } else if (err instanceof ApiError) {
         setCreateError(t(`errors.${err.code}`, { defaultValue: t('errors.GENERIC') }));
       } else if (err instanceof NetworkError) {
@@ -640,9 +646,7 @@ export default function NarrateStory() {
             <Button
               label={t('storyResult.listen')}
               onPress={() =>
-                router.replace(
-                  `/story/${id}/player?narrationId=${activeJob.narrationId}` as never,
-                )
+                router.replace(`/story/${id}/player?narrationId=${activeJob.narrationId}` as never)
               }
               style={styles.nightCta}
             />
@@ -778,9 +782,7 @@ export default function NarrateStory() {
           ) : null}
 
           {/* Family voices */}
-          <Text style={styles.sectionLabel}>
-            {t('voice.familyVoices').toLocaleUpperCase('tr')}
-          </Text>
+          <Text style={styles.sectionLabel}>{t('voice.familyVoices').toLocaleUpperCase('tr')}</Text>
           <View style={styles.voiceList}>
             {parentVoices.map((voice) => {
               const existing = readyByVoiceProfile.get(voice.id) ?? null;
@@ -793,6 +795,12 @@ export default function NarrateStory() {
                   onSelect={() => {
                     if (existing != null) {
                       openPlayer(existing.id);
+                      return;
+                    }
+                    // §36: a lapsed Premium keeps the profile but not the right to
+                    // narrate with it — say so before any work starts.
+                    if (canCloneVoice === false) {
+                      setPremiumGate('voiceClone');
                       return;
                     }
                     setSelected({ type: 'parent', id: voice.id });
@@ -891,9 +899,7 @@ export default function NarrateStory() {
             ? t('narrate.parentVoiceFeature')
             : t('subscription.features.premiumVoices')
         }
-        description={
-          premiumGate === 'voiceClone' ? t('narrate.parentVoiceFeatureDesc') : undefined
-        }
+        description={premiumGate === 'voiceClone' ? t('narrate.parentVoiceFeatureDesc') : undefined}
         onUpgrade={() => {
           setPremiumGate(null);
           router.push('/subscription/paywall' as never);

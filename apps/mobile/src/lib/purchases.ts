@@ -1,7 +1,9 @@
+import { Platform } from 'react-native';
 import Purchases, { PURCHASES_ERROR_CODE, type PurchasesPackage } from 'react-native-purchases';
 import { SubscriptionPlan } from '@masalim/types';
 import { api } from './api';
 import { queryClient } from './query';
+import { getStoredUserId, setStoredUserId } from './token-store';
 
 /**
  * PurchasesGateway (§37, plan §8.1) — the single store-purchases seam.
@@ -18,6 +20,18 @@ export interface PurchasesGateway {
   purchase(productId: string): Promise<{ success: boolean; cancelled?: boolean }>;
   restore(): Promise<{ success: boolean }>;
 }
+
+/**
+ * Store-SDK identity. The RevenueCat app user id MUST be our user id so the
+ * webhook can attribute the purchase; identity follows the session (sign-in,
+ * cold-start restore, sign-out). Every method is best-effort and never throws.
+ */
+export interface PurchasesSession {
+  identify(userId: string): Promise<void>;
+  logOut(): Promise<void>;
+}
+
+const USE_REVENUECAT = process.env.EXPO_PUBLIC_PURCHASES_PROVIDER === 'revenuecat';
 
 /** Server-resolved entitlements drive the UI — refetch them after store events. */
 async function invalidateEntitlements(): Promise<void> {
@@ -58,22 +72,84 @@ function isUserCancelled(error: unknown): boolean {
   );
 }
 
+function warnDev(message: string, error: unknown): void {
+  if (__DEV__) console.warn(`[purchases] ${message}`, error);
+}
+
+/**
+ * Per-platform public SDK key. Literal `process.env.X` member access so Expo
+ * inlines the values at bundle time (a computed key would stay undefined).
+ */
+function revenueCatApiKey(): string | null {
+  const key = Platform.select({
+    ios: process.env.EXPO_PUBLIC_REVENUECAT_IOS_KEY,
+    android: process.env.EXPO_PUBLIC_REVENUECAT_ANDROID_KEY,
+  });
+  return key != null && key.length > 0 ? key : null;
+}
+
+/** One-time SDK configure state, shared by the session and the gateway. */
+let revenueCatConfigured = false;
+
+const revenueCatSession: PurchasesSession = {
+  async identify(userId) {
+    try {
+      if (!revenueCatConfigured) {
+        const apiKey = revenueCatApiKey();
+        if (apiKey == null) return; // no key for this platform → gateway stays inert
+        Purchases.configure({ apiKey, appUserID: userId });
+        revenueCatConfigured = true;
+        return;
+      }
+      const current = await Purchases.getAppUserID();
+      if (current !== userId) {
+        await Purchases.logIn(userId);
+      }
+    } catch (error) {
+      warnDev('identify failed', error);
+    }
+  },
+
+  async logOut() {
+    try {
+      if (!revenueCatConfigured) return;
+      if (await Purchases.isAnonymous()) return;
+      await Purchases.logOut();
+    } catch (error) {
+      warnDev('logOut failed', error);
+    }
+  },
+};
+
+const noopSession: PurchasesSession = {
+  async identify() {},
+  async logOut() {},
+};
+
 /**
  * Real store purchases via react-native-purchases. The RevenueCat webhook
  * feeds the backend, which owns the entitlement flip — this gateway only
  * drives the store sheet for the requested product and re-reads server state.
  */
 class RevenueCatPurchasesGateway implements PurchasesGateway {
-  private configured = false;
-
-  /** Lazy one-time configure; a missing key leaves the gateway inert. */
-  private ensureConfigured(): boolean {
-    if (this.configured) return true;
-    const apiKey = process.env.EXPO_PUBLIC_REVENUECAT_KEY ?? '';
-    if (apiKey.length === 0) return false;
-    Purchases.configure({ apiKey });
-    this.configured = true;
-    return true;
+  /**
+   * Identify the SDK as the signed-in user before any store call. The id is
+   * cached in SecureStore at sign-in; sessions older than that cache fall back
+   * to `/users/me` (and backfill the cache).
+   */
+  private async ensureIdentified(): Promise<boolean> {
+    let userId = await getStoredUserId();
+    if (userId == null) {
+      try {
+        userId = (await api.users.me()).id;
+        await setStoredUserId(userId);
+      } catch (error) {
+        warnDev('could not resolve the user id', error);
+        return false;
+      }
+    }
+    await revenueCatSession.identify(userId);
+    return revenueCatConfigured;
   }
 
   /** Find the store package carrying this productId across all offerings. */
@@ -88,7 +164,7 @@ class RevenueCatPurchasesGateway implements PurchasesGateway {
   }
 
   async purchase(productId: string): Promise<{ success: boolean; cancelled?: boolean }> {
-    if (!this.ensureConfigured()) return { success: false };
+    if (!(await this.ensureIdentified())) return { success: false };
     const pkg = await this.packageFor(productId);
     if (pkg == null) return { success: false };
 
@@ -105,7 +181,7 @@ class RevenueCatPurchasesGateway implements PurchasesGateway {
   }
 
   async restore(): Promise<{ success: boolean }> {
-    if (!this.ensureConfigured()) return { success: false };
+    if (!(await this.ensureIdentified())) return { success: false };
     try {
       await Purchases.restorePurchases();
     } finally {
@@ -118,7 +194,9 @@ class RevenueCatPurchasesGateway implements PurchasesGateway {
 }
 
 /** Env-selected singleton — 'mock' unless explicitly set to 'revenuecat'. */
-export const purchases: PurchasesGateway =
-  process.env.EXPO_PUBLIC_PURCHASES_PROVIDER === 'revenuecat'
-    ? new RevenueCatPurchasesGateway()
-    : new MockPurchasesGateway();
+export const purchases: PurchasesGateway = USE_REVENUECAT
+  ? new RevenueCatPurchasesGateway()
+  : new MockPurchasesGateway();
+
+/** Session identity for the store SDK — a no-op under the mock provider. */
+export const purchasesSession: PurchasesSession = USE_REVENUECAT ? revenueCatSession : noopSession;

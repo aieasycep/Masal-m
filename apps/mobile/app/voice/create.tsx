@@ -38,7 +38,7 @@ import {
 } from '@masalim/ui';
 import { api } from '../../src/lib/api';
 import { useJobProgress } from '../../src/lib/job-stream';
-import { usePreviewPlayer } from '../../src/lib/preview-player';
+import { stopPreview, usePreviewPlayer } from '../../src/lib/preview-player';
 import { useVoiceRecorder, VOICE_RECORDING_CONTENT_TYPE } from '../../src/lib/recorder';
 import { AudioPreviewButton } from '../../src/components/AudioPreviewButton';
 import { Avatar } from '../../src/components/Avatar';
@@ -111,6 +111,21 @@ function formatTimer(totalSeconds: number): string {
   return `${Math.floor(whole / 60)}:${String(whole % 60).padStart(2, '0')}`;
 }
 
+/**
+ * Remove a raw take from the cache dir (probe files, discarded/re-recorded
+ * takes, takes whose clone job finished). Never throws — the OS reclaims the
+ * cache eventually; this just stops minute-long recordings from piling up.
+ */
+function discardLocalFile(uri: string | null | undefined): void {
+  if (uri == null || uri.length === 0) return;
+  try {
+    const file = new File(uri);
+    if (file.exists) file.delete();
+  } catch {
+    // Disposable cache file — ignore.
+  }
+}
+
 /** dBFS (−60…0) → bar height (6…48px). */
 function barHeight(db: number): number {
   const clamped = Math.min(0, Math.max(-60, db));
@@ -123,9 +138,7 @@ function Waveform({ bars, active }: { bars: number[]; active: boolean }) {
     <View style={styles.waveformRow}>
       {Array.from({ length: WAVEFORM_BARS }, (_, index) => {
         const sample = bars[bars.length - WAVEFORM_BARS + index];
-        const height = active
-          ? barHeight(sample ?? -60)
-          : 8 + Math.sin(index * 0.6) * 8;
+        const height = active ? barHeight(sample ?? -60) : 8 + Math.sin(index * 0.6) * 8;
         return (
           <View
             key={index}
@@ -270,8 +283,21 @@ export default function VoiceCreate() {
   const [showSilenceHint, setShowSilenceHint] = useState(false);
   const silentCount = useRef(0);
   const finishing = useRef(false);
-  // The finished take. KEPT on disk across failed uploads ("Kaydın güvende").
+  // The finished take. KEPT on disk across failed uploads ("Kaydın güvende")
+  // and across a failed clone job (the error step re-uploads the same file);
+  // deleted once the voice is READY, when discarded, or when the screen unmounts.
   const [kept, setKept] = useState<{ uri: string; durationSeconds: number } | null>(null);
+  const keptUriRef = useRef<string | null>(null);
+  useEffect(() => {
+    keptUriRef.current = kept?.uri ?? null;
+  }, [kept]);
+  useEffect(
+    () => () => {
+      // Leaving mid-flow (processing/error/review): nothing can reuse the file.
+      discardLocalFile(keptUriRef.current);
+    },
+    [],
+  );
 
   // Submission / processing
   const [submitting, setSubmitting] = useState(false);
@@ -352,7 +378,8 @@ export default function VoiceCreate() {
       try {
         await start();
         await new Promise((resolve) => setTimeout(resolve, MIC_TEST_SAMPLE_MS));
-        await stop();
+        const probe = await stop();
+        discardLocalFile(probe?.uri);
       } catch {
         // Probe failed (e.g. simulator without input) — fall through to neutral-ok.
       }
@@ -364,7 +391,13 @@ export default function VoiceCreate() {
           ? null
           : samples.reduce((sum, value) => sum + value, 0) / samples.length;
       setMicResult(
-        avg == null ? 'ok' : avg < MIC_TEST_QUIET_DB ? 'quiet' : avg > MIC_TEST_NOISY_DB ? 'noisy' : 'ok',
+        avg == null
+          ? 'ok'
+          : avg < MIC_TEST_QUIET_DB
+            ? 'quiet'
+            : avg > MIC_TEST_NOISY_DB
+              ? 'noisy'
+              : 'ok',
       );
       setMicPhase('done');
     };
@@ -380,6 +413,7 @@ export default function VoiceCreate() {
     try {
       const result = await rec.stop();
       if (result == null || result.durationSeconds < VOICE_RECORDING.MIN_DURATION_SECONDS) {
+        discardLocalFile(result?.uri);
         rec.reset();
         setBars([]);
         return;
@@ -409,10 +443,23 @@ export default function VoiceCreate() {
   }, [step, isActiveRecording, rec.durationSeconds, finishRecording]);
 
   const restartRecording = useCallback(async () => {
-    if (isActiveRecording) await rec.stop();
+    if (isActiveRecording) {
+      const abandoned = await rec.stop();
+      discardLocalFile(abandoned?.uri);
+    }
     rec.reset();
     setBars([]);
   }, [rec, isActiveRecording]);
+
+  /** Drop the finished take (re-record / discard): stop its preview, delete the file. */
+  const discardKept = useCallback(() => {
+    const uri = keptUriRef.current;
+    if (uri != null) {
+      void stopPreview();
+      discardLocalFile(uri);
+    }
+    setKept(null);
+  }, []);
 
   const mapError = useCallback(
     (error: unknown): string => {
@@ -483,7 +530,8 @@ export default function VoiceCreate() {
         setJobId(voice.jobId);
         setStep('processing');
       } else {
-        // Synchronous (mock) path — no job to watch.
+        // Synchronous (mock) path — no job to watch; the upload is final, drop the take.
+        discardKept();
         await queryClient.invalidateQueries({ queryKey: ['voices'] });
         setStep('success');
       }
@@ -494,12 +542,25 @@ export default function VoiceCreate() {
     } finally {
       setSubmitting(false);
     }
-  }, [kept, submitting, consentChecked, activeVoiceId, ownerType, displayName, t, queryClient, mapError]);
+  }, [
+    kept,
+    submitting,
+    consentChecked,
+    activeVoiceId,
+    ownerType,
+    displayName,
+    t,
+    queryClient,
+    mapError,
+    discardKept,
+  ]);
 
-  // Processing verdict from the real job stream.
+  // Processing verdict from the real job stream. The raw take stays on disk
+  // until SUCCEEDED so a FAILED job can retry with the same recording.
   useEffect(() => {
     if (step !== 'processing') return;
     if (job.status === AIJobStatus.SUCCEEDED) {
+      discardKept();
       void queryClient.invalidateQueries({ queryKey: ['voices'] });
       setStep('success');
     } else if (job.status === AIJobStatus.FAILED || job.status === AIJobStatus.CANCELLED) {
@@ -510,7 +571,7 @@ export default function VoiceCreate() {
       );
       setStep('error');
     }
-  }, [step, job.status, job.errorCode, queryClient, t]);
+  }, [step, job.status, job.errorCode, queryClient, t, discardKept]);
 
   const goBack = useCallback(() => {
     switch (step) {
@@ -531,6 +592,7 @@ export default function VoiceCreate() {
         setStep('micTest');
         break;
       case 'review':
+        discardKept();
         rec.reset();
         setBars([]);
         setStep('recording');
@@ -538,7 +600,7 @@ export default function VoiceCreate() {
       default:
         exit();
     }
-  }, [step, isRecreate, exit, rec, restartRecording]);
+  }, [step, isRecreate, exit, rec, restartRecording, discardKept]);
 
   const pickOwner = (type: VoiceOwnerType) => {
     setOwnerType(type);
@@ -962,10 +1024,15 @@ export default function VoiceCreate() {
       case 'review':
         return (
           <>
-            <Button label={t('voice.useRecording')} onPress={() => void submit()} loading={submitting} />
+            <Button
+              label={t('voice.useRecording')}
+              onPress={() => void submit()}
+              loading={submitting}
+            />
             <Button
               label={t('voice.reRecord')}
               onPress={() => {
+                discardKept();
                 rec.reset();
                 setBars([]);
                 setStep('recording');
@@ -996,7 +1063,7 @@ export default function VoiceCreate() {
               onPress={() => {
                 rec.reset();
                 setBars([]);
-                setKept(null);
+                discardKept();
                 setJobId(null);
                 setStep('recording');
               }}
@@ -1148,7 +1215,11 @@ const styles = StyleSheet.create({
     marginBottom: spacing.lg,
   },
   ownerList: { gap: 10, marginBottom: spacing.xl },
-  ownerLabel: { fontFamily: fontFamilies.bodyBold, fontSize: fontSizes.xl, color: colors.foreground },
+  ownerLabel: {
+    fontFamily: fontFamilies.bodyBold,
+    fontSize: fontSizes.xl,
+    color: colors.foreground,
+  },
 
   consentSubtitle: {
     fontFamily: fontFamilies.body,

@@ -4,6 +4,7 @@ import type {
   AnalyticsBatchInput,
   AppConfig,
   AppleAuthInput,
+  AppleNonceResponse,
   AuthSession,
   AuthTokens,
   AvatarUploadInput,
@@ -25,6 +26,7 @@ import type {
   CreateStoryInput,
   CreateVoiceProfileInput,
   DeleteAccountInput,
+  EmailVerificationSendResponse,
   Illustration,
   IllustrationSet,
   RenderBookInput,
@@ -54,6 +56,8 @@ import type {
   UpdateMeInput,
   UpdateStoryInput,
   UpdateVoiceProfileInput,
+  VerifyEmailInput,
+  VerifyEmailResponse,
   VoiceProfile,
 } from '@masalim/validation';
 import { HttpClient, type HttpClientConfig, type RequestOptions } from './http';
@@ -74,13 +78,24 @@ export class MasalimApiClient {
       this.http.post<AuthSession>('/auth/register', input, { anonymous: true }),
     login: (input: LoginInput) =>
       this.http.post<AuthSession>('/auth/login', input, { anonymous: true }),
+    /** Step 1 of Sign in with Apple: a single-use server nonce (the client sends Apple its SHA-256). */
+    appleNonce: () =>
+      this.http.post<AppleNonceResponse>('/auth/apple/nonce', undefined, { anonymous: true }),
+    /** Step 2: identity token + the RAW nonce from `appleNonce` (the server re-derives the hash). */
     apple: (input: AppleAuthInput) =>
       this.http.post<AuthSession>('/auth/apple', input, { anonymous: true }),
     google: (input: GoogleAuthInput) =>
       this.http.post<AuthSession>('/auth/google', input, { anonymous: true }),
     refresh: (refreshToken: string) =>
       this.http.post<AuthTokens>('/auth/refresh', { refreshToken }, { anonymous: true }),
-    logout: (refreshToken?: string) => this.http.post<void>('/auth/logout', { refreshToken }),
+    /** Revokes ONLY the given refresh token (this device); without one, every device. */
+    logout: (refreshToken?: string) =>
+      this.http.post<void>('/auth/logout', refreshToken != null ? { refreshToken } : {}),
+    /** (Re)send the e-mail verification code; 429 RATE_LIMITED carries `details.retryAfterSeconds`. */
+    sendEmailVerification: () =>
+      this.http.post<EmailVerificationSendResponse>('/auth/email/verification'),
+    verifyEmail: (input: VerifyEmailInput) =>
+      this.http.post<VerifyEmailResponse>('/auth/email/verify', input),
     forgotPassword: (input: ForgotPasswordInput) =>
       this.http.post<{ sent: boolean }>('/auth/password/forgot', input, { anonymous: true }),
     resetPassword: (input: ResetPasswordInput) =>

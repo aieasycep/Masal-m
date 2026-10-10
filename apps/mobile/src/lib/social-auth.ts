@@ -1,5 +1,11 @@
 import * as AppleAuthentication from 'expo-apple-authentication';
-import { GoogleSignin, isErrorWithCode, statusCodes } from '@react-native-google-signin/google-signin';
+import {
+  GoogleSignin,
+  isErrorWithCode,
+  statusCodes,
+} from '@react-native-google-signin/google-signin';
+import { sha256 } from '@noble/hashes/sha2';
+import { bytesToHex, utf8ToBytes } from '@noble/hashes/utils';
 import type { AuthSession } from '@masalim/validation';
 import { api } from './api';
 
@@ -25,10 +31,15 @@ function isAppleCancellation(err: unknown): boolean {
 
 /**
  * Sign in with Apple → exchanges the identity token with the backend.
- * Apple only returns the full name on the FIRST authorization, so it is
- * forwarded once when present (backend persists it).
+ * Replay protection: the server issues a single-use nonce, Apple receives its
+ * SHA-256 hex (and embeds it in the identity token), and the backend gets the
+ * RAW nonce back to re-derive and compare. Apple only returns the full name on
+ * the FIRST authorization, so it is forwarded once when present.
  */
 export async function signInWithApple(): Promise<AuthSession> {
+  const { nonce } = await api.auth.appleNonce();
+  const hashedNonce = bytesToHex(sha256(utf8ToBytes(nonce)));
+
   let credential: AppleAuthentication.AppleAuthenticationCredential;
   try {
     credential = await AppleAuthentication.signInAsync({
@@ -36,6 +47,7 @@ export async function signInWithApple(): Promise<AuthSession> {
         AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
         AppleAuthentication.AppleAuthenticationScope.EMAIL,
       ],
+      nonce: hashedNonce,
     });
   } catch (err) {
     if (isAppleCancellation(err)) throw new SocialAuthCancelled();
@@ -47,11 +59,11 @@ export async function signInWithApple(): Promise<AuthSession> {
     throw new Error('Apple sign-in returned no identity token');
   }
 
-  const formattedName =
-    fullName != null ? AppleAuthentication.formatFullName(fullName).trim() : '';
+  const formattedName = fullName != null ? AppleAuthentication.formatFullName(fullName).trim() : '';
 
   return api.auth.apple({
     identityToken,
+    nonce,
     ...(formattedName.length > 0 ? { fullName: formattedName } : {}),
   });
 }

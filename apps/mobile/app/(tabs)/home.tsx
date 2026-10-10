@@ -10,6 +10,7 @@ import type { Recommendation, StorySummary } from '@masalim/validation';
 import { colors, fontFamilies, fontSizes, gradients, radius, shadows, spacing } from '@masalim/ui';
 import { Avatar } from '../../src/components/Avatar';
 import { ChildSwitcherSheet, childAvatarEmoji } from '../../src/components/ChildSwitcherSheet';
+import { EmailVerifyBanner } from '../../src/components/EmailVerifyBanner';
 import { QuotaBanner } from '../../src/components/QuotaBanner';
 import { Screen } from '../../src/components/Screen';
 import { SectionHeader } from '../../src/components/SectionHeader';
@@ -72,6 +73,16 @@ export default function Home() {
     queryKey: ['entitlements'],
     queryFn: () => api.subscription.entitlements(),
   });
+  // Public config (1h stale): only nudge for e-mail verification while the
+  // server mails for real — mock-mail environments never show the banner.
+  const appConfigQuery = useQuery({
+    queryKey: ['app-config'],
+    queryFn: () => api.app.config(),
+    staleTime: 60 * 60 * 1000,
+  });
+  const showEmailVerify =
+    appConfigQuery.data?.emailVerificationRequired === true &&
+    meQuery.data?.emailVerified === false;
 
   // Credit banner: spendable = monthly quota left + purchased balance.
   // "exhausted" once even a short story (3 kredi) is unaffordable, "warning"
@@ -84,9 +95,7 @@ export default function Home() {
       ? null
       : Math.max(0, creditState.quota.limit - creditState.quota.used) + creditState.balance;
   const quotaVariant: 'warning' | 'exhausted' | null =
-    entitlements == null ||
-    entitlements.plan === SubscriptionPlan.PREMIUM ||
-    quotaRemaining == null
+    entitlements == null || entitlements.plan === SubscriptionPlan.PREMIUM || quotaRemaining == null
       ? null
       : quotaRemaining < 3
         ? 'exhausted'
@@ -135,7 +144,13 @@ export default function Home() {
     }
     const timer = setTimeout(() => setTourVisible(true), 700);
     return () => clearTimeout(timer);
-  }, [seenHomeTour, tourVisible, onboardingCompleted, childrenQuery.isSuccess, storiesQuery.isSuccess]);
+  }, [
+    seenHomeTour,
+    tourVisible,
+    onboardingCompleted,
+    childrenQuery.isSuccess,
+    storiesQuery.isSuccess,
+  ]);
 
   const tourSteps: TourStep[] = [
     { targetKey: 'home.hero', title: t('tour.homeHeroTitle'), body: t('tour.homeHeroBody') },
@@ -258,6 +273,13 @@ export default function Home() {
             remaining={Math.max(quotaRemaining ?? 0, 0)}
             onSeePremium={() => router.push('/subscription/quota' as never)}
           />
+        </View>
+      ) : null}
+
+      {/* E-mail verification nudge — right under the quota banner. */}
+      {showEmailVerify ? (
+        <View style={styles.quotaSection}>
+          <EmailVerifyBanner />
         </View>
       ) : null}
 
