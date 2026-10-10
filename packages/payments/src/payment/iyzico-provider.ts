@@ -92,14 +92,20 @@ export class IyzicoPaymentProvider implements PaymentProvider {
       paymentStatus?: string;
       paymentId?: string;
       paidPrice?: number | string;
+      basketId?: string;
       errorMessage?: string;
     }>('/payment/iyzipos/checkoutform/auth/ecom/detail', { token: providerToken, locale: 'tr' });
 
     const succeeded = response.status === 'success' && response.paymentStatus === 'SUCCESS';
     return {
-      status: succeeded ? 'SUCCEEDED' : response.paymentStatus === 'INIT_THREEDS' ? 'PENDING' : 'FAILED',
+      status: succeeded
+        ? 'SUCCEEDED'
+        : response.paymentStatus === 'INIT_THREEDS'
+          ? 'PENDING'
+          : 'FAILED',
       providerPaymentId: String(response.paymentId ?? providerToken),
-      paidAmount: response.paidPrice != null ? String(response.paidPrice) : null,
+      paidAmount: normalizeAmount(response.paidPrice),
+      basketId: response.basketId ?? null,
       rawResponse: sanitize(response),
     };
   }
@@ -152,6 +158,17 @@ export class IyzicoPaymentProvider implements PaymentProvider {
     }
     return (await response.json()) as T;
   }
+}
+
+/**
+ * iyzico reports paidPrice as a bare number ("649" / 649.5); the order total is
+ * a 2-decimal string, so the verdict carries the same shape or null when the
+ * value is not numeric.
+ */
+export function normalizeAmount(value: number | string | null | undefined): string | null {
+  if (value == null || (typeof value === 'string' && value.trim() === '')) return null;
+  const amount = Number(value);
+  return Number.isFinite(amount) ? amount.toFixed(2) : null;
 }
 
 /** Strip anything card-like before persisting raw responses (§47). */

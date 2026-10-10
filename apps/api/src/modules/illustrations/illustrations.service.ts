@@ -88,12 +88,12 @@ export class IllustrationsService {
       };
     }
 
-    // The story's FIRST illustration set is included in its story credits;
-    // every further set (a different style) costs half the story price.
+    // The story's FIRST illustration set is included in its story credits ONCE
+    // per story, not per version (a title edit must not reset the allowance);
+    // every further set costs half the story price.
     const priorSets = await this.prisma.illustrationSet.count({
       where: {
         storyId,
-        storyVersion: story.version,
         status: { in: ['QUEUED', 'GENERATING', 'READY'] },
       },
     });
@@ -234,9 +234,7 @@ export class IllustrationsService {
     pageCount: number,
     _userId: string,
   ): Promise<IllustrationSetDto> {
-    const targetsDone = new Set(
-      set.illustrations.map((item) => item.storyPageId ?? 'cover'),
-    ).size;
+    const targetsDone = new Set(set.illustrations.map((item) => item.storyPageId ?? 'cover')).size;
     return {
       id: set.id,
       storyId: set.storyId,
@@ -244,9 +242,7 @@ export class IllustrationsService {
       style: set.style,
       status: set.status,
       progress: { completed: targetsDone, total: pageCount + 1 },
-      illustrations: await Promise.all(
-        set.illustrations.map((item) => this.illustrationDto(item)),
-      ),
+      illustrations: await Promise.all(set.illustrations.map((item) => this.illustrationDto(item))),
       createdAt: set.createdAt.toISOString(),
       jobId: await this.activeJobFor(set.id),
     };

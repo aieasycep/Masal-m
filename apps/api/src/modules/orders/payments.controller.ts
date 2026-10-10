@@ -3,6 +3,8 @@ import { ApiTags } from '@nestjs/swagger';
 import { createZodDto } from 'nestjs-zod';
 import { z } from 'zod';
 import { ErrorCode, PaymentStatus } from '@masalim/types';
+import { CurrentUser } from '../../common/auth/current-user.decorator';
+import type { AuthenticatedUser } from '../../common/auth/jwt-auth.guard';
 import { Public } from '../../common/auth/public.decorator';
 import { AppException } from '../../common/errors/app.exception';
 import { ENV } from '../../config/config.module';
@@ -34,9 +36,10 @@ export class PaymentsController {
     return this.payments.completeByToken(body.token);
   }
 
-  /** Dev-only completion for the mock provider (no hosted checkout). */
+  /** Dev-only completion for the mock provider (no hosted checkout); only the order's owner may complete it. */
   @Post('mock/complete')
   async mockComplete(
+    @CurrentUser() user: AuthenticatedUser,
     @Body() body: MockCompleteDto,
   ): Promise<{ status: PaymentStatus; orderId: string }> {
     if (this.env.NODE_ENV === 'production' || this.env.PAYMENT_PROVIDER !== 'mock') {
@@ -46,6 +49,6 @@ export class PaymentsController {
         HttpStatus.NOT_FOUND,
       );
     }
-    return this.payments.completeByToken(body.providerToken);
+    return this.payments.completeByToken(body.providerToken, user.id);
   }
 }

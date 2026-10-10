@@ -253,16 +253,16 @@ Local `.env` = `.env.example` + generated JWT secrets (already present, gitignor
   constant — client enforces now, API tightens on merge; LOCAL take playback
   in review via preview-player file URI; consent rewrite + child-clone
   notice; level meter), wizard guest-child ("Başka bir çocuk" in-wizard name)
-  + general branch, StoryResult 5 tiles 3-per-row, checkout single flow
-  configure→address→review (3-label StepBar), paywall copy (no "Sınırsız"),
-  settings/audio.tsx (rate 0.8–1.5x + autoFollowPage in app-prefs, player
-  seeded). V2 pass (KendiHikayem_UIUX_V2_Delta.zip): entry-point child
-  continuity (hero CTA resets stale different-child drafts), recommendation
-  cards seed themes+idea via applySuggestion pre-initialize, step-4 age
-  hidden for registered children ("Yaş bilgisi profilden alınıyor"), result
-  narrate tile "Sesi Değiştir" when narrations exist, Kitap Yap routes to
-  illustrate when no READY set, suggestions-header "Tümü" removed. PR #4
-  draft later became the promotion PR and was merged Sep 1.
+  - general branch, StoryResult 5 tiles 3-per-row, checkout single flow
+    configure→address→review (3-label StepBar), paywall copy (no "Sınırsız"),
+    settings/audio.tsx (rate 0.8–1.5x + autoFollowPage in app-prefs, player
+    seeded). V2 pass (KendiHikayem_UIUX_V2_Delta.zip): entry-point child
+    continuity (hero CTA resets stale different-child drafts), recommendation
+    cards seed themes+idea via applySuggestion pre-initialize, step-4 age
+    hidden for registered children ("Yaş bilgisi profilden alınıyor"), result
+    narrate tile "Sesi Değiştir" when narrations exist, Kitap Yap routes to
+    illustrate when no READY set, suggestions-header "Tümü" removed. PR #4
+    draft later became the promotion PR and was merged Sep 1.
 - **NEW UI PROMOTED TO PRODUCTION (Sep 1)** — user gave the explicit "Yeni
   UI'yı onaylıyorum, production'a al" → PR #4 (uiux-review→main) merged @
   401d18b. SINGLE app again: package `com.masalim.app` / "Masalım" carries the
@@ -316,6 +316,37 @@ Local `.env` = `.env.example` + generated JWT secrets (already present, gitignor
   Anthropic API key at hand-over → docs/deploy-server.md "Adım 7" (Console →
   Billing credits → API Keys → GitHub secret). Until the secret exists the
   deploy stops at step 1 and the VPS keeps running GPT.
+- **SECURITY AUDIT + FIX TRAIN (Oct 10, on PR #17)** — user: "kodu sıfırdan test et…
+  yoksa canlıya geçelim". Verdict: NOT ready. Method: 3 explore sweeps → 48 candidates
+  (scratchpad/audit/candidates.md) → runtime probes against a local API
+  (scratchpad/audit/audit-probes.sh, all 10 reproduced) → Workflow-tool adversarial
+  verification on a frozen worktree → fixes by 3 parallel agents + me. Container
+  quirks learned: NO root .env (export env from scratchpad/audit/env.sh); native
+  Postgres 16 + Redis 7 exist (`service postgresql/redis-server start`, role
+  masalim/masalim, CREATEDB) — no Docker needed; journeys.spec leaves
+  `physical_books` ON (reset before smoke-monetization); Workflow tool runs only
+  2 agents at a time here (4 CPUs) and background work dies on container restarts
+  (resume via resumeFromRunId). User decisions: mock purchase + SMTP stay for
+  testing and are closed AT go-live (docs/go-live.md is the switch list); admin
+  password changed from the panel (new Ayarlar page). Fixed in this train:
+  Google audience fail-closed, social-login linking policy (no auto-link to
+  password accounts), first narration/illustration free PER STORY (title edits
+  no longer bump version), TRUST_PROXY env (+providers.env=1) so throttles key on
+  the client IP, reset-code hardening (single valid code, 5 attempts), lockout
+  email+ip, atomic refresh rotation + owner-scoped logout, Swagger/CORS tightened,
+  admin realm key + DB re-check + lockout + password change endpoint, demo user
+  disabled outside dev/test, avatar key prefix guard, edit-time moderation +
+  prompt isolation tags + whole-text moderation window (20k), payments
+  idempotency scoping + iyzico numeric amount, RevenueCat timing-safe + SANDBOX
+  reject in production, account-deletion worker (anonymize user row, purge
+  content/storage/provider voices, hourly sweep; login during grace cancels),
+  local storage key hardening + dev upload cap, smoke-story.sh fixed account +
+  Python fix, TRUNCATED story code (no retry), moderator truncation → retryable
+  error, director model/fallback logging, effort-support list (Sonnet 4.6 kept).
+  NOT done (next PR): non-root containers/Chromium sandbox, admin CSP, MinIO tag
+  pin (Docker Hub tag API unreachable from here), book render queue key, push
+  token ownership, orphan upload cleanup, Apple nonce, email verification (needs
+  SMTP), RevenueCat Purchases.logIn (mobile, needs store).
 - **keepalive.yml REMOVED (Sep 14)**. The repo's DEFAULT BRANCH is the claude
   branch (`git ls-remote --symref origin HEAD`), so GitHub cron ran it there
   every ~2–4 h (never the 10-min schedule) and reported a `ping` check on PR
@@ -369,25 +400,25 @@ Local `.env` = `.env.example` + generated JWT secrets (already present, gitignor
   ("ayda 1 kısa masal"); purchased credits never expire; yearly DEFERRED.
   Backend: CreditLedger (quota/balance split, idempotent refund/grant) +
   User.creditBalance; EntitlementService.consumeCredits (kota→bakiye, CAS tx)
-  + INSUFFICIENT_CREDITS (402); prices in PricingConfig row monetization_v1
-  (runtime-read → change without app update); /subscription/offerings serves
-  plan-priced packs (_std/_member DOUBLE products — stores can't per-user
-  price); NON_RENEWING_PURCHASE grants via same normalized webhook/mock
-  pipeline. Mobile: comparison-table paywall (user's screenshot layout, NO
-  time trial), quota.tsx → "Kredilerim" wallet (packs in-place),
-  credit-aware Home banner, wizard duration cards show 3/6/10 badges,
-  INSUFFICIENT_CREDITS routes to wallet everywhere. **Regenerate = 1 kredi
-  (Sep 2, user: "her tekrarı 1 kredi", no free retries)**:
-  ILLUSTRATION_REGENERATE_CREDIT_COST in types; regenerate() consumes up
-  front (ref illustration_regen/`${illustrationId}:${uuid}`, payload
-  creditRefId), processor refunds THAT ref on terminal failure (never the
-  set's); mobile ConfirmSheet + "1 kredi" chip on illustrate + cover editor.
-  Wallet discoverability fix (same PR): Profile "Kredilerim" row (live
-  count), Home header 🎟 pill (all plans), paywall "Kredilerimi Gör" link —
-  before this the wallet was reachable ONLY via the low-credit banner.
-  Verified:
-  scratchpad/smoke-monetization.sh (gift→kota→bakiye→insufficient→pack→
-  resume→print gate) + premium path (30 kr kota, member packs).
+  - INSUFFICIENT_CREDITS (402); prices in PricingConfig row monetization_v1
+    (runtime-read → change without app update); /subscription/offerings serves
+    plan-priced packs (_std/_member DOUBLE products — stores can't per-user
+    price); NON_RENEWING_PURCHASE grants via same normalized webhook/mock
+    pipeline. Mobile: comparison-table paywall (user's screenshot layout, NO
+    time trial), quota.tsx → "Kredilerim" wallet (packs in-place),
+    credit-aware Home banner, wizard duration cards show 3/6/10 badges,
+    INSUFFICIENT_CREDITS routes to wallet everywhere. **Regenerate = 1 kredi
+    (Sep 2, user: "her tekrarı 1 kredi", no free retries)**:
+    ILLUSTRATION_REGENERATE_CREDIT_COST in types; regenerate() consumes up
+    front (ref illustration_regen/`${illustrationId}:${uuid}`, payload
+    creditRefId), processor refunds THAT ref on terminal failure (never the
+    set's); mobile ConfirmSheet + "1 kredi" chip on illustrate + cover editor.
+    Wallet discoverability fix (same PR): Profile "Kredilerim" row (live
+    count), Home header 🎟 pill (all plans), paywall "Kredilerimi Gör" link —
+    before this the wallet was reachable ONLY via the low-credit banner.
+    Verified:
+    scratchpad/smoke-monetization.sh (gift→kota→bakiye→insufficient→pack→
+    resume→print gate) + premium path (30 kr kota, member packs).
 - **BOOK PRINT = "YAKINDA" (launch decision)**: physical_books flag seeds
   DISABLED (create-only — existing DBs keep value; admin panel toggles);
   orders quote/create throw FEATURE_DISABLED server-side; mobile preview
@@ -421,9 +452,9 @@ Local `.env` = `.env.example` + generated JWT secrets (already present, gitignor
   medium specs with negatives; style now LEADS sheet+edit prompts; edit
   prompt carries "reference = identity only" + quality tier. Root cause of
   "hep aynı tarz görsel": near-synonym templates + 'Character sheet:' anchor
-  + edit call's preserve-the-reference dominance. Picker descriptions now
-  concrete (Pixar tarzı / suluboya kâğıdı vs.). Style-sample thumbnails on
-  picker cards = open idea (needs IMAGE_API_KEY one-off generation).
+  - edit call's preserve-the-reference dominance. Picker descriptions now
+    concrete (Pixar tarzı / suluboya kâğıdı vs.). Style-sample thumbnails on
+    picker cards = open idea (needs IMAGE_API_KEY one-off generation).
 
 ## Environment gotchas
 

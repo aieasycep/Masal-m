@@ -17,11 +17,11 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { AppException } from '../../common/errors/app.exception';
 import { MailService } from '../../providers/mail.service';
 import { EntitlementService } from '../subscription/entitlement.service';
-import { LockoutService } from './lockout.service';
+import { LockoutService, RESET_CODE_TTL_SECONDS } from './lockout.service';
 import { SocialVerifyService } from './social-verify.service';
 import { TokenService } from './token.service';
 
-const RESET_CODE_TTL_MS = 15 * 60 * 1000;
+const RESET_CODE_TTL_MS = RESET_CODE_TTL_SECONDS * 1000;
 
 @Injectable()
 export class AuthService {
@@ -58,22 +58,22 @@ export class AuthService {
     return this.buildSession(user);
   }
 
-  async login(input: LoginInput): Promise<AuthSession> {
-    await this.lockout.assertNotLockedOut(input.email);
+  async login(input: LoginInput, ip: string): Promise<AuthSession> {
+    await this.lockout.assertNotLockedOut(input.email, ip);
     const user = await this.prisma.user.findUnique({ where: { email: input.email } });
     const valid =
       user?.passwordHash != null &&
-      user.deletedAt == null &&
+      (await this.canSignIn(user)) &&
       (await argon2.verify(user.passwordHash, input.password));
     if (!valid || user == null) {
-      await this.lockout.recordFailure(input.email);
+      await this.lockout.recordFailure(input.email, ip);
       throw new AppException(
         ErrorCode.AUTH_INVALID_CREDENTIALS,
         'Invalid email or password',
         HttpStatus.UNAUTHORIZED,
       );
     }
-    await this.lockout.reset(input.email);
+    await this.lockout.reset(input.email, ip);
     await this.cancelPendingDeletionOnLogin(user.id);
     return this.buildSession(user);
   }
@@ -84,6 +84,7 @@ export class AuthService {
       AuthProvider.APPLE,
       identity.providerUserId,
       identity.email,
+      identity.emailVerified,
       // Apple only sends the name on first authorization — persist it then.
       input.fullName,
     );
@@ -97,6 +98,7 @@ export class AuthService {
       AuthProvider.GOOGLE,
       identity.providerUserId,
       identity.email,
+      identity.emailVerified,
     );
     await this.cancelPendingDeletionOnLogin(user.id);
     return this.buildSession(user);
@@ -108,7 +110,7 @@ export class AuthService {
 
   async logout(userId: string, refreshToken?: string): Promise<void> {
     if (refreshToken) {
-      await this.tokens.revoke(refreshToken);
+      await this.tokens.revokeForUser(userId, refreshToken);
     } else {
       await this.tokens.revokeAllForUser(userId);
     }
@@ -119,6 +121,9 @@ export class AuthService {
     // Do not reveal whether the account exists.
     if (user == null || user.deletedAt != null) return;
 
+    // Only the newest code is live: otherwise every "forgot" would add one
+    // more valid 6-digit code and widen the guess space.
+    await this.retireResetCodes(user.id);
     const code = String(randomInt(100000, 1000000));
     await this.prisma.passwordReset.create({
       data: {
@@ -134,14 +139,16 @@ export class AuthService {
     });
   }
 
-  async resetPassword(input: ResetPasswordInput): Promise<void> {
+  async resetPassword(input: ResetPasswordInput, ip?: string): Promise<void> {
     const user = await this.prisma.user.findUnique({ where: { email: input.email } });
     if (user == null || user.deletedAt != null) {
-      throw new AppException(
-        ErrorCode.AUTH_RESET_CODE_INVALID,
-        'Invalid or expired code',
-        HttpStatus.BAD_REQUEST,
-      );
+      throw invalidResetCode();
+    }
+    // An exhausted guess budget burns even a freshly issued code: the window
+    // has to pass before reset works again for this account.
+    if (await this.lockout.resetAttemptsExhausted(user.id)) {
+      await this.retireResetCodes(user.id);
+      throw invalidResetCode();
     }
     const reset = await this.prisma.passwordReset.findFirst({
       where: {
@@ -153,11 +160,10 @@ export class AuthService {
       orderBy: { createdAt: 'desc' },
     });
     if (reset == null) {
-      throw new AppException(
-        ErrorCode.AUTH_RESET_CODE_INVALID,
-        'Invalid or expired code',
-        HttpStatus.BAD_REQUEST,
-      );
+      if (await this.lockout.recordResetFailure(user.id)) {
+        await this.retireResetCodes(user.id);
+      }
+      throw invalidResetCode();
     }
     await this.prisma.$transaction([
       this.prisma.passwordReset.update({ where: { id: reset.id }, data: { usedAt: new Date() } }),
@@ -166,6 +172,9 @@ export class AuthService {
         data: { passwordHash: await argon2.hash(input.newPassword) },
       }),
     ]);
+    await this.lockout.clearResetAttempts(user.id);
+    // Proving control of the mailbox also lifts any login lockout.
+    await this.lockout.reset(user.email, ip);
     // New password invalidates every existing session.
     await this.tokens.revokeAllForUser(user.id);
   }
@@ -174,20 +183,34 @@ export class AuthService {
     provider: AuthProvider,
     providerUserId: string,
     email: string | null,
+    emailVerified: boolean,
     fullName?: string,
   ): Promise<User> {
     const identity = await this.prisma.authIdentity.findUnique({
       where: { provider_providerUserId: { provider, providerUserId } },
       include: { user: true },
     });
-    if (identity != null && identity.user.deletedAt == null) {
+    if (identity != null) {
+      // A pending deletion is reactivated by the caller's cancel helper; an
+      // account past its grace period must not resurface via the email path.
+      if (!(await this.canSignIn(identity.user))) throw accountUnavailable();
       return identity.user;
     }
 
-    // Link to an existing account with the same verified email, else create.
-    if (email != null) {
-      const byEmail = await this.prisma.user.findUnique({ where: { email } });
-      if (byEmail != null && byEmail.deletedAt == null) {
+    // An unverified provider email is only a claim: it must neither link to
+    // nor occupy a real address (both enable pre-account hijacks).
+    const trustedEmail = emailVerified ? email : null;
+    if (trustedEmail != null) {
+      const byEmail = await this.prisma.user.findUnique({ where: { email: trustedEmail } });
+      if (byEmail != null) {
+        if (byEmail.passwordHash != null) {
+          throw new AppException(
+            ErrorCode.AUTH_EMAIL_IN_USE,
+            'This email is registered with a password — sign in with your password',
+            HttpStatus.CONFLICT,
+          );
+        }
+        if (!(await this.canSignIn(byEmail))) throw accountUnavailable();
         await this.prisma.authIdentity.create({
           data: { userId: byEmail.id, provider, providerUserId },
         });
@@ -195,10 +218,10 @@ export class AuthService {
       }
     }
 
-    const placeholderEmail = email ?? `${provider.toLowerCase()}-${providerUserId}@users.masalim.app`;
+    const placeholderEmail = `${provider.toLowerCase()}-${providerUserId}@users.masalim.app`;
     const created = await this.prisma.user.create({
       data: {
-        email: placeholderEmail,
+        email: trustedEmail ?? placeholderEmail,
         name: fullName ?? 'Masalım Kullanıcısı',
         identities: { create: { provider, providerUserId } },
       },
@@ -220,6 +243,19 @@ export class AuthService {
       .catch(() => undefined); // a failed gift must never block registration
   }
 
+  /**
+   * Soft-deleted accounts may still sign in while their ACCOUNT deletion is
+   * pending (grace period, §84); afterwards they stay rejected.
+   */
+  private async canSignIn(user: Pick<User, 'id' | 'deletedAt'>): Promise<boolean> {
+    if (user.deletedAt == null) return true;
+    const pending = await this.prisma.deletionRequest.findFirst({
+      where: { userId: user.id, scope: 'ACCOUNT', status: 'PENDING' },
+      select: { id: true },
+    });
+    return pending != null;
+  }
+
   /** Signing in during the grace period cancels a pending account deletion (§84). */
   private async cancelPendingDeletionOnLogin(userId: string): Promise<void> {
     await this.prisma.deletionRequest.updateMany({
@@ -229,6 +265,13 @@ export class AuthService {
     await this.prisma.user.updateMany({
       where: { id: userId, deletedAt: { not: null } },
       data: { deletedAt: null },
+    });
+  }
+
+  private async retireResetCodes(userId: string): Promise<void> {
+    await this.prisma.passwordReset.updateMany({
+      where: { userId, usedAt: null },
+      data: { usedAt: new Date() },
     });
   }
 
@@ -246,6 +289,23 @@ export class AuthService {
       },
     };
   }
+}
+
+function invalidResetCode(): AppException {
+  return new AppException(
+    ErrorCode.AUTH_RESET_CODE_INVALID,
+    'Invalid or expired code',
+    HttpStatus.BAD_REQUEST,
+  );
+}
+
+/** Deleted past the grace period — same wording as a bad password, reveals nothing. */
+function accountUnavailable(): AppException {
+  return new AppException(
+    ErrorCode.AUTH_INVALID_CREDENTIALS,
+    'Invalid email or password',
+    HttpStatus.UNAUTHORIZED,
+  );
 }
 
 function sha256(value: string): string {

@@ -14,10 +14,10 @@ Bu rehber Masalım'ın canlı ortamını Render yerine kendi sunucunda
 
 Adresler (kurulum sonrası):
 
-| Servis | Adres |
-|---|---|
-| API | https://api.57-129-6-57.sslip.io/health |
-| Admin paneli | https://admin.57-129-6-57.sslip.io |
+| Servis       | Adres                                                        |
+| ------------ | ------------------------------------------------------------ |
+| API          | https://api.57-129-6-57.sslip.io/health                      |
+| Admin paneli | https://admin.57-129-6-57.sslip.io                           |
 | Medya deposu | https://storage.57-129-6-57.sslip.io (uygulama içi kullanım) |
 
 > `sslip.io` alan adı satın almadan IP'ye çözünen ücretsiz bir servistir.
@@ -77,14 +77,15 @@ Tarayıcıda: **github.com/aieasycep/Masal-m → Settings → Secrets and
 variables → Actions → New repository secret**. Sırayla şu kayıtları oluştur
 (Name kısmını aynen yaz):
 
-| Name | Ne için? | Value (nereden?) |
-|---|---|---|
-| `SERVER_SSH_KEY` | Sunucuya giriş | Adım 1'de kopyaladığın anahtar metni |
-| `ANTHROPIC_API_KEY` | **Claude** — hikâye + güvenlik denetimi + seslendirme yönetmeni | Adım 7'deki gibi platform.claude.com'dan |
-| `TTS_API_KEY` | ElevenLabs seslendirme | ElevenLabs → API Keys |
-| `VOICE_CLONE_API_KEY` | ElevenLabs ses klonlama | ElevenLabs → aynı anahtar olabilir |
-| `IMAGE_API_KEY` | OpenAI görseller (Claude görsel üretmez) | platform.openai.com → API keys |
-| `AI_API_KEY` | *(isteğe bağlı)* OpenAI'ye geri dönüş anahtarı | platform.openai.com → API keys |
+| Name                             | Ne için?                                                                                                                | Value (nereden?)                          |
+| -------------------------------- | ----------------------------------------------------------------------------------------------------------------------- | ----------------------------------------- |
+| `SERVER_SSH_KEY`                 | Sunucuya giriş                                                                                                          | Adım 1'de kopyaladığın anahtar metni      |
+| `ANTHROPIC_API_KEY`              | **Claude** — hikâye + güvenlik denetimi + seslendirme yönetmeni                                                         | Adım 7'deki gibi platform.claude.com'dan  |
+| `TTS_API_KEY`                    | ElevenLabs seslendirme                                                                                                  | ElevenLabs → API Keys                     |
+| `VOICE_CLONE_API_KEY`            | ElevenLabs ses klonlama                                                                                                 | ElevenLabs → aynı anahtar olabilir        |
+| `IMAGE_API_KEY`                  | OpenAI görseller (Claude görsel üretmez)                                                                                | platform.openai.com → API keys            |
+| `AI_API_KEY`                     | _(isteğe bağlı)_ OpenAI'ye geri dönüş anahtarı                                                                          | platform.openai.com → API keys            |
+| `SMOKE_EMAIL` / `SMOKE_PASSWORD` | _(isteğe bağlı)_ `story_smoke` dağıtım testinin kullandığı sabit test hesabı (yoksa her çalıştırmada yeni hesap açılır) | Uygulamada kendin açtığın bir test hesabı |
 
 > Render'daki değerleri görmek için: dashboard.render.com → masalim-api →
 > Environment sekmesi → değerin yanındaki göz simgesi.
@@ -136,7 +137,7 @@ Görseller Claude ile üretilemez; onlar OpenAI gpt-image-1'de kalır
 1. Tarayıcıda **https://platform.claude.com** → Sign up (claude.ai e-postanla
    girebilirsin; "Claude Developer Platform"/Console hesabı ayrıdır).
 2. Sol menüde **Billing** → **Add credits** → kart ekle, 20–40 $ yükle.
-   (İstersen *Auto-reload* kapalı kalsın — kredi bitince hikâye üretimi
+   (İstersen _Auto-reload_ kapalı kalsın — kredi bitince hikâye üretimi
    "Sorun oluştu" der, sen yükleyince kendiliğinden düzelir.)
 3. Sol menüde **API Keys** → **Create Key** → ad: `masalim-sunucu` → oluştur →
    `sk-ant-...` ile başlayan metni **hemen kopyala** (bir daha gösterilmez).
@@ -175,7 +176,10 @@ secret'ındaki OpenAI anahtarıyla gpt-4o / gpt-4o-mini'ye döner. Model veya
 - Sırlar sunucuda `/opt/masalim/.env` (üretilmiş; git'e girmez) ve
   `/opt/masalim/providers.env` (GitHub Secrets'tan her dağıtımda yazılır;
   LLM sağlayıcı seçimi — `AI_PROVIDER`, `AI_MODEL`, `AI_EFFORT`,
-  `MODERATION_*` — de buradadır ve `.env`'dekini ezer) dosyalarındadır.
+  `MODERATION_*` — ve `TRUST_PROXY=1` (host nginx tek güvenilir vekil; oran
+  sınırı/giriş kilidi gerçek istemci IP'sine göre) de buradadır ve
+  `.env`'dekini ezer) dosyalarındadır.
+- Canlıya geçiş (test modundan çıkış) adımları: `docs/go-live.md`.
 - `NODE_ENV=staging`: ödeme/abonelik hâlâ mock (gerçek mağaza kurulumları
   yapılana dek) — üretim modu mock sağlayıcıları bilerek reddeder.
 - Yedekleme: veritabanı `postgres-data`, medya `minio-data` Docker

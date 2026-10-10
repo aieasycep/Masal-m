@@ -74,7 +74,8 @@ export class NarrationsService {
     const hasNewerNonFailed = new Set<string>();
     const stale: string[] = [];
     for (const row of rows) {
-      const key = row.voiceProfileId != null ? `vp:${row.voiceProfileId}` : `sv:${row.systemVoiceId}`;
+      const key =
+        row.voiceProfileId != null ? `vp:${row.voiceProfileId}` : `sv:${row.systemVoiceId}`;
       if (row.status !== NarrationStatus.FAILED) {
         hasNewerNonFailed.add(key);
         continue;
@@ -157,12 +158,12 @@ export class NarrationsService {
       return { narration: await this.toDto(existing), jobId: activeJob?.id ?? null };
     }
 
-    // The story's FIRST narration is included in its story credits; narrating
-    // the same version with ANOTHER voice costs half the story price.
+    // The story's FIRST narration is included in its story credits ONCE per
+    // story, not per version (a title edit must not reset the allowance);
+    // every further narration costs half the story price.
     const priorNarrations = await this.prisma.narration.count({
       where: {
         storyId,
-        storyVersion: story.version,
         status: { in: [NarrationStatus.QUEUED, NarrationStatus.PROCESSING, NarrationStatus.READY] },
       },
     });
@@ -224,8 +225,7 @@ export class NarrationsService {
       id: row.id,
       storyId: row.storyId,
       storyVersion: row.storyVersion,
-      narratorName:
-        row.voiceProfile?.displayName ?? row.systemVoice?.displayName ?? 'Masalım',
+      narratorName: row.voiceProfile?.displayName ?? row.systemVoice?.displayName ?? 'Masalım',
       isParentVoice: row.voiceProfileId != null,
       voiceProfileId: row.voiceProfileId,
       systemVoiceId: row.systemVoiceId,

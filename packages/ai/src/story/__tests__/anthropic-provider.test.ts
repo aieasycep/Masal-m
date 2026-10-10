@@ -36,15 +36,27 @@ const storyWith = (wordsPerPage: number, title = 'Ege ve Ay') => ({
 
 const reply = (
   payload: unknown,
-  overrides: { stop_reason?: string; thinkingFirst?: boolean; inputTokens?: number; outputTokens?: number } = {},
+  overrides: {
+    stop_reason?: string;
+    thinkingFirst?: boolean;
+    inputTokens?: number;
+    outputTokens?: number;
+  } = {},
 ) => ({
   model: 'claude-opus-5-5',
   stop_reason: overrides.stop_reason ?? 'end_turn',
   content: [
-    ...(overrides.thinkingFirst === false ? [] : [{ type: 'thinking', thinking: '', signature: 'x' }]),
+    // Non-empty thinking text so a reader that joins all blocks (or takes
+    // content[0]) fails loudly instead of passing by accident.
+    ...(overrides.thinkingFirst === false
+      ? []
+      : [{ type: 'thinking', thinking: '{"title":"WRONG","pages":[]}', signature: 'x' }]),
     { type: 'text', text: typeof payload === 'string' ? payload : JSON.stringify(payload) },
   ],
-  usage: { input_tokens: overrides.inputTokens ?? 100, output_tokens: overrides.outputTokens ?? 50 },
+  usage: {
+    input_tokens: overrides.inputTokens ?? 100,
+    output_tokens: overrides.outputTokens ?? 50,
+  },
 });
 
 beforeEach(() => {
@@ -95,11 +107,34 @@ describe('AnthropicStoryProvider', () => {
     await expect(provider.generateStory(INPUT)).rejects.toMatchObject({ code: 'REFUSED' });
   });
 
-  it('maps max_tokens truncation to INVALID_OUTPUT instead of a provider error', async () => {
+  it('maps max_tokens truncation to TRUNCATED (non-retryable) without a repair round', async () => {
     create.mockResolvedValueOnce(reply('{"title": "cut', { stop_reason: 'max_tokens' }));
     const provider = new AnthropicStoryProvider({ apiKey: 'k' });
 
-    await expect(provider.generateStory(INPUT)).rejects.toMatchObject({ code: 'INVALID_OUTPUT' });
+    await expect(provider.generateStory(INPUT)).rejects.toMatchObject({ code: 'TRUNCATED' });
+    expect(create).toHaveBeenCalledTimes(1);
+  });
+
+  it('refuses when the expanded story carries the unsafe sentinel', async () => {
+    create
+      .mockResolvedValueOnce(reply(storyWith(20)))
+      .mockResolvedValueOnce(reply(storyWith(70, '___UNSAFE___')));
+    const provider = new AnthropicStoryProvider({ apiKey: 'k' });
+
+    await expect(provider.generateStory(INPUT)).rejects.toMatchObject({ code: 'REFUSED' });
+  });
+
+  it('keeps effort for Sonnet 4.6 (supports the parameter)', async () => {
+    create.mockResolvedValueOnce(reply(storyWith(80)));
+    const provider = new AnthropicStoryProvider({
+      apiKey: 'k',
+      model: 'claude-sonnet-4-6',
+      effort: 'low',
+    });
+
+    await provider.generateStory(INPUT);
+
+    expect(create.mock.calls[0]![0].output_config.effort).toBe('low');
   });
 
   it('wraps SDK failures as PROVIDER_ERROR', async () => {
@@ -127,7 +162,9 @@ describe('AnthropicStoryProvider', () => {
   });
 
   it('gives up with INVALID_OUTPUT when the repair round is still invalid', async () => {
-    create.mockResolvedValueOnce(reply('not json at all')).mockResolvedValueOnce(reply({ title: 'only' }));
+    create
+      .mockResolvedValueOnce(reply('not json at all'))
+      .mockResolvedValueOnce(reply({ title: 'only' }));
     const provider = new AnthropicStoryProvider({ apiKey: 'k' });
 
     await expect(provider.generateStory(INPUT)).rejects.toMatchObject({ code: 'INVALID_OUTPUT' });
@@ -147,7 +184,9 @@ describe('AnthropicStoryProvider', () => {
   });
 
   it('delivers the first story when the expand round fails or is not longer', async () => {
-    create.mockResolvedValueOnce(reply(storyWith(20))).mockRejectedValueOnce(new Error('overloaded'));
+    create
+      .mockResolvedValueOnce(reply(storyWith(20)))
+      .mockRejectedValueOnce(new Error('overloaded'));
     const provider = new AnthropicStoryProvider({ apiKey: 'k' });
 
     const result = await provider.generateStory(INPUT);

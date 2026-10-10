@@ -1,11 +1,17 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { AgeRange } from '@masalim/types';
-import type { Child, CreateChildInput, Recommendation, UpdateChildInput } from '@masalim/validation';
+import type {
+  Child,
+  CreateChildInput,
+  Recommendation,
+  UpdateChildInput,
+} from '@masalim/validation';
 import type { Child as ChildRow } from '@masalim/database';
 import type { StorageProvider } from '@masalim/storage';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AppException } from '../../common/errors/app.exception';
 import { STORAGE } from '../../providers/providers.module';
+import { assertOwnAvatarKey } from '../users/users.service';
 
 @Injectable()
 export class ChildrenService {
@@ -32,6 +38,7 @@ export class ChildrenService {
   }
 
   async create(userId: string, input: CreateChildInput): Promise<Child> {
+    if (input.avatarObjectKey != null) assertOwnAvatarKey(userId, input.avatarObjectKey);
     const row = await this.prisma.child.create({
       data: {
         userId,
@@ -48,6 +55,7 @@ export class ChildrenService {
 
   async update(userId: string, childId: string, input: UpdateChildInput): Promise<Child> {
     await this.findOwned(userId, childId);
+    if (input.avatarObjectKey != null) assertOwnAvatarKey(userId, input.avatarObjectKey);
     const row = await this.prisma.child.update({
       where: { id: childId },
       data: {

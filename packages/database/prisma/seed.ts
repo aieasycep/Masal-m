@@ -1,4 +1,5 @@
 /* eslint-disable no-console */
+import { randomBytes } from 'node:crypto';
 import { PrismaClient } from '@prisma/client';
 import argon2 from 'argon2';
 
@@ -106,11 +107,36 @@ async function seedFeatureFlags() {
     // Launch decision (Sep 2026): book PRINT ordering is "Yakında" — the digital
     // book/preview experience stays, checkout is closed. Existing databases keep
     // their current value (enabled is create-only here); toggle via admin panel.
-    { key: 'physical_books', enabled: false, isPublic: true, description: 'Physical book ordering flow' },
-    { key: 'parent_voice_cloning', enabled: true, isPublic: true, description: 'Parent voice recording & cloning' },
-    { key: 'illustrations', enabled: true, isPublic: true, description: 'AI illustration generation' },
-    { key: 'subscriptions', enabled: true, isPublic: true, description: 'Premium subscriptions & paywall' },
-    { key: 'new_voice_providers', enabled: false, isPublic: false, description: 'Experimental voice providers' },
+    {
+      key: 'physical_books',
+      enabled: false,
+      isPublic: true,
+      description: 'Physical book ordering flow',
+    },
+    {
+      key: 'parent_voice_cloning',
+      enabled: true,
+      isPublic: true,
+      description: 'Parent voice recording & cloning',
+    },
+    {
+      key: 'illustrations',
+      enabled: true,
+      isPublic: true,
+      description: 'AI illustration generation',
+    },
+    {
+      key: 'subscriptions',
+      enabled: true,
+      isPublic: true,
+      description: 'Premium subscriptions & paywall',
+    },
+    {
+      key: 'new_voice_providers',
+      enabled: false,
+      isPublic: false,
+      description: 'Experimental voice providers',
+    },
   ];
   for (const flag of flags) {
     await prisma.featureFlag.upsert({
@@ -156,14 +182,33 @@ async function seedPricing() {
       key: 'monetization_v1',
       value: {
         currency: 'TRY',
-        subscription: { productId: 'masalim_premium_monthly', priceTRY: '999.99', monthlyCredits: 30 },
+        subscription: {
+          productId: 'masalim_premium_monthly',
+          priceTRY: '999.99',
+          monthlyCredits: 30,
+        },
         packs: [
           { productId: 'masalim_credits_6_std', tier: 'FREE', credits: 6, priceTRY: '299.99' },
           { productId: 'masalim_credits_12_std', tier: 'FREE', credits: 12, priceTRY: '599.99' },
           { productId: 'masalim_credits_30_std', tier: 'FREE', credits: 30, priceTRY: '1499.99' },
-          { productId: 'masalim_credits_6_member', tier: 'PREMIUM', credits: 6, priceTRY: '239.99' },
-          { productId: 'masalim_credits_12_member', tier: 'PREMIUM', credits: 12, priceTRY: '479.99' },
-          { productId: 'masalim_credits_30_member', tier: 'PREMIUM', credits: 30, priceTRY: '1199.99' },
+          {
+            productId: 'masalim_credits_6_member',
+            tier: 'PREMIUM',
+            credits: 6,
+            priceTRY: '239.99',
+          },
+          {
+            productId: 'masalim_credits_12_member',
+            tier: 'PREMIUM',
+            credits: 12,
+            priceTRY: '479.99',
+          },
+          {
+            productId: 'masalim_credits_30_member',
+            tier: 'PREMIUM',
+            credits: 30,
+            priceTRY: '1199.99',
+          },
         ],
       },
       active: true,
@@ -175,21 +220,95 @@ async function seedPricing() {
 
 async function seedRecommendationTemplates() {
   const templates = [
-    { interest: 'uzay', title: 'Uzay Macerası', themes: ['SPACE', 'ADVENTURE'], promptSeed: 'Kahraman uzaya gidip kaybolan küçük bir yıldızı evine döndürsün.', emoji: '🚀' },
-    { interest: 'dinozorlar', title: 'Dinozorlarla Tanışma', themes: ['ANIMALS', 'ADVENTURE'], promptSeed: 'Kahraman zamanda yolculuk yapıp dost bir dinozorla arkadaş olsun.', emoji: '🦕' },
-    { interest: 'deniz', title: 'Denizin Altındaki Sır', themes: ['SEA', 'ADVENTURE'], promptSeed: 'Kahraman denizaltı keşfine çıkıp parlayan bir inciyi bulsun.', emoji: '🐠' },
-    { interest: 'hayvanlar', title: 'Ormanın Küçük Kaşifi', themes: ['ANIMALS', 'NATURE'], promptSeed: 'Kahraman ormandaki hayvanlara yardım ederek yeni dostlar edinsin.', emoji: '🌿' },
-    { interest: 'arabalar', title: 'Hızlı Tekerlekler', themes: ['ADVENTURE'], promptSeed: 'Kahraman konuşan bir yarış arabasıyla büyük yarışa katılsın.', emoji: '🏎️' },
-    { interest: 'prensesler', title: 'Cesur Prenses', themes: ['FAIRY_TALE', 'COURAGE'], promptSeed: 'Kahraman cesur bir prenses olarak krallığı kurtarsın.', emoji: '👑' },
-    { interest: 'doğa', title: 'Sihirli Bahçe', themes: ['NATURE', 'IMAGINATION'], promptSeed: 'Kahraman her tohumun bir dilek olduğu sihirli bir bahçe keşfetsin.', emoji: '🌱' },
-    { interest: 'robotlar', title: 'Robot Arkadaşım', themes: ['FANTASY', 'FRIENDSHIP'], promptSeed: 'Kahraman kendi yaptığı küçük robotla dostluğun anlamını öğrensin.', emoji: '🤖' },
-    { interest: 'futbol', title: 'Altın Gol', themes: ['ADVENTURE', 'FRIENDSHIP'], promptSeed: 'Kahraman takımıyla birlikte büyük maçta dostluğun gücünü keşfetsin.', emoji: '⚽' },
-    { interest: 'periler', title: 'Peri Tozunun Sırrı', themes: ['FAIRY_TALE', 'IMAGINATION'], promptSeed: 'Kahraman kayıp peri tozunu bulmak için masal diyarına yolculuk etsin.', emoji: '🧚' },
-    { interest: 'macera', title: 'Gizemli Harita', themes: ['ADVENTURE', 'COURAGE'], promptSeed: 'Kahraman eski bir haritanın izinde saklı bir hazineyi bulsun.', emoji: '🗺️' },
-    { interest: 'müzik', title: 'Şarkı Söyleyen Yıldızlar', themes: ['IMAGINATION', 'SLEEP'], promptSeed: 'Kahraman gökyüzündeki yıldızların ninnisini keşfetsin.', emoji: '🎵' },
+    {
+      interest: 'uzay',
+      title: 'Uzay Macerası',
+      themes: ['SPACE', 'ADVENTURE'],
+      promptSeed: 'Kahraman uzaya gidip kaybolan küçük bir yıldızı evine döndürsün.',
+      emoji: '🚀',
+    },
+    {
+      interest: 'dinozorlar',
+      title: 'Dinozorlarla Tanışma',
+      themes: ['ANIMALS', 'ADVENTURE'],
+      promptSeed: 'Kahraman zamanda yolculuk yapıp dost bir dinozorla arkadaş olsun.',
+      emoji: '🦕',
+    },
+    {
+      interest: 'deniz',
+      title: 'Denizin Altındaki Sır',
+      themes: ['SEA', 'ADVENTURE'],
+      promptSeed: 'Kahraman denizaltı keşfine çıkıp parlayan bir inciyi bulsun.',
+      emoji: '🐠',
+    },
+    {
+      interest: 'hayvanlar',
+      title: 'Ormanın Küçük Kaşifi',
+      themes: ['ANIMALS', 'NATURE'],
+      promptSeed: 'Kahraman ormandaki hayvanlara yardım ederek yeni dostlar edinsin.',
+      emoji: '🌿',
+    },
+    {
+      interest: 'arabalar',
+      title: 'Hızlı Tekerlekler',
+      themes: ['ADVENTURE'],
+      promptSeed: 'Kahraman konuşan bir yarış arabasıyla büyük yarışa katılsın.',
+      emoji: '🏎️',
+    },
+    {
+      interest: 'prensesler',
+      title: 'Cesur Prenses',
+      themes: ['FAIRY_TALE', 'COURAGE'],
+      promptSeed: 'Kahraman cesur bir prenses olarak krallığı kurtarsın.',
+      emoji: '👑',
+    },
+    {
+      interest: 'doğa',
+      title: 'Sihirli Bahçe',
+      themes: ['NATURE', 'IMAGINATION'],
+      promptSeed: 'Kahraman her tohumun bir dilek olduğu sihirli bir bahçe keşfetsin.',
+      emoji: '🌱',
+    },
+    {
+      interest: 'robotlar',
+      title: 'Robot Arkadaşım',
+      themes: ['FANTASY', 'FRIENDSHIP'],
+      promptSeed: 'Kahraman kendi yaptığı küçük robotla dostluğun anlamını öğrensin.',
+      emoji: '🤖',
+    },
+    {
+      interest: 'futbol',
+      title: 'Altın Gol',
+      themes: ['ADVENTURE', 'FRIENDSHIP'],
+      promptSeed: 'Kahraman takımıyla birlikte büyük maçta dostluğun gücünü keşfetsin.',
+      emoji: '⚽',
+    },
+    {
+      interest: 'periler',
+      title: 'Peri Tozunun Sırrı',
+      themes: ['FAIRY_TALE', 'IMAGINATION'],
+      promptSeed: 'Kahraman kayıp peri tozunu bulmak için masal diyarına yolculuk etsin.',
+      emoji: '🧚',
+    },
+    {
+      interest: 'macera',
+      title: 'Gizemli Harita',
+      themes: ['ADVENTURE', 'COURAGE'],
+      promptSeed: 'Kahraman eski bir haritanın izinde saklı bir hazineyi bulsun.',
+      emoji: '🗺️',
+    },
+    {
+      interest: 'müzik',
+      title: 'Şarkı Söyleyen Yıldızlar',
+      themes: ['IMAGINATION', 'SLEEP'],
+      promptSeed: 'Kahraman gökyüzündeki yıldızların ninnisini keşfetsin.',
+      emoji: '🎵',
+    },
   ];
   for (const t of templates) {
-    const existing = await prisma.recommendationTemplate.findFirst({ where: { interest: t.interest, title: t.title } });
+    const existing = await prisma.recommendationTemplate.findFirst({
+      where: { interest: t.interest, title: t.title },
+    });
     if (!existing) {
       await prisma.recommendationTemplate.create({
         data: { ...t, themes: t.themes as never },
@@ -215,10 +334,35 @@ async function seedAdminUser() {
   console.log(`Seeded admin user ${email}`);
 }
 
-async function seedDevData() {
-  if (process.env.NODE_ENV === 'production') return;
+const DEMO_USER_EMAIL = 'demo@masalim.local';
 
-  const email = 'demo@masalim.local';
+/**
+ * Outside development/test the well-known demo account must not be usable:
+ * if an earlier seed created it, replace its password with a random one and
+ * revoke its sessions. Rows are kept so no foreign-key cascade touches data.
+ */
+async function disableDemoUser() {
+  const existing = await prisma.user.findUnique({ where: { email: DEMO_USER_EMAIL } });
+  if (!existing) return;
+  await prisma.user.update({
+    where: { id: existing.id },
+    data: { passwordHash: await argon2.hash(randomBytes(32).toString('hex')) },
+  });
+  await prisma.refreshToken.updateMany({
+    where: { userId: existing.id, revokedAt: null },
+    data: { revokedAt: new Date() },
+  });
+  console.log('Dev demo user disabled (random password, sessions revoked)');
+}
+
+async function seedDevData() {
+  const nodeEnv = process.env.NODE_ENV ?? 'development';
+  if (nodeEnv !== 'development' && nodeEnv !== 'test') {
+    await disableDemoUser();
+    return;
+  }
+
+  const email = DEMO_USER_EMAIL;
   const existing = await prisma.user.findUnique({ where: { email } });
   if (existing) {
     console.log('Dev demo data already present, skipping');
@@ -289,7 +433,9 @@ async function seedDevData() {
     },
   });
 
-  console.log('Seeded dev demo user (demo@masalim.local / demo-password-1) with children and a story');
+  console.log(
+    'Seeded dev demo user (demo@masalim.local / demo-password-1) with children and a story',
+  );
 }
 
 async function main() {

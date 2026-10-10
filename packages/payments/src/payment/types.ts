@@ -35,8 +35,13 @@ export interface CreatePaymentResult {
 export interface VerifyPaymentResult {
   status: 'SUCCEEDED' | 'FAILED' | 'PENDING';
   providerPaymentId: string;
-  /** Paid amount as reported by the provider — MUST be compared to the expected amount (§82). */
+  /**
+   * Paid amount as reported by the provider, normalised to a 2-decimal string
+   * ("649.00") — MUST be compared to the expected amount (§82).
+   */
   paidAmount: string | null;
+  /** Provider-echoed order reference (iyzico basketId) — compared to the order number when present. */
+  basketId?: string | null;
   rawResponse: unknown;
 }
 

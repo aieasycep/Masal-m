@@ -9,6 +9,8 @@ const envSchema = z
     API_PORT: z.coerce.number().int().default(3001),
     API_PUBLIC_URL: z.string().url().default('http://localhost:3001'),
     CORS_ORIGINS: z.string().default('http://localhost:3000'),
+    /** Hops of trusted reverse proxies in front of the API (VPS nginx = 1); 0 = none. */
+    TRUST_PROXY: z.coerce.number().int().min(0).default(0),
 
     DATABASE_URL: z.string().min(1),
     REDIS_URL: z.string().min(1).default('redis://localhost:6379'),

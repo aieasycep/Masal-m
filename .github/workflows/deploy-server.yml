@@ -84,15 +84,16 @@ jobs:
           check_model() {
             local model="$1" code
             if [ "$AI_VENDOR" = anthropic ]; then
-              code=$(curl -sS -o /tmp/model.json -w '%{http_code}' \
+              code=$(curl -sS --max-time 20 -o /tmp/model.json -w '%{http_code}' \
                 -H "x-api-key: $KEY" -H "anthropic-version: 2023-06-01" \
-                "https://api.anthropic.com/v1/models/$model")
+                "https://api.anthropic.com/v1/models/$model" || echo 000)
             else
-              code=$(curl -sS -o /tmp/model.json -w '%{http_code}' \
-                -H "Authorization: Bearer $KEY" "https://api.openai.com/v1/models/$model")
+              code=$(curl -sS --max-time 20 -o /tmp/model.json -w '%{http_code}' \
+                -H "Authorization: Bearer $KEY" "https://api.openai.com/v1/models/$model" || echo 000)
             fi
             case "$code" in
               200) echo "✓ $model bu anahtarla erişilebilir" ;;
+              000) echo "::error::Sağlayıcı API'sine ulaşılamadı (ağ/zaman aşımı) — model kontrolü yapılamadı: $model. Biraz sonra yeniden dene."; exit 1 ;;
               401|403) echo "::error::$SECRET_NAME anahtarı reddedildi (HTTP $code). Anahtarı yeniden oluşturup secret'ı güncelle."; exit 1 ;;
               404) echo "::error::Model bulunamadı: $model (HTTP 404). Workflow'daki model adını kontrol et."; exit 1 ;;
               *) echo "::error::Model kontrolü başarısız: $model → HTTP $code: $(head -c 300 /tmp/model.json)"; exit 1 ;;
@@ -145,6 +146,9 @@ jobs:
             echo "TTS_API_KEY=$TTS_API_KEY"
             echo "VOICE_CLONE_API_KEY=$VOICE_CLONE_API_KEY"
             echo "IMAGE_API_KEY=$IMAGE_API_KEY"
+            # Host nginx is the single trusted proxy hop: rate limits and login
+            # lockouts must key on the real client IP, not on 127.0.0.1.
+            echo "TRUST_PROXY=1"
           } | ssh "$SERVER" 'umask 077; cat > /opt/masalim/providers.env'
 
       # Sunucuda 80/443 host nginx'te (başka projeler de yayında). Masalım'ın
@@ -190,9 +194,18 @@ jobs:
           echo
           echo "API canlı: $API_URL"
           echo "LLM: ${{ steps.llm.outputs.provider }} / ${{ steps.llm.outputs.story_model }} — denetim: ${{ steps.llm.outputs.mod_provider }} / ${{ steps.llm.outputs.mod_model }}"
+          if ssh "$SERVER" 'grep -q "^NODE_ENV=production" /opt/masalim/.env'; then
+            echo "Mod: ÜRETİM (NODE_ENV=production — sahte satın alma/ödeme kapalı)"
+          else
+            echo "::warning::TEST MODU: sunucu NODE_ENV=staging — sahte satın alma/ödeme uçları HERKESE açık. Canlıya geçiş adımları: docs/go-live.md"
+          fi
 
-      # İsteğe bağlı uçtan uca kanıt: canlı API'de taze bir hesapla KISA masal
-      # üretilir ve sonucu (başlık, sayfa sayısı, çizim yönergesi) log'a yazılır.
+      # İsteğe bağlı uçtan uca kanıt: canlı API'de sabit smoke hesabıyla KISA
+      # masal üretilir ve sonucu (başlık, sayfa/kelime sayısı) log'a yazılır.
+      # SMOKE_EMAIL/SMOKE_PASSWORD secret'ları yoksa tek seferlik hesap açılır.
       - name: Canlı masal üretimi (story_smoke)
         if: github.event_name == 'workflow_dispatch' && inputs.story_smoke
+        env:
+          SMOKE_EMAIL: ${{ secrets.SMOKE_EMAIL }}
+          SMOKE_PASSWORD: ${{ secrets.SMOKE_PASSWORD }}
         run: bash deploy/smoke-story.sh "$API_URL"

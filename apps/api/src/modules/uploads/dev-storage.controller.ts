@@ -1,21 +1,16 @@
-import {
-  Controller,
-  Get,
-  HttpStatus,
-  Inject,
-  Param,
-  Put,
-  Query,
-  Req,
-  Res,
-} from '@nestjs/common';
+import { Controller, Get, HttpStatus, Inject, Param, Put, Query, Req, Res } from '@nestjs/common';
 import { ApiExcludeController } from '@nestjs/swagger';
 import { LocalStorageProvider, StorageProvider } from '@masalim/storage';
-import { ErrorCode } from '@masalim/types';
+import { AVATAR_UPLOAD, ErrorCode, VOICE_RECORDING } from '@masalim/types';
 import type { Request, Response } from 'express';
 import { Public } from '../../common/auth/public.decorator';
 import { AppException } from '../../common/errors/app.exception';
 import { STORAGE } from '../../providers/providers.module';
+
+const MAX_DEV_UPLOAD_BYTES = Math.max(
+  VOICE_RECORDING.MAX_UPLOAD_BYTES,
+  AVATAR_UPLOAD.MAX_UPLOAD_BYTES,
+);
 
 /**
  * Dev-only object routes backing the LocalStorageProvider's signed URLs.
@@ -52,8 +47,19 @@ export class DevStorageController {
         HttpStatus.FORBIDDEN,
       );
     }
+    // Mirror S3's signed-upload size cap: the dev route is public (token-gated)
+    // and must not let a client stream an unbounded body onto the disk.
     const chunks: Buffer[] = [];
+    let received = 0;
     for await (const chunk of req) {
+      received += (chunk as Buffer).byteLength;
+      if (received > MAX_DEV_UPLOAD_BYTES) {
+        throw new AppException(
+          ErrorCode.VALIDATION_FAILED,
+          'Upload exceeds the allowed size',
+          HttpStatus.PAYLOAD_TOO_LARGE,
+        );
+      }
       chunks.push(chunk as Buffer);
     }
     await provider.putObject(

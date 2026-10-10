@@ -118,7 +118,25 @@ export class StoriesService {
       );
     }
 
-    const idea = [story.customPrompt, story.educationalGoal].filter(Boolean).join(' — ');
+    // Every parent-written field the prompt will see is pre-checked, not just
+    // the idea: hero name plus the attached child's name and interests (loaded
+    // the way the worker does — by id, so a since-deleted child still counts).
+    const child =
+      story.childId == null
+        ? null
+        : await this.prisma.child.findUnique({
+            where: { id: story.childId },
+            select: { name: true, interests: true },
+          });
+    const idea = [
+      story.customPrompt,
+      story.educationalGoal,
+      story.heroName,
+      child?.name,
+      child != null && child.interests.length > 0 ? child.interests.join(', ') : null,
+    ]
+      .filter((part): part is string => part != null && part.trim().length > 0)
+      .join(' — ');
     if (idea.length > 0) {
       const verdict = await this.moderator.checkStoryIdea(idea, story.language as 'tr' | 'en');
       if (!verdict.safe) {
@@ -223,9 +241,11 @@ export class StoriesService {
   }
 
   /**
-   * Edit = copy-on-write versioning (§80): the previous state is archived to
-   * StoryRevision and `version` bumps, so narrations/illustrations can detect
-   * they were produced from an older version.
+   * Edit = copy-on-write versioning (§80): when page text actually changes the
+   * previous state is archived to StoryRevision and `version` bumps, so
+   * narrations/illustrations can detect they were produced from an older
+   * version. A title-only edit renames in place — no bump, no revision.
+   * Edited text passes the same safety gate as generated text (§16).
    */
   async update(userId: string, storyId: string, input: UpdateStoryInput): Promise<StoryDetail> {
     const story = await this.findOwned(userId, storyId);
@@ -241,6 +261,36 @@ export class StoriesService {
       where: { storyId },
       orderBy: { pageNumber: 'asc' },
     });
+    const currentText = new Map(pages.map((page) => [page.pageNumber, page.text]));
+    const changedPages = (input.pages ?? []).filter(
+      (page) => currentText.has(page.pageNumber) && currentText.get(page.pageNumber) !== page.text,
+    );
+    const nextTitle = input.title != null && input.title !== story.title ? input.title : null;
+    if (changedPages.length === 0 && nextTitle == null) return this.detail(userId, storyId);
+
+    const verdict = await this.moderator.checkStoryText(
+      [...changedPages.map((page) => page.text), ...(nextTitle != null ? [nextTitle] : [])].join(
+        '\n\n',
+      ),
+      story.language as 'tr' | 'en',
+    );
+    if (!verdict.safe) {
+      throw new AppException(
+        ErrorCode.MODERATION_REJECTED,
+        'Edited text is not child-appropriate',
+        HttpStatus.UNPROCESSABLE_ENTITY,
+        { category: verdict.category },
+      );
+    }
+
+    if (changedPages.length === 0) {
+      const renamed = await this.prisma.story.update({
+        where: { id: storyId },
+        data: { title: nextTitle ?? undefined },
+        include: STORY_INCLUDE,
+      });
+      return this.toDetail(userId, renamed);
+    }
 
     const updated = await this.prisma.$transaction(async (tx) => {
       await tx.storyRevision.create({
@@ -253,13 +303,11 @@ export class StoriesService {
         },
       });
 
-      if (input.pages != null) {
-        for (const page of input.pages) {
-          await tx.storyPage.updateMany({
-            where: { storyId, pageNumber: page.pageNumber },
-            data: { text: page.text },
-          });
-        }
+      for (const page of changedPages) {
+        await tx.storyPage.updateMany({
+          where: { storyId, pageNumber: page.pageNumber },
+          data: { text: page.text },
+        });
       }
 
       const nextPages = await tx.storyPage.findMany({
@@ -269,7 +317,7 @@ export class StoriesService {
       return tx.story.update({
         where: { id: storyId },
         data: {
-          title: input.title ?? undefined,
+          title: nextTitle ?? undefined,
           storyText: nextPages.map((page) => page.text).join('\n\n'),
           version: { increment: 1 },
         },
@@ -364,9 +412,7 @@ export class StoriesService {
       heroName: row.heroName,
       themes: row.themes,
       durationTarget: row.durationTarget,
-      coverImageUrl: row.coverImageKey
-        ? await this.storage.getSignedUrl(row.coverImageKey)
-        : null,
+      coverImageUrl: row.coverImageKey ? await this.storage.getSignedUrl(row.coverImageKey) : null,
       isFavorite: row.favorites.some((favorite) => favorite.userId === userId),
       hasBook: row.books.length > 0,
       latestNarration:

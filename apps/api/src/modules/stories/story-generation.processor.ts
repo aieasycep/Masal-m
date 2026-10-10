@@ -1,10 +1,4 @@
-import {
-  Inject,
-  Injectable,
-  Logger,
-  OnApplicationShutdown,
-  OnModuleInit,
-} from '@nestjs/common';
+import { Inject, Injectable, Logger, OnApplicationShutdown, OnModuleInit } from '@nestjs/common';
 import { UnrecoverableError, Worker, Job } from 'bullmq';
 import type Redis from 'ioredis';
 import {
@@ -56,11 +50,10 @@ export class StoryGenerationProcessor implements OnModuleInit, OnApplicationShut
 
   onModuleInit(): void {
     if (this.env.WORKER_MODE === 'separate') return; // API-only process
-    this.worker = new Worker<QueueJobData>(
-      QueueName.STORY_GENERATION,
-      (job) => this.process(job),
-      { connection: this.redis, concurrency: 2 },
-    );
+    this.worker = new Worker<QueueJobData>(QueueName.STORY_GENERATION, (job) => this.process(job), {
+      connection: this.redis,
+      concurrency: 2,
+    });
     this.worker.on('failed', (job, error) => {
       this.logger.error(
         { err: error, aiJobId: job?.data.aiJobId },
@@ -130,7 +123,16 @@ export class StoryGenerationProcessor implements OnModuleInit, OnApplicationShut
       await this.jobs.setProgress(aiJob.id, 70);
 
       const fullText = result.story.pages.map((page) => page.text).join('\n\n');
-      const verdict = await this.moderator.checkStoryText(fullText, input.language);
+      // Moderate everything the child or the image model will see — the title,
+      // summary and illustration prompts are model-written too.
+      const moderatedText = [
+        result.story.title,
+        result.story.summary,
+        fullText,
+        result.story.coverIllustrationPrompt,
+        ...result.story.pages.map((page) => page.illustrationPrompt),
+      ].join('\n\n');
+      const verdict = await this.moderator.checkStoryText(moderatedText, input.language);
       await this.jobs.setProgress(aiJob.id, 85);
       if (!verdict.safe) {
         await this.rejectByModeration(aiJob, story.id, story.userId, verdict.category);
@@ -183,10 +185,16 @@ export class StoryGenerationProcessor implements OnModuleInit, OnApplicationShut
       );
     } catch (error) {
       const isLastAttempt = job.attemptsMade + 1 >= (job.opts.attempts ?? 1);
-      const refused =
-        error instanceof StoryGenerationError && error.code === 'REFUSED';
+      const refused = error instanceof StoryGenerationError && error.code === 'REFUSED';
       if (refused) {
         await this.rejectByModeration(aiJob, story.id, story.userId, 'refused');
+        return;
+      }
+      // A truncated output repeats deterministically; retrying would bill the
+      // whole output budget twice more for the same failure.
+      const truncated = error instanceof StoryGenerationError && error.code === 'TRUNCATED';
+      if (truncated) {
+        await this.finalizeFailure(aiJob, story.id, story.userId, error);
         return;
       }
       if (isLastAttempt) {

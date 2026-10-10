@@ -2,49 +2,44 @@ import {
   Body,
   Controller,
   Get,
+  HttpCode,
+  HttpStatus,
   Param,
   Patch,
   Post,
   Query,
+  Req,
   UseGuards,
   createParamDecorator,
   type ExecutionContext,
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { Throttle, seconds } from '@nestjs/throttler';
-import { createZodDto } from 'nestjs-zod';
 import { AdminRole } from '@masalim/types';
-import {
-  adminFeatureFlagPatchSchema,
-  adminListJobsQuerySchema,
-  adminListOrdersQuerySchema,
-  adminListStoriesQuerySchema,
-  adminListUsersQuerySchema,
-  adminLoginSchema,
-  adminModerationPatchSchema,
-  adminOrderPatchSchema,
-  adminSystemVoiceUpsertSchema,
-  paginationQuerySchema,
-  type AdminDashboardStats,
-  type AdminSession,
-  type AdminUserDetail,
+import type {
+  AdminDashboardStats,
+  AdminMe,
+  AdminSession,
+  AdminUserDetail,
 } from '@masalim/validation';
 import type { Request } from 'express';
 import { Public } from '../../common/auth/public.decorator';
 import { AdminAuthGuard, AdminRoles, type AuthenticatedAdmin } from './admin-auth.guard';
+import {
+  AdminChangePasswordDto,
+  AdminFeatureFlagPatchDto,
+  AdminListJobsQueryDto,
+  AdminListOrdersQueryDto,
+  AdminListStoriesQueryDto,
+  AdminListUsersQueryDto,
+  AdminLoginDto,
+  AdminModerationPatchDto,
+  AdminOrderPatchDto,
+  AdminSystemVoiceCreateDto,
+  AdminSystemVoicePatchDto,
+  PaginationQueryDto,
+} from './admin.dto';
 import { AdminService } from './admin.service';
-
-class AdminLoginDto extends createZodDto(adminLoginSchema) {}
-class AdminListUsersQueryDto extends createZodDto(adminListUsersQuerySchema) {}
-class AdminListJobsQueryDto extends createZodDto(adminListJobsQuerySchema) {}
-class AdminListStoriesQueryDto extends createZodDto(adminListStoriesQuerySchema) {}
-class AdminListOrdersQueryDto extends createZodDto(adminListOrdersQuerySchema) {}
-class AdminModerationPatchDto extends createZodDto(adminModerationPatchSchema) {}
-class AdminOrderPatchDto extends createZodDto(adminOrderPatchSchema) {}
-class AdminSystemVoiceCreateDto extends createZodDto(adminSystemVoiceUpsertSchema) {}
-class AdminSystemVoicePatchDto extends createZodDto(adminSystemVoiceUpsertSchema.partial()) {}
-class AdminFeatureFlagPatchDto extends createZodDto(adminFeatureFlagPatchSchema) {}
-class PaginationQueryDto extends createZodDto(paginationQuerySchema) {}
 
 const CurrentAdmin = createParamDecorator(
   (_data: unknown, context: ExecutionContext): AuthenticatedAdmin => {
@@ -65,7 +60,21 @@ const CurrentAdmin = createParamDecorator(
 export class AdminController {
   constructor(private readonly admin: AdminService) {}
 
-  // ── Auth ── (login skips AdminAuthGuard via its own @Public marker below)
+  // ── Self (any admin role) — login lives on AdminAuthController below ──
+
+  @Get('me')
+  me(@CurrentAdmin() admin: AuthenticatedAdmin): Promise<AdminMe> {
+    return this.admin.me(admin.id);
+  }
+
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @Patch('me/password')
+  changePassword(
+    @CurrentAdmin() admin: AuthenticatedAdmin,
+    @Body() body: AdminChangePasswordDto,
+  ): Promise<void> {
+    return this.admin.changePassword(admin, body);
+  }
 
   @Get('dashboard/stats')
   stats(): Promise<AdminDashboardStats> {
@@ -211,7 +220,7 @@ export class AdminAuthController {
 
   @Throttle({ default: { ttl: seconds(60), limit: 10 } })
   @Post('login')
-  login(@Body() body: AdminLoginDto): Promise<AdminSession> {
-    return this.admin.login(body);
+  login(@Body() body: AdminLoginDto, @Req() req: Request): Promise<AdminSession> {
+    return this.admin.login(body, req.ip ?? 'unknown');
   }
 }

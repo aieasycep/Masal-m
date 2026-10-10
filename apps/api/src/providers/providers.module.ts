@@ -142,7 +142,12 @@ const modelForVendor = (
           case 'openai':
             return new OpenAIContentModerator({
               apiKey: env.AI_API_KEY,
-              model: modelForVendor('MODERATION_MODEL', env.MODERATION_MODEL, 'openai', 'gpt-4o-mini'),
+              model: modelForVendor(
+                'MODERATION_MODEL',
+                env.MODERATION_MODEL,
+                'openai',
+                'gpt-4o-mini',
+              ),
             });
           case 'mock':
             return new MockContentModerator();
@@ -165,7 +170,23 @@ const modelForVendor = (
       useFactory: (env: Env): NarrationDirector | null =>
         env.AI_PROVIDER === 'mock' || env.AI_API_KEY === ''
           ? null
-          : new NarrationDirector({ provider: env.AI_PROVIDER, apiKey: env.AI_API_KEY }),
+          : new NarrationDirector({
+              provider: env.AI_PROVIDER,
+              apiKey: env.AI_API_KEY,
+              // Same fast model as moderation (cheap, follows the vendor switch).
+              model: modelForVendor(
+                'MODERATION_MODEL',
+                env.MODERATION_MODEL,
+                env.AI_PROVIDER,
+                env.AI_PROVIDER === 'anthropic' ? DEFAULT_ANTHROPIC_FAST_MODEL : 'gpt-4o-mini',
+              ),
+              onFallback: (reason, error) =>
+                logger.warn(
+                  `narration director fell back to plain text: ${reason}${
+                    error instanceof Error ? ` — ${error.message}` : ''
+                  }`,
+                ),
+            }),
     },
     {
       provide: VOICE_CLONE,

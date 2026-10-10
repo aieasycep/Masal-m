@@ -1,7 +1,9 @@
 import type {
   AdminAuditLog,
+  AdminChangePasswordInput,
   AdminDashboardStats,
   AdminJob,
+  AdminMe,
   AdminModerationPatchInput,
   AdminOrderPatchInput,
   AdminSession,
@@ -162,6 +164,12 @@ export const api = {
       body: { email, password },
       skipAuthRedirect: true,
     }),
+
+  // ── Self ──
+  me: () => request<AdminMe>('/admin/me'),
+  /** A wrong current password answers 401 — that must not be mistaken for an expired session. */
+  changePassword: (body: AdminChangePasswordInput) =>
+    request<void>('/admin/me/password', { method: 'PATCH', body, skipAuthRedirect: true }),
 
   // ── Dashboard ──
   dashboardStats: () => request<AdminDashboardStats>('/admin/dashboard/stats'),

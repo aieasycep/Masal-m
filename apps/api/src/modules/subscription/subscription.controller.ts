@@ -1,17 +1,8 @@
-import {
-  Body,
-  Controller,
-  Get,
-  Headers,
-  HttpCode,
-  HttpStatus,
-  Inject,
-  Post,
-} from '@nestjs/common';
+import { Body, Controller, Get, Headers, HttpCode, HttpStatus, Inject, Post } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { createZodDto } from 'nestjs-zod';
 import { z } from 'zod';
-import { randomUUID } from 'node:crypto';
+import { randomUUID, timingSafeEqual } from 'node:crypto';
 import { CREDIT_PACK_PRODUCT_IDS, ErrorCode } from '@masalim/types';
 import {
   mockPurchaseSchema,
@@ -46,6 +37,14 @@ const revenueCatWebhookSchema = z.object({
 
 class MockPurchaseDto extends createZodDto(mockPurchaseSchema) {}
 class RevenueCatWebhookDto extends createZodDto(revenueCatWebhookSchema) {}
+
+/** Constant-time secret comparison; a length mismatch is simply "no match". */
+function secretMatches(provided: string | undefined, expected: string): boolean {
+  if (provided == null) return false;
+  const a = Buffer.from(provided);
+  const b = Buffer.from(expected);
+  return a.length === b.length && timingSafeEqual(a, b);
+}
 
 const SUPPORTED_EVENTS = new Set<SubscriptionEvent['eventType']>([
   'INITIAL_PURCHASE',
@@ -93,12 +92,16 @@ export class SubscriptionController {
     @Body() body: RevenueCatWebhookDto,
   ): Promise<{ received: boolean }> {
     const secret = this.env.REVENUECAT_WEBHOOK_SECRET;
-    if (!secret || authorization !== secret) {
+    if (!secret || !secretMatches(authorization, secret)) {
       throw new AppException(
         ErrorCode.AUTH_TOKEN_INVALID,
         'Invalid webhook credentials',
         HttpStatus.UNAUTHORIZED,
       );
+    }
+    // Sandbox purchases must never grant production entitlements.
+    if (this.env.NODE_ENV === 'production' && body.event.environment === 'SANDBOX') {
+      return { received: true };
     }
     const eventType = body.event.type as SubscriptionEvent['eventType'];
     if (!SUPPORTED_EVENTS.has(eventType)) {

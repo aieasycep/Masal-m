@@ -1,6 +1,7 @@
-import { Body, Controller, HttpCode, Post } from '@nestjs/common';
+import { Body, Controller, HttpCode, Post, Req } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { ApiTags } from '@nestjs/swagger';
+import type { Request } from 'express';
 import type { AuthSession, AuthTokens } from '@masalim/validation';
 import { Public } from '../../common/auth/public.decorator';
 import { CurrentUser } from '../../common/auth/current-user.decorator';
@@ -16,6 +17,11 @@ import {
   RegisterDto,
   ResetPasswordDto,
 } from './auth.dto';
+
+/** Client address as Express resolves it (honours TRUST_PROXY); lockout needs a stable key. */
+function clientIp(req: Request): string {
+  return req.ip ?? 'unknown';
+}
 
 @ApiTags('auth')
 @Controller('auth')
@@ -33,8 +39,8 @@ export class AuthController {
   @Throttle({ default: { limit: 10, ttl: 60_000 } })
   @HttpCode(200)
   @Post('login')
-  login(@Body() body: LoginDto): Promise<AuthSession> {
-    return this.authService.login(body);
+  login(@Body() body: LoginDto, @Req() req: Request): Promise<AuthSession> {
+    return this.authService.login(body, clientIp(req));
   }
 
   @Public()
@@ -80,8 +86,11 @@ export class AuthController {
   @Throttle({ default: { limit: 5, ttl: 60_000 } })
   @HttpCode(200)
   @Post('password/reset')
-  async resetPassword(@Body() body: ResetPasswordDto): Promise<{ reset: boolean }> {
-    await this.authService.resetPassword(body);
+  async resetPassword(
+    @Body() body: ResetPasswordDto,
+    @Req() req: Request,
+  ): Promise<{ reset: boolean }> {
+    await this.authService.resetPassword(body, clientIp(req));
     return { reset: true };
   }
 }

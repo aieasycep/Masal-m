@@ -134,6 +134,9 @@ export class AnthropicStoryProvider implements StoryGenerationProvider {
       return { story: first, usage };
     }
     const expanded = second.story;
+    if (expanded?.title.includes(UNSAFE_SENTINEL)) {
+      throw new StoryGenerationError('Model flagged the request as unsafe', 'REFUSED');
+    }
     return expanded != null && countStoryWords(expanded.pages) > words
       ? { story: expanded, usage }
       : { story: first, usage };
@@ -172,7 +175,7 @@ export class AnthropicStoryProvider implements StoryGenerationProvider {
     if (response.stop_reason === 'max_tokens') {
       throw new StoryGenerationError(
         `Model output truncated at ${MAX_OUTPUT_TOKENS} tokens`,
-        'INVALID_OUTPUT',
+        'TRUNCATED',
       );
     }
 

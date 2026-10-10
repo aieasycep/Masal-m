@@ -1,11 +1,23 @@
 import Anthropic from '@anthropic-ai/sdk';
 import OpenAI from 'openai';
-import { DEFAULT_ANTHROPIC_FAST_MODEL, effortConfig, textOf } from '../shared/anthropic';
+import {
+  DEFAULT_ANTHROPIC_FAST_MODEL,
+  effortConfig,
+  FAST_CLIENT_OPTIONS,
+  textOf,
+} from '../shared/anthropic';
 
 export interface NarrationDirectorConfig {
   provider: 'openai' | 'anthropic';
   apiKey: string;
   model?: string;
+  /**
+   * Called when a chunk falls back to plain text (API error, rewritten story,
+   * over-length reply). Tagging is best-effort, but a persistent failure must
+   * be visible somewhere — without this hook a bad model id would silently
+   * switch expressive narration off for every story.
+   */
+  onFallback?: (reason: string, error?: unknown) => void;
 }
 
 // ElevenLabs v3 reads ~3,000 chars per request; chunks arrive at ≤ ~2,500, so a
@@ -13,7 +25,7 @@ export interface NarrationDirectorConfig {
 const MAX_TAGGED_LENGTH = 2900;
 
 const DIRECTOR_SYSTEM = [
-  'You are a narration director preparing a children\'s bedtime story for expressive',
+  "You are a narration director preparing a children's bedtime story for expressive",
   'text-to-speech that supports ElevenLabs v3 audio tags. Insert audio tags in square',
   'brackets to guide emotional delivery, e.g. [warmly], [softly], [whispers],',
   '[excited], [curious], [gently], [sleepy], [giggles], [gasps], [relieved].',
@@ -51,14 +63,16 @@ export const applyDirectorOutput = (original: string, modelOutput: string): stri
  */
 export class NarrationDirector {
   readonly name: string;
-  private readonly model: string;
+  readonly model: string;
   private readonly complete: (prompt: string) => Promise<string>;
+  private readonly onFallback: NarrationDirectorConfig['onFallback'];
 
   constructor(config: NarrationDirectorConfig) {
     this.name = config.provider;
+    this.onFallback = config.onFallback;
     if (config.provider === 'openai') {
       this.model = config.model ?? 'gpt-4o-mini';
-      const client = new OpenAI({ apiKey: config.apiKey });
+      const client = new OpenAI({ apiKey: config.apiKey, ...FAST_CLIENT_OPTIONS });
       this.complete = async (prompt) => {
         const completion = await client.chat.completions.create({
           model: this.model,
@@ -73,7 +87,7 @@ export class NarrationDirector {
       return;
     }
     this.model = config.model ?? DEFAULT_ANTHROPIC_FAST_MODEL;
-    const client = new Anthropic({ apiKey: config.apiKey });
+    const client = new Anthropic({ apiKey: config.apiKey, ...FAST_CLIENT_OPTIONS });
     this.complete = async (prompt) => {
       const response = await client.messages.create({
         model: this.model,
@@ -89,13 +103,17 @@ export class NarrationDirector {
   }
 
   async annotate(text: string, language: 'tr' | 'en'): Promise<string> {
+    let output: string;
     try {
-      const output = await this.complete(
+      output = await this.complete(
         `Story chunk (${language}):\n${text}\n\nReturn the same text with audio tags inserted.`,
       );
-      return applyDirectorOutput(text, output);
-    } catch {
+    } catch (error) {
+      this.onFallback?.('request failed', error);
       return text;
     }
+    const tagged = applyDirectorOutput(text, output);
+    if (tagged === text) this.onFallback?.('reply rejected (rewritten, empty or over-length)');
+    return tagged;
   }
 }

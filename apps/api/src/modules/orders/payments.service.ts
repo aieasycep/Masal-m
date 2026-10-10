@@ -10,6 +10,13 @@ import type { Env } from '../../config/env';
 import { PAYMENT } from '../../providers/providers.module';
 import { OrdersService } from './orders.service';
 
+/** "649" and "649.00" are the same money; compare on a 2-decimal rendering. */
+function normalizeAmount(value: string | null): string | null {
+  if (value == null || value.trim() === '') return null;
+  const amount = Number(value);
+  return Number.isFinite(amount) ? amount.toFixed(2) : null;
+}
+
 /** Strip anything card-like before persisting provider responses (§47). */
 function sanitize(raw: unknown): object {
   const clone = JSON.parse(JSON.stringify(raw ?? {})) as Record<string, unknown>;
@@ -53,6 +60,15 @@ export class PaymentsService {
 
     const existing = await this.prisma.payment.findUnique({ where: { idempotencyKey } });
     if (existing != null) {
+      // The key is client-chosen: a replay against another order (ownership of
+      // THIS order was checked above) must not leak that payment's checkout.
+      if (existing.orderId !== order.id) {
+        throw new AppException(
+          ErrorCode.VALIDATION_FAILED,
+          'Idempotency-Key was used for a different order',
+          HttpStatus.CONFLICT,
+        );
+      }
       const raw = (existing.rawResponse ?? {}) as { checkoutUrl?: string; providerToken?: string };
       return {
         provider: existing.provider,
@@ -62,7 +78,14 @@ export class PaymentsService {
       };
     }
 
-    const address = order.addressSnapshot as { fullName: string; phone: string; addressLine: string; city: string; district: string; postalCode: string };
+    const address = order.addressSnapshot as {
+      fullName: string;
+      phone: string;
+      addressLine: string;
+      city: string;
+      district: string;
+      postalCode: string;
+    };
     const paymentId = randomUUID();
     const result = await this.paymentProvider.createPayment({
       paymentId,
@@ -77,9 +100,7 @@ export class PaymentsService {
         ip: buyerIp || '85.34.78.112',
       },
       shippingAddress: address,
-      basketItems: [
-        { id: order.bookId, name: order.book.title, price: order.total.toFixed(2) },
-      ],
+      basketItems: [{ id: order.bookId, name: order.book.title, price: order.total.toFixed(2) }],
       callbackUrl: `${this.env.API_PUBLIC_URL}/payments/iyzico/callback`,
     });
 
@@ -112,9 +133,15 @@ export class PaymentsService {
 
   /**
    * Verify a completed checkout (§82): the provider-reported paid amount MUST
-   * match the expected order total; a mismatch fails the payment.
+   * match the expected order total (and the echoed basket id the order
+   * number); a mismatch fails the payment. `ownerUserId` is set by the
+   * authenticated mock path; the iyzico callback is unowned because its
+   * token is provider-issued.
    */
-  async completeByToken(providerToken: string): Promise<{ status: PaymentStatus; orderId: string }> {
+  async completeByToken(
+    providerToken: string,
+    ownerUserId?: string,
+  ): Promise<{ status: PaymentStatus; orderId: string }> {
     const payment = await this.prisma.payment.findFirst({
       where: {
         rawResponse: { path: ['providerToken'], equals: providerToken },
@@ -122,26 +149,43 @@ export class PaymentsService {
       include: { order: true },
     });
     if (payment == null) throw AppException.notFound('Payment not found');
+    if (ownerUserId != null && payment.order.userId !== ownerUserId) {
+      throw AppException.forbiddenOwnership();
+    }
     if (payment.status === PaymentStatus.SUCCEEDED) {
       return { status: payment.status, orderId: payment.orderId };
     }
 
     const verdict = await this.paymentProvider.verifyPayment(providerToken);
     if (verdict.status === 'SUCCEEDED') {
-      const expected = payment.order.total.toFixed(2);
-      if (verdict.paidAmount !== expected) {
+      const expected = normalizeAmount(payment.order.total.toFixed(2));
+      const paid = normalizeAmount(verdict.paidAmount);
+      const basketMismatch =
+        verdict.basketId != null && verdict.basketId !== payment.order.orderNumber;
+      if (paid == null || paid !== expected || basketMismatch) {
         await this.prisma.payment.update({
           where: { id: payment.id },
           data: {
             status: PaymentStatus.FAILED,
             rawResponse: {
               ...sanitize(verdict.rawResponse),
-              mismatch: { expected, paid: verdict.paidAmount },
+              mismatch: {
+                expected,
+                paid: verdict.paidAmount,
+                orderNumber: payment.order.orderNumber,
+                basketId: verdict.basketId ?? null,
+              },
             },
           },
         });
         this.logger.error(
-          { paymentId: payment.id, expected, paid: verdict.paidAmount },
+          {
+            paymentId: payment.id,
+            expected,
+            paid: verdict.paidAmount,
+            orderNumber: payment.order.orderNumber,
+            basketId: verdict.basketId ?? null,
+          },
           'payment amount mismatch',
         );
         throw new AppException(
