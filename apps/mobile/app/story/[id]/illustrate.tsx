@@ -1,5 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+  type ImageSourcePropType,
+} from 'react-native';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -26,7 +34,6 @@ import { ApiError, NetworkError } from '@masalim/api-client';
 import type { Illustration, IllustrationSet } from '@masalim/validation';
 import {
   colors,
-  coverTints,
   fontFamilies,
   fontSizes,
   gradients,
@@ -46,6 +53,11 @@ import { storyThemeEmoji } from '../../../src/components/StorySheet';
 import { CheckIcon } from '../../../src/components/icons';
 import { KeepScreenAwake } from '../../../src/components/KeepScreenAwake';
 import { ErrorState } from '../../../src/components/states';
+import classicSample from '../../../assets/style-samples/CLASSIC_STORYBOOK.webp';
+import handDrawnSample from '../../../assets/style-samples/HAND_DRAWN.webp';
+import pastelSample from '../../../assets/style-samples/PASTEL.webp';
+import soft3dSample from '../../../assets/style-samples/SOFT_3D.webp';
+import watercolorSample from '../../../assets/style-samples/WATERCOLOR.webp';
 
 /** Picker order mirrors the design's card order. */
 const STYLE_ORDER: IllustrationStyle[] = [
@@ -57,16 +69,16 @@ const STYLE_ORDER: IllustrationStyle[] = [
 ];
 
 /**
- * Three vertical color stripes per style card (design: IllustrationStyle).
- * Tokens where they exist; the classic/pastel palettes are design literals
- * absent from the token set.
+ * Real sample per style — the SAME hero and scene rendered in each medium
+ * (generated once by the "Style Samples" workflow), so the picker shows the
+ * difference instead of describing it.
  */
-const STYLE_STRIPES: Record<IllustrationStyle, readonly [string, string, string]> = {
-  WATERCOLOR: [coverTints[1], colors.lavenderLight, colors.peach],
-  SOFT_3D: [colors.peach, colors.gold, coverTints[2]],
-  CLASSIC_STORYBOOK: ['#D4A574', '#8B6914', '#5C3D1E'],
-  PASTEL: ['#F0C9D4', '#C9E0F0', '#D4F0C9'],
-  HAND_DRAWN: [colors.foreground, colors.mutedForeground, colors.background],
+const STYLE_SAMPLES: Record<IllustrationStyle, ImageSourcePropType> = {
+  WATERCOLOR: watercolorSample,
+  SOFT_3D: soft3dSample,
+  CLASSIC_STORYBOOK: classicSample,
+  PASTEL: pastelSample,
+  HAND_DRAWN: handDrawnSample,
 };
 
 const STYLE_EMOJIS: Record<IllustrationStyle, string> = {
@@ -754,11 +766,12 @@ export default function IllustrateStory() {
             style={styles.styleCard}
             accessibilityLabel={t(`illustrate.styles.${style}`)}
           >
-            <View style={styles.stripes}>
-              {STYLE_STRIPES[style].map((stripeColor, index) => (
-                <View key={index} style={[styles.stripeBar, { backgroundColor: stripeColor }]} />
-              ))}
-            </View>
+            <Image
+              source={STYLE_SAMPLES[style]}
+              style={styles.sample}
+              contentFit="cover"
+              accessibilityIgnoresInvertColors
+            />
             <View style={styles.styleInfo}>
               <Text style={styles.styleEmoji}>{STYLE_EMOJIS[style]}</Text>
               <View style={styles.styleTextBlock}>
@@ -918,8 +931,12 @@ export default function IllustrateStory() {
               { opacity: regen != null ? 0.5 : pressed ? 0.7 : 1 },
             ]}
           >
-            <Text style={styles.actionEmoji}>🔄</Text>
-            <Text style={styles.actionLabel}>{t('illustrate.regenerateAction')}</Text>
+            <View style={styles.actionMain}>
+              <Text style={styles.actionEmoji}>🔄</Text>
+              <Text style={styles.actionLabel} numberOfLines={2}>
+                {t('illustrate.regenerateAction')}
+              </Text>
+            </View>
             {/* Transparent pricing: every regenerate is a metered render. */}
             <View style={styles.costChip}>
               <Text style={styles.costChipText}>
@@ -936,8 +953,12 @@ export default function IllustrateStory() {
             accessibilityLabel={t('illustrate.chooseAlternative')}
             style={({ pressed }) => [styles.actionButton, { opacity: pressed ? 0.7 : 1 }]}
           >
-            <Text style={styles.actionEmoji}>🖼</Text>
-            <Text style={styles.actionLabel}>{t('illustrate.alternatives')}</Text>
+            <View style={styles.actionMain}>
+              <Text style={styles.actionEmoji}>🖼</Text>
+              <Text style={styles.actionLabel} numberOfLines={2}>
+                {t('illustrate.alternatives')}
+              </Text>
+            </View>
           </Pressable>
         </View>
       </Animated.View>
@@ -1163,8 +1184,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.lg,
     overflow: 'hidden',
   },
-  stripes: { width: 96, flexDirection: 'row', alignSelf: 'stretch' },
-  stripeBar: { flex: 1 },
+  sample: { width: 112, alignSelf: 'stretch', backgroundColor: colors.muted },
   styleInfo: {
     flex: 1,
     flexDirection: 'row',
@@ -1307,23 +1327,29 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.xs,
   },
   actionRow: { flexDirection: 'row', gap: 10, marginTop: spacing.md },
+  // Column: [icon + label] over the optional cost chip. A single row overflowed
+  // the half-width button once the "1 kredi" chip joined the label (icon spilled
+  // past the left edge, chip clipped on the right).
   actionButton: {
     flex: 1,
-    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    paddingVertical: 14,
+    paddingVertical: 12,
+    paddingHorizontal: 10,
     borderRadius: radius.base,
     backgroundColor: colors.card,
     borderWidth: 1,
     borderColor: colors.border,
   },
+  actionMain: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   actionEmoji: { fontSize: fontSizes.base },
   actionLabel: {
+    flexShrink: 1,
     fontFamily: fontFamilies.bodyBold,
     fontSize: fontSizes.base,
     color: colors.foreground,
+    textAlign: 'center',
   },
   costChip: {
     backgroundColor: colors.secondary,

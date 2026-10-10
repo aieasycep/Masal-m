@@ -3,7 +3,7 @@ import { CreditReason, SubscriptionPlan, SubscriptionStatus } from '@masalim/typ
 import type { Subscription as SubscriptionDto, SubscriptionEvent } from '@masalim/validation';
 import { PrismaService } from '../../prisma/prisma.service';
 import { EntitlementService } from './entitlement.service';
-import { MonetizationConfigService } from './monetization-config.service';
+import { MonetizationConfigService, type MonetizationConfig } from './monetization-config.service';
 
 /**
  * Store-subscription sync (§37): consumes normalized events — RevenueCat
@@ -49,10 +49,18 @@ export class SubscriptionService {
         this.logger.warn({ productId: event.productId }, 'credit purchase for unknown product');
         return;
       }
+      const credits = await this.creditsForPurchase(user.id, pack);
+      if (credits <= 0) {
+        this.logger.error(
+          { userId: user.id, productId: event.productId },
+          'credit pack resolves to zero credits — nothing granted',
+        );
+        return;
+      }
       const idempotencyKey = `${provider}:${event.eventId ?? `${event.appUserId}:${event.eventTimeMs}`}`;
       const granted = await this.entitlements.grantCredits(
         user.id,
-        pack.credits,
+        credits,
         CreditReason.PURCHASE,
         { type: 'product', id: event.productId },
         idempotencyKey,
@@ -77,8 +85,18 @@ export class SubscriptionService {
     }
 
     // NON_RENEWING_PURCHASE returned above — the remaining kinds drive plan state.
-    const status = statusForEvent(event.eventType as Exclude<SubscriptionEvent['eventType'], 'NON_RENEWING_PURCHASE'>);
+    const eventType = event.eventType as Exclude<
+      SubscriptionEvent['eventType'],
+      'NON_RENEWING_PURCHASE'
+    >;
+    const status = statusForEvent(eventType);
     const expiresAt = event.expirationAtMs == null ? null : new Date(event.expirationAtMs);
+    // A purchase/renewal starts a new billing period: the Premium credit quota
+    // is anchored on it (not on the calendar month). Other events leave the
+    // period anchor alone.
+    const periodStart = startsBillingPeriod(eventType)
+      ? { currentPeriodStartedAt: new Date(event.purchasedAtMs ?? event.eventTimeMs) }
+      : {};
 
     await this.prisma.subscription.upsert({
       where: { userId: user.id },
@@ -91,6 +109,7 @@ export class SubscriptionService {
         startedAt: eventAt,
         expiresAt,
         latestEventAt: eventAt,
+        ...periodStart,
       },
       update: {
         provider,
@@ -98,6 +117,7 @@ export class SubscriptionService {
         status,
         expiresAt,
         latestEventAt: eventAt,
+        ...periodStart,
       },
     });
 
@@ -108,6 +128,49 @@ export class SubscriptionService {
       data: { subscriptionPlan: plan },
     });
   }
+
+  /**
+   * Credits a pack purchase grants. Store products carry fixed prices, so the
+   * cheaper `_member` packs are reachable by a FREE account (a lapsed
+   * subscriber's cached paywall, a restored purchase): the owner decision is
+   * to grant what was paid for — the member price converted at the standard
+   * per-credit rate (239.99 TL ÷ 49.99 TL/credit → 4, not 6). PREMIUM users
+   * buying a `_std` pack get it unchanged (they overpaid, never underpaid).
+   */
+  private async creditsForPurchase(userId: string, pack: CreditPack): Promise<number> {
+    if (pack.tier !== SubscriptionPlan.PREMIUM) return pack.credits;
+    const plan = await this.entitlements.planFor(userId);
+    if (plan === SubscriptionPlan.PREMIUM) return pack.credits;
+
+    const { packs } = await this.monetization.get();
+    const standard = packs.find(
+      (candidate) => candidate.tier === SubscriptionPlan.FREE && candidate.credits === pack.credits,
+    );
+    if (standard == null) {
+      this.logger.warn(
+        { userId, productId: pack.productId },
+        'member pack bought by a FREE user — no standard counterpart, granted as is',
+      );
+      return pack.credits;
+    }
+    const standardPricePerCredit = Number(standard.priceTRY) / standard.credits;
+    const credits = Math.floor(Number(pack.priceTRY) / standardPricePerCredit);
+    this.logger.warn(
+      { userId, productId: pack.productId, granted: credits },
+      'member pack bought by a FREE user — pro-rated',
+    );
+    return credits;
+  }
+}
+
+type CreditPack = MonetizationConfig['packs'][number];
+
+function startsBillingPeriod(
+  eventType: Exclude<SubscriptionEvent['eventType'], 'NON_RENEWING_PURCHASE'>,
+): boolean {
+  return (
+    eventType === 'INITIAL_PURCHASE' || eventType === 'RENEWAL' || eventType === 'UNCANCELLATION'
+  );
 }
 
 function statusForEvent(

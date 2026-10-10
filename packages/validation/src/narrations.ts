@@ -26,6 +26,27 @@ export const narrationTimingSchema = z.object({
 });
 export type NarrationTiming = z.infer<typeof narrationTimingSchema>;
 
+/**
+ * Karaoke unit — compact keys because a long story carries ~1,500 of these:
+ * t = word text, p = 1-based pageNumber, i = word index inside the page
+ * (whitespace tokens, `/\S+/g`), s/e = start/end seconds in the final audio.
+ */
+export const narrationWordTimingSchema = z.object({
+  t: z.string(),
+  p: z.number().int().min(1),
+  i: z.number().int().min(0),
+  s: z.number().min(0),
+  e: z.number().min(0),
+});
+export type NarrationWordTiming = z.infer<typeof narrationWordTimingSchema>;
+
+export const narrationWordTimingsSchema = z.object({
+  /** aligned = provider forced alignment of the real audio; estimated = spread from chunk durations. */
+  source: z.enum(['aligned', 'estimated']),
+  words: z.array(narrationWordTimingSchema),
+});
+export type NarrationWordTimings = z.infer<typeof narrationWordTimingsSchema>;
+
 export const narrationSchema = z.object({
   id: z.string(),
   storyId: z.string(),
@@ -37,6 +58,8 @@ export const narrationSchema = z.object({
   audioUrl: z.string().nullable(),
   duration: z.number().nullable(),
   timings: z.array(narrationTimingSchema).nullable(),
+  /** Word-level timeline for karaoke text sync (null for narrations made before it existed). */
+  wordTimings: narrationWordTimingsSchema.nullable(),
   status: narrationStatusSchema,
   createdAt: z.string(),
   jobId: z.string().nullable(),

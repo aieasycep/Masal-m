@@ -1,15 +1,15 @@
-# Masalım — mevcut host nginx'ine eklenen sanal sunucular.
-# Deploy workflow bu dosyayı /etc/nginx/sites-available/masalim.conf'a kopyalar,
-# sites-enabled'a bağlar, `nginx -t` sınamasından geçerse SADECE `reload` eder
-# (restart yok — sunucudaki diğer siteler kesintiye uğramaz). TLS'i certbot
-# (--nginx) bu bloklara ekler; certbot yalnızca server_name'i eşleşen blokları
-# değiştirir, diğer projelerin sitelerine dokunmaz.
+# Masalım — mevcut host nginx'ine eklenen sanal sunucular (ŞABLON).
+# Deploy workflow __DOMAIN__ yerine alan adını (repo değişkeni MASALIM_DOMAIN)
+# koyarak /etc/nginx/sites-available/masalim.conf'a yazar; render değişmediyse
+# dosyaya dokunmaz. TLS'i certbot (--nginx) aynı bloklara ekler ve nginx'i
+# kendisi yeniden yükler; HTTP-only hâli hiçbir zaman tek başına yüklenmez.
+# Sunucudaki diğer projelerin siteleri etkilenmez (yalnızca reload).
 
 # API — SSE (GET /jobs/:id/stream) için tamponlama kapalı, uzun okuma süresi.
 server {
     listen 80;
     listen [::]:80;
-    server_name api.57-129-6-57.sslip.io;
+    server_name api.__DOMAIN__;
 
     client_max_body_size 25m;
 
@@ -29,7 +29,7 @@ server {
 server {
     listen 80;
     listen [::]:80;
-    server_name storage.57-129-6-57.sslip.io;
+    server_name storage.__DOMAIN__;
 
     client_max_body_size 200m;
 
@@ -49,7 +49,7 @@ server {
 server {
     listen 80;
     listen [::]:80;
-    server_name admin.57-129-6-57.sslip.io;
+    server_name admin.__DOMAIN__;
 
     location / {
         proxy_pass http://127.0.0.1:8803;

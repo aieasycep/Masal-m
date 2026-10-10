@@ -23,14 +23,29 @@ export const StorageKeys = {
   avatar: (userId: string) => `users/${userId}/avatars`,
   narrationAudio: (userId: string, storyId: string, narrationId: string) =>
     `users/${userId}/stories/${storyId}/narrations/${narrationId}.mp3`,
+  /**
+   * Synthesized narration chunks cached per (story, voice) so a retried or
+   * re-created narration never re-bills TTS for chunks that already exist.
+   * Deleted after a successful concat; the daily sweep removes stale leftovers.
+   */
+  narrationChunkCache: (userId: string, storyId: string, voiceHash: string) =>
+    `users/${userId}/stories/${storyId}/narration-cache/${voiceHash}`,
   illustration: (userId: string, storyId: string, illustrationId: string) =>
     `users/${userId}/stories/${storyId}/illustrations/${illustrationId}.png`,
   bookPdf: (userId: string, bookId: string) => `users/${userId}/books/${bookId}/print.pdf`,
-  bookPreviewPdf: (userId: string, bookId: string) =>
-    `users/${userId}/books/${bookId}/preview.pdf`,
+  bookPreviewPdf: (userId: string, bookId: string) => `users/${userId}/books/${bookId}/preview.pdf`,
   systemVoicePreview: (systemVoiceId: string, ext: string) =>
     `system-voices/${systemVoiceId}/preview.${ext}`,
   /** Immutable order snapshot prefix — excluded from user deletion (§81). */
   orderSnapshot: (orderId: string) => `orders/${orderId}`,
   userPrefix: (userId: string) => `users/${userId}`,
 } as const;
+
+/**
+ * Objects the maintenance sweep may delete once nothing references them:
+ * client uploads (avatars, voice recordings) and narration chunk caches.
+ * Everything else (narrations, illustrations, PDFs, previews) is owned by a row.
+ */
+export function isTransientUploadKey(objectKey: string): boolean {
+  return /\/(voice-recordings|avatars|narration-cache)\//.test(objectKey);
+}

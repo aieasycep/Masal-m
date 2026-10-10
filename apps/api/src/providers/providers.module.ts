@@ -1,8 +1,10 @@
-import { Global, Module } from '@nestjs/common';
+import { Global, Logger, Module } from '@nestjs/common';
 import { createStorageProvider, StorageProvider } from '@masalim/storage';
 import { ExpoPushProvider, MockPushProvider, PushProvider } from '@masalim/notifications';
 import {
   AnthropicStoryProvider,
+  DEFAULT_ANTHROPIC_FAST_MODEL,
+  DEFAULT_ANTHROPIC_STORY_MODEL,
   ElevenLabsTtsProvider,
   ElevenLabsVoiceCloneProvider,
   LlmContentModerator,
@@ -43,16 +45,23 @@ export const IMAGE_AI = Symbol('IMAGE_AI');
 export const PAYMENT = Symbol('PAYMENT');
 export const PRINT = Symbol('PRINT');
 
+const logger = new Logger('ProvidersModule');
+
 // AI_MODEL/MODERATION_MODEL default to Claude-named models, so a provider switch
-// with a stale model value would send e.g. "claude-opus-5" to OpenAI and fail every
-// request. Cross-vendor values fall back to the vendor's default instead.
+// with a stale model value would send e.g. "claude-opus-5-5" to OpenAI and fail
+// every request. Cross-vendor values fall back to the vendor's default instead —
+// loudly, so a leftover value in a server env file is visible at boot.
 const modelForVendor = (
+  setting: string,
   model: string,
   vendor: 'anthropic' | 'openai',
   fallback: string,
 ): string => {
   const isClaude = model.startsWith('claude');
   const matchesVendor = vendor === 'anthropic' ? isClaude : !isClaude;
+  if (!matchesVendor) {
+    logger.warn(`${setting}="${model}" does not belong to ${vendor}; using "${fallback}"`);
+  }
   return matchesVendor ? model : fallback;
 };
 
@@ -86,7 +95,11 @@ const modelForVendor = (
       inject: [ENV],
       useFactory: (env: Env): PushProvider =>
         env.PUSH_PROVIDER === 'expo'
-          ? new ExpoPushProvider({ accessToken: env.EXPO_ACCESS_TOKEN || undefined })
+          ? new ExpoPushProvider({
+              accessToken: env.EXPO_ACCESS_TOKEN || undefined,
+              onError: (message, error) =>
+                logger.warn(`${message}: ${error instanceof Error ? error.message : String(error)}`),
+            })
           : new MockPushProvider(),
     },
     {
@@ -97,12 +110,18 @@ const modelForVendor = (
           case 'anthropic':
             return new AnthropicStoryProvider({
               apiKey: env.AI_API_KEY,
-              model: modelForVendor(env.AI_MODEL, 'anthropic', 'claude-opus-5'),
+              model: modelForVendor(
+                'AI_MODEL',
+                env.AI_MODEL,
+                'anthropic',
+                DEFAULT_ANTHROPIC_STORY_MODEL,
+              ),
+              effort: env.AI_EFFORT,
             });
           case 'openai':
             return new OpenAIStoryProvider({
               apiKey: env.AI_API_KEY,
-              model: modelForVendor(env.AI_MODEL, 'openai', 'gpt-4o'),
+              model: modelForVendor('AI_MODEL', env.AI_MODEL, 'openai', 'gpt-4o'),
             });
           case 'mock':
             return new MockStoryProvider();
@@ -117,12 +136,22 @@ const modelForVendor = (
           case 'llm':
             return new LlmContentModerator({
               apiKey: env.AI_API_KEY,
-              model: modelForVendor(env.MODERATION_MODEL, 'anthropic', 'claude-opus-5'),
+              model: modelForVendor(
+                'MODERATION_MODEL',
+                env.MODERATION_MODEL,
+                'anthropic',
+                DEFAULT_ANTHROPIC_FAST_MODEL,
+              ),
             });
           case 'openai':
             return new OpenAIContentModerator({
               apiKey: env.AI_API_KEY,
-              model: modelForVendor(env.MODERATION_MODEL, 'openai', 'gpt-4o-mini'),
+              model: modelForVendor(
+                'MODERATION_MODEL',
+                env.MODERATION_MODEL,
+                'openai',
+                'gpt-4o-mini',
+              ),
             });
           case 'mock':
             return new MockContentModerator();
@@ -145,7 +174,23 @@ const modelForVendor = (
       useFactory: (env: Env): NarrationDirector | null =>
         env.AI_PROVIDER === 'mock' || env.AI_API_KEY === ''
           ? null
-          : new NarrationDirector({ provider: env.AI_PROVIDER, apiKey: env.AI_API_KEY }),
+          : new NarrationDirector({
+              provider: env.AI_PROVIDER,
+              apiKey: env.AI_API_KEY,
+              // Same fast model as moderation (cheap, follows the vendor switch).
+              model: modelForVendor(
+                'MODERATION_MODEL',
+                env.MODERATION_MODEL,
+                env.AI_PROVIDER,
+                env.AI_PROVIDER === 'anthropic' ? DEFAULT_ANTHROPIC_FAST_MODEL : 'gpt-4o-mini',
+              ),
+              onFallback: (reason, error) =>
+                logger.warn(
+                  `narration director fell back to plain text: ${reason}${
+                    error instanceof Error ? ` — ${error.message}` : ''
+                  }`,
+                ),
+            }),
     },
     {
       provide: VOICE_CLONE,

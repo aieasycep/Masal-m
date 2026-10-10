@@ -12,6 +12,12 @@ on:
         required: false
         default: ""
 
+# contents: write → publish the verified APK as the fixed 'test-latest' release;
+# actions: read → look up the APK run's commit for the release notes.
+permissions:
+  contents: write
+  actions: read
+
 jobs:
   crash-log:
     runs-on: ubuntu-latest
@@ -66,8 +72,8 @@ jobs:
             smoke-alive.txt
           retention-days: 14
 
-      # Keep this step LAST so the distilled crash info sits at the end of the
-      # job log (easy to fetch with a log tail).
+      # The distilled crash info stays near the end of the job log (easy to
+      # fetch with a log tail); only the verdict + release steps follow it.
       - name: Extract crash summary
         if: always()
         run: |
@@ -85,3 +91,38 @@ jobs:
           grep -n -B 2 -A 160 "FATAL EXCEPTION" logcat-smoke.txt || echo "no FATAL EXCEPTION found"
           echo "================ AndroidRuntime lines (player smoke) ================"
           grep -n "AndroidRuntime" logcat-smoke.txt | tail -n 80 || true
+
+      - name: Verdict (fail unless the app survived startup AND the player smoke ran to the end)
+        run: |
+          status=0
+          grep -q "APP_ALIVE=yes" app-alive.txt || { echo "::error::app process died during startup"; status=1; }
+          grep -q "SMOKE_ALIVE=yes" smoke-alive.txt || { echo "::error::app process died during the player smoke"; status=1; }
+          grep -q "\[player-smoke\] DONE" logcat-smoke.txt || { echo "::error::player smoke did not reach DONE (no marker in logcat)"; status=1; }
+          exit $status
+
+      # Fixed, phone-friendly download: the release page always carries the LAST
+      # VERIFIED build as a direct .apk asset (no zip, no expiry). The tag is
+      # recreated each time so it points at the build's own commit.
+      - name: Publish the verified APK as the fixed "test-latest" release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          meta=$(gh run view "$APK_RUN_ID" --repo "$GITHUB_REPOSITORY" --json headSha,headBranch,displayTitle,url)
+          sha=$(echo "$meta" | jq -r .headSha)
+          branch=$(echo "$meta" | jq -r .headBranch)
+          title=$(echo "$meta" | jq -r .displayTitle)
+          build_url=$(echo "$meta" | jq -r .url)
+          cp apk/app-release.apk Masalim.apk
+          {
+            echo "**Doğrulanmış test APK'sı** — telefonda aşağıdaki \`Masalim.apk\` dosyasına dokun, indir, kur."
+            echo
+            echo "- Commit: \`${sha}\` (${branch})"
+            echo "- Değişiklik: ${title}"
+            echo "- Derleme: ${build_url}"
+            echo "- Emülatör doğrulaması: açılış OK, ses çalma testi sonuna kadar oynadı, çökme yok — ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          } > release-notes.md
+          gh release delete test-latest --repo "$GITHUB_REPOSITORY" --cleanup-tag --yes || true
+          gh release create test-latest Masalim.apk --repo "$GITHUB_REPOSITORY" --target "$sha" --prerelease \
+            --title "Masalım — test APK (doğrulanmış)" --notes-file release-notes.md
+          echo "Release: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/releases/tag/test-latest"

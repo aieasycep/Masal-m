@@ -70,6 +70,8 @@ export const subscriptionEventSchema = z.object({
   productId: z.string(),
   eventTimeMs: z.number().int(),
   expirationAtMs: z.number().int().nullable(),
+  /** Purchase/renewal time — anchors the Premium quota period (null = use eventTimeMs). */
+  purchasedAtMs: z.number().int().nullable().default(null),
   environment: z.enum(['SANDBOX', 'PRODUCTION']),
   /** Store/webhook event id — credit grants are idempotent on it. */
   eventId: z.string().nullish(),

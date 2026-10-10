@@ -6,15 +6,33 @@ export interface PushMessage {
   data: Record<string, string>;
 }
 
+/** Provider receipt handle for one accepted message; needed to look the receipt up later. */
+export interface PushTicket {
+  id: string;
+  token: string;
+}
+
 export interface PushSendReport {
   sent: number;
   /** Tokens the provider reported as dead — callers must prune these DeviceToken rows. */
   deadTokens: string[];
+  /**
+   * Tickets for the accepted messages. Delivery failures (an uninstalled app)
+   * only surface in the receipt later, so callers queue these for a sweep that
+   * calls `getReceipts`.
+   */
+  tickets: PushTicket[];
 }
 
 export interface PushProvider {
   readonly name: string;
   send(messages: PushMessage[]): Promise<PushSendReport>;
+  /**
+   * Resolve receipts for earlier tickets. Receipts carry only the ticket id,
+   * so the caller passes the `{id, token}` pairs it kept and gets back the
+   * tokens whose receipt says the device is gone.
+   */
+  getReceipts?(tickets: PushTicket[]): Promise<{ deadTokens: string[] }>;
 }
 
 /**

@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import {
   Inject,
   Injectable,
@@ -8,11 +9,11 @@ import {
 import { UnrecoverableError, Worker, type Job } from 'bullmq';
 import Redis from 'ioredis';
 import { ErrorCode, NarrationStatus, NotificationType } from '@masalim/types';
-import type { NarrationDirector, TextToSpeechProvider } from '@masalim/ai';
+import type { NarrationDirector, SpeechResult, TextToSpeechProvider } from '@masalim/ai';
 import type { StorageProvider } from '@masalim/storage';
 import { StorageKeys } from '@masalim/storage';
 import { PushRoutes } from '@masalim/notifications';
-import type { NarrationTiming } from '@masalim/validation';
+import type { NarrationTiming, NarrationWordTimings } from '@masalim/validation';
 import { PrismaService } from '../../prisma/prisma.service';
 import { REDIS } from '../../redis/redis.module';
 import { ENV } from '../../config/config.module';
@@ -21,6 +22,11 @@ import { NARRATION_DIRECTOR, STORAGE, TTS } from '../../providers/providers.modu
 import { JobsService } from '../../jobs/jobs.service';
 import { EntitlementService } from '../subscription/entitlement.service';
 import { QueueName, type QueueJobData } from '../../jobs/queues';
+import {
+  estimateWordTimings,
+  fullStoryText,
+  wordTimingsFromAlignment,
+} from '../../audio/word-timings';
 import { NotificationsService } from '../notifications/notifications.service';
 import {
   chunkStoryPages,
@@ -31,10 +37,26 @@ import {
 /** Silence between story pages so page turns don't sound rushed. */
 const PAGE_TURN_GAP_SECONDS = 1;
 
+/** AIUsageLog `type` values written by this worker. */
+export const NARRATION_USAGE_TYPES = {
+  GENERATION: 'NARRATION_GENERATION',
+  DIRECTOR: 'NARRATION_DIRECTOR',
+  ALIGNMENT: 'WORD_ALIGNMENT',
+} as const;
+
+const sha256 = (value: string): string => createHash('sha256').update(value).digest('hex');
+
 /**
  * Narration worker (§19/§6a): sentence-boundary chunks → TTS per chunk →
  * ffmpeg concat (single re-encode) → duration + per-chunk timings (drives the
  * player's "Metni göster" text sync). Progress = real per-chunk milestones.
+ *
+ * Synthesized chunks are cached in storage under a per-(story, voice) prefix
+ * (`StorageKeys.narrationChunkCache`) keyed by chunk text + voice + model +
+ * director mode, so a retried attempt — or a new narration row the user
+ * creates for the same story and voice after a failure — only pays TTS for
+ * the chunks that never finished. The prefix is dropped once the narration
+ * is READY; stale leftovers age out through the daily maintenance sweep.
  */
 @Injectable()
 export class NarrationProcessor implements OnModuleInit, OnApplicationShutdown {
@@ -76,6 +98,8 @@ export class NarrationProcessor implements OnModuleInit, OnApplicationShutdown {
       },
     });
     if (narration == null || narration.story.deletedAt != null) {
+      // Story deleted while queued: an extra narration was charged at enqueue.
+      await this.entitlements.refundCreditsForRef(aiJob.userId, 'narration', aiJob.entityId);
       await this.jobs.fail(aiJob.id, ErrorCode.NOT_FOUND, 'Narration or story missing');
       throw new UnrecoverableError('Narration missing');
     }
@@ -96,6 +120,26 @@ export class NarrationProcessor implements OnModuleInit, OnApplicationShutdown {
       where: { id: narration.id },
       data: { status: NarrationStatus.PROCESSING, provider: this.tts.name },
     });
+
+    const userId = narration.story.userId;
+    const cachePrefix = StorageKeys.narrationChunkCache(
+      userId,
+      narration.storyId,
+      sha256(providerVoiceId).slice(0, 12),
+    );
+    // Provider calls made by THIS attempt — what the usage log bills.
+    let synthesized = 0;
+    let directorCalls = 0;
+    const logUsage = (
+      type: string,
+      success: boolean,
+      units: number,
+      model?: string,
+      provider = this.tts.name,
+    ) =>
+      this.prisma.aIUsageLog
+        .create({ data: { userId, jobId: aiJob.id, provider, model, type, success, units } })
+        .catch((error: unknown) => this.logger.warn({ err: error }, 'usage log write failed'));
 
     try {
       const language = narration.story.language === 'en' ? 'en' : 'tr';
@@ -121,16 +165,31 @@ export class NarrationProcessor implements OnModuleInit, OnApplicationShutdown {
 
       const rendered: AudioChunkInput[] = [];
       for (const [index, chunk] of chunks.entries()) {
-        const expressiveText =
-          director == null ? undefined : await director.annotate(chunk.text, language);
-        const speech = await this.tts.generateSpeech({
-          text: chunk.text,
-          expressiveText: expressiveText !== chunk.text ? expressiveText : undefined,
-          providerVoiceId,
-          language,
-        });
+        const fingerprint = sha256(
+          `${chunk.text}|${providerVoiceId}|${this.env.TTS_MODEL}|${director ? 'x' : 'p'}`,
+        ).slice(0, 16);
+        const cacheKey = `${cachePrefix}/${index}-${fingerprint}`;
+        let speech = await this.readCachedChunk(cacheKey);
+        if (speech == null) {
+          const expressiveText =
+            director == null ? undefined : await director.annotate(chunk.text, language);
+          if (director != null) directorCalls += 1;
+          speech = await this.tts.generateSpeech({
+            text: chunk.text,
+            expressiveText: expressiveText !== chunk.text ? expressiveText : undefined,
+            providerVoiceId,
+            language,
+          });
+          synthesized += 1;
+          // Best effort: a cache write failure only costs a possible re-synthesis.
+          await this.storage
+            .putObject(cacheKey, speech.audio, speech.contentType)
+            .catch((error: unknown) =>
+              this.logger.warn({ err: error, cacheKey }, 'narration chunk cache write failed'),
+            );
+        }
         rendered.push({ ...speech, gapAfterSeconds: gapAfter[index] });
-        // 5→80% spread over chunks — every tick is a really synthesized chunk.
+        // 5→80% spread over chunks — every tick is a really rendered chunk.
         await this.jobs.setProgress(aiJob.id, 5 + Math.round(((index + 1) / chunks.length) * 75));
       }
 
@@ -158,6 +217,16 @@ export class NarrationProcessor implements OnModuleInit, OnApplicationShutdown {
         narration.id,
       );
       await this.storage.putObject(audioKey, concat.audio, concat.contentType);
+      await this.jobs.setProgress(aiJob.id, 93);
+
+      // Karaoke timeline: forced alignment of the FINAL file against the clean
+      // story text (audio tags never reach it); any failure degrades to an
+      // estimate spread from the measured chunk durations. Never fails the job.
+      const { wordTimings, alignment } = await this.buildWordTimings(
+        narration.story.pages,
+        concat,
+        timings,
+      );
       await this.jobs.setProgress(aiJob.id, 97);
 
       await this.prisma.narration.update({
@@ -166,19 +235,52 @@ export class NarrationProcessor implements OnModuleInit, OnApplicationShutdown {
           audioKey,
           duration: round2(concat.totalDurationSeconds),
           timings,
+          wordTimings: wordTimings ?? undefined,
           status: NarrationStatus.READY,
           error: null,
         },
       });
       await this.jobs.complete(aiJob.id, narration.id);
+
+      await logUsage(NARRATION_USAGE_TYPES.GENERATION, true, synthesized, this.env.TTS_MODEL);
+      if (directorCalls > 0) {
+        await logUsage(
+          NARRATION_USAGE_TYPES.DIRECTOR,
+          true,
+          directorCalls,
+          this.env.MODERATION_MODEL,
+          this.env.AI_PROVIDER,
+        );
+      }
+      if (alignment !== 'skipped') {
+        await logUsage(NARRATION_USAGE_TYPES.ALIGNMENT, alignment === 'ok', 1);
+      }
+      // The finished file supersedes the chunk cache (a failed job keeps it so
+      // the user's retry — a new narration row, same story + voice — reuses it).
+      await this.storage
+        .deletePrefix(cachePrefix)
+        .catch((error: unknown) =>
+          this.logger.warn({ err: error, cachePrefix }, 'narration chunk cache cleanup failed'),
+        );
+
       await this.notifications.notify(
-        narration.story.userId,
+        userId,
         NotificationType.STORY_READY,
         { storyTitle: narration.story.title },
         PushRoutes.storyReady(narration.storyId),
         { storyId: narration.storyId, narrationId: narration.id },
       );
     } catch (error) {
+      await logUsage(NARRATION_USAGE_TYPES.GENERATION, false, synthesized, this.env.TTS_MODEL);
+      if (directorCalls > 0) {
+        await logUsage(
+          NARRATION_USAGE_TYPES.DIRECTOR,
+          false,
+          directorCalls,
+          this.env.MODERATION_MODEL,
+          this.env.AI_PROVIDER,
+        );
+      }
       const isLastAttempt = job.attemptsMade + 1 >= (job.opts.attempts ?? 1);
       if (isLastAttempt) {
         await this.finalizeFailure(
@@ -192,7 +294,50 @@ export class NarrationProcessor implements OnModuleInit, OnApplicationShutdown {
     }
   }
 
-  private async finalizeFailure(aiJobId: string, narrationId: string, message: string): Promise<void> {
+  /** A previously synthesized chunk, or null when absent/unreadable (then re-synthesized). */
+  private async readCachedChunk(cacheKey: string): Promise<SpeechResult | null> {
+    try {
+      const meta = await this.storage.headObject(cacheKey);
+      if (meta == null) return null;
+      const audio = await this.storage.getObject(cacheKey);
+      return { audio, contentType: meta.contentType };
+    } catch (error) {
+      this.logger.warn({ err: error, cacheKey }, 'narration chunk cache read failed');
+      return null;
+    }
+  }
+
+  private async buildWordTimings(
+    pages: Array<{ pageNumber: number; text: string }>,
+    concat: { audio: Buffer; contentType: string },
+    timings: NarrationTiming[],
+  ): Promise<{
+    wordTimings: NarrationWordTimings | null;
+    alignment: 'ok' | 'failed' | 'skipped';
+  }> {
+    if (this.tts.alignWords != null) {
+      try {
+        const alignment = await this.tts.alignWords({
+          audio: concat.audio,
+          contentType: concat.contentType,
+          text: fullStoryText(pages),
+        });
+        const aligned = wordTimingsFromAlignment(pages, alignment);
+        if (aligned != null) return { wordTimings: aligned, alignment: 'ok' };
+        this.logger.warn('word alignment too sparse — using estimated timeline');
+      } catch (error) {
+        this.logger.warn({ err: error }, 'word alignment failed — using estimated timeline');
+      }
+      return { wordTimings: estimateWordTimings(pages, timings), alignment: 'failed' };
+    }
+    return { wordTimings: estimateWordTimings(pages, timings), alignment: 'skipped' };
+  }
+
+  private async finalizeFailure(
+    aiJobId: string,
+    narrationId: string,
+    message: string,
+  ): Promise<void> {
     const row = await this.prisma.narration.update({
       where: { id: narrationId },
       data: { status: NarrationStatus.FAILED, error: message.slice(0, 300) },

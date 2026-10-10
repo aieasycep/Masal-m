@@ -48,3 +48,6 @@ playwright-report/
 test-results/
 .maestro/output/
 dist-export/
+
+# local-disk storage provider (dev/test uploads)
+.local-storage/

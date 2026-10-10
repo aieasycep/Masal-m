@@ -21,11 +21,15 @@ export class SocialVerifyService {
     this.googleClient = new OAuth2Client(this.env.GOOGLE_CLIENT_ID || undefined);
   }
 
-  async verifyApple(identityToken: string, nonce?: string): Promise<VerifiedSocialIdentity> {
+  /**
+   * `hashedNonce` is the SHA-256 hex of the raw nonce the server issued: Apple
+   * stores that digest in the token and the library compares it verbatim.
+   */
+  async verifyApple(identityToken: string, hashedNonce: string): Promise<VerifiedSocialIdentity> {
     try {
       const payload = await appleSignin.verifyIdToken(identityToken, {
         audience: this.env.APPLE_BUNDLE_ID,
-        nonce,
+        nonce: hashedNonce,
         ignoreExpiration: false,
       });
       return {
@@ -43,10 +47,19 @@ export class SocialVerifyService {
   }
 
   async verifyGoogle(idToken: string): Promise<VerifiedSocialIdentity> {
+    // Fail closed: with no audience google-auth-library accepts ANY app's
+    // id_token, so an unconfigured server must refuse the route outright.
+    if (!this.env.GOOGLE_CLIENT_ID) {
+      throw new AppException(
+        ErrorCode.FEATURE_DISABLED,
+        'Google sign-in is not configured',
+        HttpStatus.SERVICE_UNAVAILABLE,
+      );
+    }
     try {
       const ticket = await this.googleClient.verifyIdToken({
         idToken,
-        audience: this.env.GOOGLE_CLIENT_ID || undefined,
+        audience: this.env.GOOGLE_CLIENT_ID,
       });
       const payload = ticket.getPayload();
       if (payload?.sub == null) throw new Error('missing sub');

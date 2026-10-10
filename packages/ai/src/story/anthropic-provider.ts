@@ -1,7 +1,14 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { zodOutputFormat } from '@anthropic-ai/sdk/helpers/zod';
 import { z as z4 } from 'zod/v4';
-import { generatedStorySchema } from '@masalim/validation';
+import { generatedStorySchema, type GeneratedStory } from '@masalim/validation';
+import {
+  type AnthropicEffort,
+  DEFAULT_ANTHROPIC_STORY_MODEL,
+  effortConfig,
+  STORY_CLIENT_OPTIONS,
+  textOf,
+} from '../shared/anthropic';
 import {
   buildSystemPrompt,
   buildUserPrompt,
@@ -19,6 +26,8 @@ import {
 export interface AnthropicStoryProviderConfig {
   apiKey: string;
   model?: string;
+  /** Thinking depth; `medium` is the Claude Opus 5.5 default and plenty for prose. */
+  effort?: AnthropicEffort;
 }
 
 /**
@@ -39,93 +48,148 @@ const transportStorySchema = z4.object({
   ),
 });
 
+// Only the JSON schema of this object is sent; parsing is done by hand below so
+// that stop_reason (refusal / max_tokens) is examined BEFORE any parse error.
+const STORY_OUTPUT_FORMAT = zodOutputFormat(transportStorySchema);
+
+// Thinking tokens count toward max_tokens on Claude 5.5; a LONG story is ~7k
+// output tokens on the current tokenizer, so this leaves room for medium effort.
+// Stays under the SDK's non-streaming ceiling (~21k).
+const MAX_OUTPUT_TOKENS = 16000;
+
+interface Attempt {
+  raw: string;
+  story: GeneratedStory | null;
+  issues: string;
+}
+
 /** Story generation via the Anthropic API with schema-enforced structured output. */
 export class AnthropicStoryProvider implements StoryGenerationProvider {
   readonly name = 'anthropic';
   private readonly client: Anthropic;
   private readonly model: string;
+  private readonly effort: AnthropicEffort;
 
   constructor(config: AnthropicStoryProviderConfig) {
-    this.client = new Anthropic({ apiKey: config.apiKey });
-    this.model = config.model ?? 'claude-opus-5';
+    this.client = new Anthropic({ apiKey: config.apiKey, ...STORY_CLIENT_OPTIONS });
+    this.model = config.model ?? DEFAULT_ANTHROPIC_STORY_MODEL;
+    this.effort = config.effort ?? 'medium';
   }
 
   async generateStory(input: StoryGenerationInput): Promise<StoryGenerationResult> {
-    const first = await this.parseOnce(input, buildUserPrompt(input));
+    const system = buildSystemPrompt(input);
+    const userPrompt = buildUserPrompt(input);
+    const usage = { inputTokens: 0, outputTokens: 0, model: this.model };
+
+    let attempt = await this.requestStory(system, userPrompt, usage);
+
+    // Schema repair (parity with the OpenAI provider): structured output pins
+    // the shape, but the canonical schema also carries length limits (title
+    // ≤120, page text ≤2200, 3–20 pages). One corrective round for those.
+    if (attempt.story == null) {
+      attempt = await this.requestStory(
+        system,
+        [
+          userPrompt,
+          '',
+          `Önceki deneme şemaya uymadı. Hatalar: ${attempt.issues}`,
+          'Önceki JSON:',
+          attempt.raw,
+          'Aynı hikâyeyi (aynı başlık, olay örgüsü ve sayfa sayısıyla) şemaya tam uyan biçimde yeniden üret.',
+        ].join('\n'),
+        usage,
+      );
+      if (attempt.story == null) {
+        throw new StoryGenerationError(
+          `Model output failed schema validation after repair: ${attempt.issues}`,
+          'INVALID_OUTPUT',
+        );
+      }
+    }
+    const first = attempt.story;
+    if (first.title.includes(UNSAFE_SENTINEL)) {
+      throw new StoryGenerationError('Model flagged the request as unsafe', 'REFUSED');
+    }
 
     // Length repair: if the model undershot the word budget, one follow-up
     // request expands the same story. A still-short second attempt is
     // delivered rather than failed.
-    const words = countStoryWords(first.story.pages);
+    const words = countStoryWords(first.pages);
     const minWords = minTotalWords(input.durationTarget);
-    if (words >= minWords) return first;
+    if (words >= minWords) return { story: first, usage };
 
-    const expandPrompt = [
-      buildUserPrompt(input),
-      '',
-      `İlk deneme çok kısa kaldı: toplam ${words} kelime, alt sınır ${minWords} kelime. Kısa versiyon şuydu:`,
-      JSON.stringify(first.story),
-      'Aynı hikâyeyi (aynı başlık, olay örgüsü ve sayfa sayısıyla) her sayfayı zenginleştirip genişleterek yeniden üret; kelime bütçesine bu kez tam uy.',
-    ].join('\n');
-    let second: StoryGenerationResult;
+    let second: Attempt;
     try {
-      second = await this.parseOnce(input, expandPrompt);
+      second = await this.requestStory(
+        system,
+        [
+          userPrompt,
+          '',
+          `İlk deneme çok kısa kaldı: toplam ${words} kelime, alt sınır ${minWords} kelime. Kısa versiyon şuydu:`,
+          JSON.stringify(first),
+          'Aynı hikâyeyi (aynı başlık, olay örgüsü ve sayfa sayısıyla) her sayfayı zenginleştirip genişleterek yeniden üret; kelime bütçesine bu kez tam uy.',
+        ].join('\n'),
+        usage,
+      );
     } catch {
-      return first;
+      return { story: first, usage };
     }
-    const usage = {
-      inputTokens: (first.usage?.inputTokens ?? 0) + (second.usage?.inputTokens ?? 0),
-      outputTokens: (first.usage?.outputTokens ?? 0) + (second.usage?.outputTokens ?? 0),
-      model: second.usage?.model ?? this.model,
-    };
-    return countStoryWords(second.story.pages) > words
-      ? { story: second.story, usage }
-      : { ...first, usage };
+    const expanded = second.story;
+    if (expanded?.title.includes(UNSAFE_SENTINEL)) {
+      throw new StoryGenerationError('Model flagged the request as unsafe', 'REFUSED');
+    }
+    return expanded != null && countStoryWords(expanded.pages) > words
+      ? { story: expanded, usage }
+      : { story: first, usage };
   }
 
-  private async parseOnce(
-    input: StoryGenerationInput,
+  /**
+   * One API round: stop_reason is checked before parsing so refusals and
+   * truncation map to their own error codes instead of surfacing as a generic
+   * provider failure (which the job queue would retry blindly).
+   */
+  private async requestStory(
+    system: string,
     userPrompt: string,
-  ): Promise<StoryGenerationResult> {
-    let response;
+    usage: { inputTokens: number; outputTokens: number; model: string },
+  ): Promise<Attempt> {
+    let response: Anthropic.Message;
     try {
-      response = await this.client.messages.parse({
+      response = await this.client.messages.create({
         model: this.model,
-        max_tokens: 16000,
-        system: buildSystemPrompt(input),
+        max_tokens: MAX_OUTPUT_TOKENS,
+        system,
         messages: [{ role: 'user', content: userPrompt }],
-        output_config: { format: zodOutputFormat(transportStorySchema) },
+        output_config: { ...effortConfig(this.model, this.effort), format: STORY_OUTPUT_FORMAT },
       });
     } catch (err) {
       throw new StoryGenerationError('Anthropic request failed', 'PROVIDER_ERROR', err);
     }
 
+    usage.inputTokens += response.usage.input_tokens;
+    usage.outputTokens += response.usage.output_tokens;
+    usage.model = response.model;
+
     if (response.stop_reason === 'refusal') {
       throw new StoryGenerationError('Model refused the request', 'REFUSED');
     }
-    if (response.parsed_output == null) {
-      throw new StoryGenerationError('Model returned no parseable story', 'INVALID_OUTPUT');
-    }
-
-    const validated = generatedStorySchema.safeParse(response.parsed_output);
-    if (!validated.success) {
+    if (response.stop_reason === 'max_tokens') {
       throw new StoryGenerationError(
-        'Model output failed schema validation',
-        'INVALID_OUTPUT',
-        validated.error,
+        `Model output truncated at ${MAX_OUTPUT_TOKENS} tokens`,
+        'TRUNCATED',
       );
     }
-    if (validated.data.title.includes(UNSAFE_SENTINEL)) {
-      throw new StoryGenerationError('Model flagged the request as unsafe', 'REFUSED');
-    }
 
-    return {
-      story: validated.data,
-      usage: {
-        inputTokens: response.usage.input_tokens,
-        outputTokens: response.usage.output_tokens,
-        model: response.model,
-      },
-    };
+    const raw = textOf(response);
+    let parsedJson: unknown;
+    try {
+      parsedJson = JSON.parse(raw);
+    } catch {
+      return { raw, story: null, issues: 'response is not valid JSON' };
+    }
+    const validated = generatedStorySchema.safeParse(parsedJson);
+    return validated.success
+      ? { raw, story: validated.data, issues: '' }
+      : { raw, story: null, issues: JSON.stringify(validated.error.issues.slice(0, 5)) };
   }
 }

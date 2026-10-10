@@ -1,0 +1,12 @@
+# Docker build context (repo root) — keep images free of local artifacts.
+**/node_modules
+.git
+.turbo
+**/.turbo
+**/dist-export
+**/.next/cache
+apps/mobile/android
+apps/mobile/ios
+.local-storage
+scratchpad
+docs/design-reference

@@ -88,10 +88,26 @@ export class VoiceCloneProcessor implements OnModuleInit, OnApplicationShutdown 
     }
 
     const language = profile.user.locale === 'en' ? 'en' : 'tr';
+    // Whether the provider was asked to clone in THIS attempt (what the usage log bills).
+    let cloneRequested = false;
+    const logUsage = (success: boolean) =>
+      this.prisma.aIUsageLog
+        .create({
+          data: {
+            userId: profile.userId,
+            jobId: aiJob.id,
+            provider: this.voiceClone.name,
+            type: 'VOICE_CLONE',
+            success,
+            units: cloneRequested ? 1 : 0,
+          },
+        })
+        .catch((error: unknown) => this.logger.warn({ err: error }, 'usage log write failed'));
     try {
       const recording = await this.storage.getObject(recordingKey);
       await this.jobs.setProgress(aiJob.id, 30);
 
+      cloneRequested = true;
       const { providerVoiceId } = await this.voiceClone.createVoice({
         displayName: profile.displayName,
         audio: recording,
@@ -125,7 +141,11 @@ export class VoiceCloneProcessor implements OnModuleInit, OnApplicationShutdown 
       });
 
       // Retire the old clone only after the new one is live (§46).
-      if (isRecreate && previousProviderVoiceId != null && previousProviderVoiceId !== providerVoiceId) {
+      if (
+        isRecreate &&
+        previousProviderVoiceId != null &&
+        previousProviderVoiceId !== providerVoiceId
+      ) {
         await this.voiceClone.deleteVoice(previousProviderVoiceId).catch(() => undefined);
       }
       if (isRecreate && previousRecordingKey != null && previousRecordingKey !== recordingKey) {
@@ -141,6 +161,7 @@ export class VoiceCloneProcessor implements OnModuleInit, OnApplicationShutdown 
       }
 
       await this.jobs.complete(aiJob.id, profile.id);
+      await logUsage(true);
       await this.notifications.notify(
         profile.userId,
         NotificationType.VOICE_READY,
@@ -149,6 +170,7 @@ export class VoiceCloneProcessor implements OnModuleInit, OnApplicationShutdown 
         { voiceProfileId: profile.id },
       );
     } catch (error) {
+      await logUsage(false);
       const isLastAttempt = job.attemptsMade + 1 >= (job.opts.attempts ?? 1);
       if (isLastAttempt) {
         // Keep the recording so the user can retry without re-reading (§20).

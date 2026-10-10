@@ -10,7 +10,12 @@ import {
   VoiceProfileStatus,
 } from '@masalim/types';
 import type { StorageProvider } from '@masalim/storage';
-import type { CreateNarrationInput, Narration as NarrationDto, NarrationTiming } from '@masalim/validation';
+import type {
+  CreateNarrationInput,
+  Narration as NarrationDto,
+  NarrationTiming,
+  NarrationWordTimings,
+} from '@masalim/validation';
 import type { Prisma } from '@masalim/database';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AppException } from '../../common/errors/app.exception';
@@ -69,7 +74,8 @@ export class NarrationsService {
     const hasNewerNonFailed = new Set<string>();
     const stale: string[] = [];
     for (const row of rows) {
-      const key = row.voiceProfileId != null ? `vp:${row.voiceProfileId}` : `sv:${row.systemVoiceId}`;
+      const key =
+        row.voiceProfileId != null ? `vp:${row.voiceProfileId}` : `sv:${row.systemVoiceId}`;
       if (row.status !== NarrationStatus.FAILED) {
         hasNewerNonFailed.add(key);
         continue;
@@ -106,6 +112,10 @@ export class NarrationsService {
 
     let voiceKey: string;
     if (input.voiceProfileId != null) {
+      // A cloned parent voice is a Premium feature at narration time too, not
+      // only at clone time: a lapsed subscriber keeps the profile but cannot
+      // narrate with it until they are Premium again (owner decision).
+      await this.entitlements.requireFeature(userId, EntitlementKey.PARENT_VOICE_CLONE);
       const profile = await this.voiceProfiles.findOwned(userId, input.voiceProfileId);
       if (profile.status !== VoiceProfileStatus.READY || profile.providerVoiceId == null) {
         throw new AppException(
@@ -152,27 +162,36 @@ export class NarrationsService {
       return { narration: await this.toDto(existing), jobId: activeJob?.id ?? null };
     }
 
-    // The story's FIRST narration is included in its story credits; narrating
-    // the same version with ANOTHER voice costs half the story price.
-    const priorNarrations = await this.prisma.narration.count({
-      where: {
-        storyId,
-        storyVersion: story.version,
-        status: { in: [NarrationStatus.QUEUED, NarrationStatus.PROCESSING, NarrationStatus.READY] },
-      },
-    });
-    const creditCost = priorNarrations === 0 ? 0 : EXTRA_ACTION_CREDIT_COSTS[story.durationTarget];
-
-    const narration = await this.prisma.narration.create({
-      data: {
-        storyId,
-        storyVersion: story.version,
-        voiceProfileId: input.voiceProfileId ?? null,
-        systemVoiceId: input.systemVoiceId ?? null,
-        provider: 'pending',
-        status: NarrationStatus.QUEUED,
-      },
-      include: NARRATION_INCLUDE,
+    // The story's FIRST narration is included in its story credits ONCE per
+    // story, not per version (a title edit must not reset the allowance);
+    // every further narration costs half the story price. The count and the
+    // insert run under a per-story advisory lock so two concurrent requests
+    // cannot both see "no prior narration" and both come out free.
+    const { narration, creditCost } = await this.prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${storyId}))`;
+      const priorNarrations = await tx.narration.count({
+        where: {
+          storyId,
+          status: {
+            in: [NarrationStatus.QUEUED, NarrationStatus.PROCESSING, NarrationStatus.READY],
+          },
+        },
+      });
+      const created = await tx.narration.create({
+        data: {
+          storyId,
+          storyVersion: story.version,
+          voiceProfileId: input.voiceProfileId ?? null,
+          systemVoiceId: input.systemVoiceId ?? null,
+          provider: 'pending',
+          status: NarrationStatus.QUEUED,
+        },
+        include: NARRATION_INCLUDE,
+      });
+      return {
+        narration: created,
+        creditCost: priorNarrations === 0 ? 0 : EXTRA_ACTION_CREDIT_COSTS[story.durationTarget],
+      };
     });
     if (creditCost > 0) {
       try {
@@ -219,14 +238,14 @@ export class NarrationsService {
       id: row.id,
       storyId: row.storyId,
       storyVersion: row.storyVersion,
-      narratorName:
-        row.voiceProfile?.displayName ?? row.systemVoice?.displayName ?? 'Masalım',
+      narratorName: row.voiceProfile?.displayName ?? row.systemVoice?.displayName ?? 'Masalım',
       isParentVoice: row.voiceProfileId != null,
       voiceProfileId: row.voiceProfileId,
       systemVoiceId: row.systemVoiceId,
       audioUrl: row.audioKey ? await this.storage.getSignedUrl(row.audioKey, 3600) : null,
       duration: row.duration,
       timings: (row.timings as NarrationTiming[] | null) ?? null,
+      wordTimings: (row.wordTimings as NarrationWordTimings | null) ?? null,
       status: row.status,
       createdAt: row.createdAt.toISOString(),
       jobId: activeJob?.id ?? null,

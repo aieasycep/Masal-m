@@ -26,6 +26,12 @@ import { StoriesService } from '../stories/stories.service';
 /** Ledger ref type for per-attempt regenerate spends (refId = `${illustrationId}:${uuid}`). */
 export const REGENERATE_CREDIT_REF_TYPE = 'illustration_regen';
 
+/**
+ * Placeholder imageKey of rows older worker builds created before uploading;
+ * the processor deletes them on its next attempt — never show them meanwhile.
+ */
+const PENDING_IMAGE_KEY = 'pending';
+
 type SetWithIllustrations = Prisma.IllustrationSetGetPayload<{
   include: { illustrations: true };
 }>;
@@ -88,25 +94,31 @@ export class IllustrationsService {
       };
     }
 
-    // The story's FIRST illustration set is included in its story credits;
-    // every further set (a different style) costs half the story price.
-    const priorSets = await this.prisma.illustrationSet.count({
-      where: {
-        storyId,
-        storyVersion: story.version,
-        status: { in: ['QUEUED', 'GENERATING', 'READY'] },
-      },
-    });
-    const creditCost = priorSets === 0 ? 0 : EXTRA_ACTION_CREDIT_COSTS[story.durationTarget];
-
-    const set = await this.prisma.illustrationSet.create({
-      data: {
-        storyId,
-        storyVersion: story.version,
-        style: input.style,
-        status: IllustrationSetStatus.QUEUED,
-      },
-      include: { illustrations: true },
+    // The story's FIRST illustration set is included in its story credits ONCE
+    // per story, not per version (a title edit must not reset the allowance);
+    // every further set costs half the story price. Count + insert run under a
+    // per-story advisory lock so concurrent requests cannot both come out free.
+    const { set, creditCost } = await this.prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${storyId}))`;
+      const priorSets = await tx.illustrationSet.count({
+        where: {
+          storyId,
+          status: { in: ['QUEUED', 'GENERATING', 'READY'] },
+        },
+      });
+      const created = await tx.illustrationSet.create({
+        data: {
+          storyId,
+          storyVersion: story.version,
+          style: input.style,
+          status: IllustrationSetStatus.QUEUED,
+        },
+        include: { illustrations: true },
+      });
+      return {
+        set: created,
+        creditCost: priorSets === 0 ? 0 : EXTRA_ACTION_CREDIT_COSTS[story.durationTarget],
+      };
     });
     if (creditCost > 0) {
       try {
@@ -234,9 +246,8 @@ export class IllustrationsService {
     pageCount: number,
     _userId: string,
   ): Promise<IllustrationSetDto> {
-    const targetsDone = new Set(
-      set.illustrations.map((item) => item.storyPageId ?? 'cover'),
-    ).size;
+    const items = set.illustrations.filter((item) => item.imageKey !== PENDING_IMAGE_KEY);
+    const targetsDone = new Set(items.map((item) => item.storyPageId ?? 'cover')).size;
     return {
       id: set.id,
       storyId: set.storyId,
@@ -244,9 +255,7 @@ export class IllustrationsService {
       style: set.style,
       status: set.status,
       progress: { completed: targetsDone, total: pageCount + 1 },
-      illustrations: await Promise.all(
-        set.illustrations.map((item) => this.illustrationDto(item)),
-      ),
+      illustrations: await Promise.all(items.map((item) => this.illustrationDto(item))),
       createdAt: set.createdAt.toISOString(),
       jobId: await this.activeJobFor(set.id),
     };

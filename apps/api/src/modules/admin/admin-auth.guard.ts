@@ -13,13 +13,8 @@ import { AdminRole, ErrorCode } from '@masalim/types';
 import { AppException } from '../../common/errors/app.exception';
 import { ENV } from '../../config/config.module';
 import type { Env } from '../../config/env';
-
-export interface AdminTokenPayload {
-  sub: string;
-  email: string;
-  role: AdminRole;
-  type: 'admin';
-}
+import { PrismaService } from '../../prisma/prisma.service';
+import { adminSigningSecret, type AdminTokenPayload } from './admin-token';
 
 export interface AuthenticatedAdmin {
   id: string;
@@ -32,14 +27,18 @@ export const ADMIN_ROLES_KEY = 'adminRoles';
 export const AdminRoles = (...roles: AdminRole[]) => SetMetadata(ADMIN_ROLES_KEY, roles);
 
 /**
- * Separate admin JWT realm (§39): admin tokens carry type='admin' and are
- * never interchangeable with user access tokens. RBAC enforced per handler.
+ * Separate admin JWT realm (§39): admin tokens are signed with a key derived
+ * from JWT_SECRET (see admin-token.ts) and are never interchangeable with user
+ * access tokens. The token only identifies the admin — role and email are
+ * re-read from the AdminUser row on every request, so a demoted or deleted
+ * admin loses access immediately. RBAC enforced per handler.
  */
 @Injectable()
 export class AdminAuthGuard implements CanActivate {
   constructor(
     private readonly jwtService: JwtService,
     private readonly reflector: Reflector,
+    private readonly prisma: PrismaService,
     @Inject(ENV) private readonly env: Env,
   ) {}
 
@@ -58,7 +57,7 @@ export class AdminAuthGuard implements CanActivate {
     let payload: AdminTokenPayload;
     try {
       payload = await this.jwtService.verifyAsync<AdminTokenPayload>(token, {
-        secret: this.env.JWT_SECRET,
+        secret: adminSigningSecret(this.env.JWT_SECRET),
       });
     } catch (error) {
       const expired = error instanceof Error && error.name === 'TokenExpiredError';
@@ -68,10 +67,22 @@ export class AdminAuthGuard implements CanActivate {
         HttpStatus.UNAUTHORIZED,
       );
     }
-    if (payload.type !== 'admin') {
+    if (payload.type !== 'admin' || typeof payload.sub !== 'string') {
       throw new AppException(
         ErrorCode.AUTH_TOKEN_INVALID,
         'Not an admin token',
+        HttpStatus.UNAUTHORIZED,
+      );
+    }
+
+    const admin = await this.prisma.adminUser.findUnique({
+      where: { id: payload.sub },
+      select: { id: true, email: true, role: true },
+    });
+    if (admin == null) {
+      throw new AppException(
+        ErrorCode.AUTH_TOKEN_INVALID,
+        'Admin account no longer exists',
         HttpStatus.UNAUTHORIZED,
       );
     }
@@ -80,7 +91,7 @@ export class AdminAuthGuard implements CanActivate {
       context.getHandler(),
       context.getClass(),
     ]);
-    if (allowed != null && allowed.length > 0 && !allowed.includes(payload.role)) {
+    if (allowed != null && allowed.length > 0 && !allowed.includes(admin.role)) {
       throw new AppException(
         ErrorCode.FORBIDDEN_OWNERSHIP,
         'Insufficient admin role',
@@ -88,7 +99,7 @@ export class AdminAuthGuard implements CanActivate {
       );
     }
 
-    request.admin = { id: payload.sub, email: payload.email, role: payload.role };
+    request.admin = { id: admin.id, email: admin.email, role: admin.role };
     return true;
   }
 }

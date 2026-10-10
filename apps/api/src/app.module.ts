@@ -33,6 +33,7 @@ import { NotificationsModule } from './modules/notifications/notifications.modul
 import { SubscriptionModule } from './modules/subscription/subscription.module';
 import { AppConfigModule } from './modules/app-config/app-config.module';
 import { HealthModule } from './modules/health/health.module';
+import { MaintenanceModule } from './modules/maintenance/maintenance.module';
 
 @Module({
   imports: [
@@ -96,6 +97,7 @@ import { HealthModule } from './modules/health/health.module';
     SubscriptionModule,
     AppConfigModule,
     HealthModule,
+    MaintenanceModule,
   ],
   providers: [
     { provide: APP_PIPE, useClass: ZodValidationPipe },

@@ -12,7 +12,6 @@ import { Screen } from '../../src/components/Screen';
 import { ScreenHeader } from '../../src/components/ScreenHeader';
 import { ChevronRightIcon } from '../../src/components/icons';
 import { api } from '../../src/lib/api';
-import { unregisterPush } from '../../src/lib/push';
 import { useAppPrefs } from '../../src/stores/app-prefs';
 import { useAuthStore } from '../../src/stores/auth';
 
@@ -75,8 +74,16 @@ export default function SettingsIndex() {
   const meQuery = useQuery({ queryKey: ['me'], queryFn: () => api.users.me() });
   const childrenQuery = useQuery({ queryKey: ['children'], queryFn: () => api.children.list() });
   const voicesQuery = useQuery({ queryKey: ['voices'], queryFn: () => api.voices.list() });
+  const appConfigQuery = useQuery({
+    queryKey: ['app-config'],
+    queryFn: () => api.app.config(),
+    staleTime: 60 * 60 * 1000,
+  });
 
   const me = meQuery.data;
+  // Same condition as the Home banner — a second entry point while unverified.
+  const showEmailVerify =
+    appConfigQuery.data?.emailVerificationRequired === true && me?.emailVerified === false;
   const childCount = childrenQuery.data?.length;
   const voiceCount = voicesQuery.data?.filter(
     (voice) => voice.status !== VoiceProfileStatus.DELETED,
@@ -90,14 +97,8 @@ export default function SettingsIndex() {
 
   const signOut = async () => {
     setConfirmSignOut(false);
-    // Best-effort: drop this device's push token while the session is still valid.
-    await unregisterPush();
-    try {
-      await api.auth.logout();
-    } catch {
-      // Signing out locally always succeeds even if the API call fails.
-    }
-    await useAuthStore.getState().clearSession();
+    // Single sign-out path (push token + this device's refresh token + local state).
+    await useAuthStore.getState().signOut();
     router.replace('/(onboarding)/splash' as never);
   };
 
@@ -112,6 +113,15 @@ export default function SettingsIndex() {
           sub={me?.name}
           onPress={() => router.push('/settings/account' as never)}
         />
+        {showEmailVerify ? (
+          <ListRow
+            icon="✉️"
+            label={t('emailVerify.title')}
+            sub={t('emailVerify.bannerTitle')}
+            badge={t('emailVerify.bannerCta')}
+            onPress={() => router.push('/settings/verify-email' as never)}
+          />
+        ) : null}
         <ListRow
           icon="🧒"
           label={t('profile.childrenSection')}

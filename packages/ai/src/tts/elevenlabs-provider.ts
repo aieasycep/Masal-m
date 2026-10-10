@@ -1,4 +1,9 @@
-import { TtsError, type SpeechResult, type TextToSpeechProvider } from './types';
+import {
+  TtsError,
+  type SpeechResult,
+  type TextToSpeechProvider,
+  type WordAlignment,
+} from './types';
 
 export interface ElevenLabsTtsConfig {
   apiKey: string;
@@ -18,6 +23,9 @@ export interface ElevenLabsTtsConfig {
 const V3_SETTINGS = { stability: 0.5, similarity_boost: 0.75 };
 // v2 models: lower stability + some style exaggeration reads far less flat for
 // storytelling than the defaults, at the cost of slightly less consistency.
+/** A 10-minute narration aligns in well under a minute; generous cap for slow days. */
+const ALIGNMENT_TIMEOUT_MS = 180_000;
+
 const V2_STORYTELLING_SETTINGS = {
   stability: 0.35,
   similarity_boost: 0.75,
@@ -64,6 +72,50 @@ export class ElevenLabsTtsProvider implements TextToSpeechProvider {
       );
     }
     throw new TtsError(`ElevenLabs TTS failed (${primary.error})`);
+  }
+
+  /**
+   * Forced alignment (`POST /v1/forced-alignment`, multipart file + text):
+   * works on any audio — v3 output and cloned voices included — which is why
+   * karaoke timings come from the FINAL narration file rather than from the
+   * per-chunk synthesis calls.
+   */
+  async alignWords(input: {
+    audio: Buffer;
+    contentType: string;
+    text: string;
+  }): Promise<WordAlignment> {
+    const form = new FormData();
+    form.append(
+      'file',
+      new Blob([new Uint8Array(input.audio)], { type: input.contentType }),
+      'narration.mp3',
+    );
+    form.append('text', input.text);
+    const response = await fetch(`${this.baseUrl}/v1/forced-alignment`, {
+      method: 'POST',
+      headers: { 'xi-api-key': this.apiKey },
+      body: form,
+      signal: AbortSignal.timeout(ALIGNMENT_TIMEOUT_MS),
+    });
+    if (!response.ok) {
+      const body = await response.text().catch(() => '');
+      throw new TtsError(`ElevenLabs forced alignment failed (${response.status}: ${body.slice(0, 300)})`);
+    }
+    const json = (await response.json()) as {
+      characters?: Array<{ text: string; start: number; end: number }>;
+      words?: Array<{ text: string; start: number; end: number; loss?: number }>;
+      loss?: number;
+    };
+    const words = Array.isArray(json.words) ? json.words : [];
+    if (words.length === 0) throw new TtsError('ElevenLabs forced alignment returned no words');
+    return {
+      characters: Array.isArray(json.characters)
+        ? json.characters.map((c) => ({ text: c.text, start: c.start, end: c.end }))
+        : [],
+      words: words.map((w) => ({ text: w.text, start: w.start, end: w.end })),
+      ...(typeof json.loss === 'number' ? { loss: json.loss } : {}),
+    };
   }
 
   private async synthesize(

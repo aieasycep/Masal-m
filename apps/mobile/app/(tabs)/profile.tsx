@@ -7,7 +7,6 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { AGE_RANGE_LABELS, OrderStatus } from '@masalim/types';
 import { colors, fontFamilies, fontSizes, radius, shadows, spacing } from '@masalim/ui';
 import { api } from '../../src/lib/api';
-import { unregisterPush } from '../../src/lib/push';
 import { useAuthStore } from '../../src/stores/auth';
 import { useAppPrefs } from '../../src/stores/app-prefs';
 import { Avatar } from '../../src/components/Avatar';
@@ -44,7 +43,7 @@ const INACTIVE_ORDER_STATUSES: readonly OrderStatus[] = [
 /** Profile & family screen — pixel pass from docs/design-reference Profile.tsx. */
 export default function Profile() {
   const { t } = useTranslation();
-  const clearSession = useAuthStore((state) => state.clearSession);
+  const signOutSession = useAuthStore((state) => state.signOut);
   const selectedChildId = useAppPrefs((state) => state.selectedChildId);
   const setSelectedChildId = useAppPrefs((state) => state.setSelectedChildId);
   const [confirmSignOut, setConfirmSignOut] = useState(false);
@@ -141,14 +140,8 @@ export default function Profile() {
 
   const signOut = async () => {
     setConfirmSignOut(false);
-    // Best-effort: drop this device's push token while the session is still valid.
-    await unregisterPush();
-    try {
-      await api.auth.logout();
-    } catch {
-      // Signing out locally always succeeds even if the API call fails.
-    }
-    await clearSession();
+    // Single sign-out path (push token + this device's refresh token + local state).
+    await signOutSession();
     router.replace('/(onboarding)/splash' as never);
   };
 

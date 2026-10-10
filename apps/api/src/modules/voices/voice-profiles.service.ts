@@ -45,6 +45,7 @@ export class VoiceProfilesService {
   async create(userId: string, input: CreateVoiceProfileInput): Promise<VoiceProfileDto> {
     await this.entitlements.requireFeature(userId, EntitlementKey.PARENT_VOICE_CLONE);
     this.assertRecording(userId, input.recordingObjectKey, input.recordingDurationSeconds);
+    await this.assertRecordingUploaded(input.recordingObjectKey);
 
     const row = await this.prisma.voiceProfile.create({
       data: {
@@ -87,6 +88,7 @@ export class VoiceProfilesService {
     const row = await this.findOwned(userId, voiceId);
     await this.entitlements.requireFeature(userId, EntitlementKey.PARENT_VOICE_CLONE);
     this.assertRecording(userId, input.recordingObjectKey, input.recordingDurationSeconds);
+    await this.assertRecordingUploaded(input.recordingObjectKey);
 
     await this.prisma.voiceProfile.update({
       where: { id: voiceId },
@@ -121,19 +123,26 @@ export class VoiceProfilesService {
     deleteProviderVoice: (providerVoiceId: string) => Promise<void>,
   ): Promise<void> {
     const row = await this.findOwned(userId, voiceId);
+    // A failed provider delete keeps the id on the (soft-deleted) row so the
+    // hourly deletion sweep can retry it — orphaned clones would otherwise
+    // silently eat the ElevenLabs voice slots.
+    let providerDeleted = row.providerVoiceId == null;
     if (row.providerVoiceId != null) {
-      await deleteProviderVoice(row.providerVoiceId).catch(() => {
-        // Provider deletion is retried by ops tooling; local purge still proceeds.
-      });
+      providerDeleted = await deleteProviderVoice(row.providerVoiceId).then(
+        () => true,
+        () => false,
+      );
     }
-    if (row.recordingKey != null) await this.storage.deleteObject(row.recordingKey).catch(() => undefined);
-    if (row.previewKey != null) await this.storage.deleteObject(row.previewKey).catch(() => undefined);
+    if (row.recordingKey != null)
+      await this.storage.deleteObject(row.recordingKey).catch(() => undefined);
+    if (row.previewKey != null)
+      await this.storage.deleteObject(row.previewKey).catch(() => undefined);
     await this.prisma.voiceProfile.update({
       where: { id: voiceId },
       data: {
         status: VoiceProfileStatus.DELETED,
         deletedAt: new Date(),
-        providerVoiceId: null,
+        providerVoiceId: providerDeleted ? null : row.providerVoiceId,
         recordingKey: null,
         previewKey: null,
       },
@@ -166,6 +175,17 @@ export class VoiceProfilesService {
         `Recording must be at most ${VOICE_RECORDING.MAX_DURATION_SECONDS}s`,
         HttpStatus.UNPROCESSABLE_ENTITY,
       );
+    }
+  }
+
+  /**
+   * The clone job would fail later on a missing or empty object; refuse now so
+   * the premium slot and the user's wait are not spent on a dangling key.
+   */
+  private async assertRecordingUploaded(objectKey: string): Promise<void> {
+    const meta = await this.storage.headObject(objectKey);
+    if (meta == null || meta.contentLength <= 0) {
+      throw AppException.validation('Recording upload not found');
     }
   }
 

@@ -8,6 +8,8 @@ export const appConfigSchema = z.object({
     android: z.string().nullable(),
   }),
   maintenanceMode: z.boolean(),
+  /** True when the server mails for real and unverified accounts should be nudged. */
+  emailVerificationRequired: z.boolean(),
   /** Public feature flags exposed to clients. */
   features: z.record(z.string(), z.boolean()),
 });

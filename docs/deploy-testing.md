@@ -84,5 +84,6 @@ işlerini, içerik denetimini ve özellik anahtarlarını buradan yönetirsin.
   takılırsa Render'da *Starter* (~$7/ay) kademesine geçmek yeterli.
 - Render ücretsiz Postgres 30 gün sonra sona erer (test için yeterli; kalıcı
   kurulumda ücretli kademe ya da kendi sunucunuz).
-- Gerçek yapay zekâ çıktısı istenirse: Render'da `AI_PROVIDER=anthropic` +
-  `AI_API_KEY` eklemek yeterli (bkz. `docs/providers.md`).
+- Gerçek yapay zekâ çıktısı istenirse: `AI_PROVIDER=anthropic`,
+  `MODERATION_PROVIDER=llm` + `AI_API_KEY=<Claude anahtarı>` eklemek yeterli
+  (bkz. `docs/providers.md`; kendi sunucun için `docs/deploy-server.md` Adım 7).

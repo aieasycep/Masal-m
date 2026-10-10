@@ -25,11 +25,11 @@ const TERMINAL_STATUSES = new Set<AIJobStatus>([
 
 /** No SSE event for this long → assume the stream is dead and fall back to polling. */
 const SSE_WATCHDOG_MS = 10_000;
-const POLL_INTERVAL_MS = 2_000;
+const POLL_INTERVAL_MS = 3_000;
 
 /**
  * Live progress for an AIJob: SSE stream (`GET /jobs/:id/stream`) with an
- * authenticated EventSource, falling back to 2s polling when the stream errors
+ * authenticated EventSource, falling back to 3s polling when the stream errors
  * or goes silent. Stops on terminal status (SUCCEEDED/FAILED/CANCELLED) or unmount.
  */
 export function useJobProgress(jobId: string | undefined): JobProgress {

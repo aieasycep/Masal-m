@@ -4,18 +4,18 @@ on:
   workflow_dispatch:
     inputs:
       api_url:
-        description: "API adresi. Boş bırakılırsa canlı sunucu (VPS) kullanılır."
+        description: 'API adresi. Boş bırakılırsa canlı sunucu (VPS) kullanılır.'
         required: false
-        default: ""
+        default: ''
   push:
     branches: [claude/masalim-implementation-plan-pz1pkl]
     paths:
-      - ".github/workflows/android-apk.yml"
-      - "apps/mobile/**"
-      - "patches/**"
-      - "packages/**"
-      - "pnpm-lock.yaml"
-      - "package.json"
+      - '.github/workflows/android-apk.yml'
+      - 'apps/mobile/**'
+      - 'patches/**'
+      - 'packages/**'
+      - 'pnpm-lock.yaml'
+      - 'package.json'
 
 jobs:
   apk:
@@ -23,7 +23,9 @@ jobs:
     timeout-minutes: 60
     env:
       # EXPO_PUBLIC_* values are inlined into the JS bundle at build time.
-      EXPO_PUBLIC_API_URL: ${{ inputs.api_url != '' && inputs.api_url || 'https://api.57-129-6-57.sslip.io' }}
+      # Varsayılan canlı API adresi repo değişkeni MASALIM_DOMAIN'den türetilir
+      # (deploy-server.yml ile aynı kaynak); yoksa sslip.io varsayılanı.
+      EXPO_PUBLIC_API_URL: ${{ inputs.api_url != '' && inputs.api_url || format('https://api.{0}', vars.MASALIM_DOMAIN || '57-129-6-57.sslip.io') }}
       EXPO_PUBLIC_PURCHASES_PROVIDER: mock
     steps:
       - uses: actions/checkout@v4
@@ -38,7 +40,7 @@ jobs:
       - uses: actions/setup-java@v5
         with:
           distribution: temurin
-          java-version: "17"
+          java-version: '17'
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile

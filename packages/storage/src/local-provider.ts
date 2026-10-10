@@ -1,8 +1,16 @@
-import { createHmac, randomUUID } from 'node:crypto';
-import { promises as fs } from 'node:fs';
+import { createHmac, randomBytes, randomUUID } from 'node:crypto';
+import { promises as fs, type Dirent } from 'node:fs';
 import path from 'node:path';
 import { SIGNED_URL_DEFAULT_TTL_SECONDS } from '@masalim/types';
-import type { SignedUpload, StorageConfig, StorageObjectMeta, StorageProvider } from './types';
+import type {
+  SignedUpload,
+  StorageConfig,
+  StorageObjectEntry,
+  StorageObjectMeta,
+  StorageProvider,
+} from './types';
+
+const META_SUFFIX = '.meta.json';
 
 /**
  * Local-disk storage for development without MinIO/S3. Objects live under
@@ -15,13 +23,15 @@ export class LocalStorageProvider implements StorageProvider {
   private readonly rootDir: string;
   private readonly baseUrl: string;
   private readonly defaultTtl: number;
-  private readonly secret = 'masalim-local-storage-dev-secret';
+  // Random per process: signed dev URLs die with a restart, which is harmless
+  // locally and means no fixed secret ever ships in the repository.
+  private readonly secret = randomBytes(32).toString('hex');
 
   constructor(config: StorageConfig) {
     if (!config.localRootDir || !config.localBaseUrl) {
       throw new Error('LocalStorageProvider requires localRootDir and localBaseUrl');
     }
-    this.rootDir = config.localRootDir;
+    this.rootDir = path.resolve(config.localRootDir);
     this.baseUrl = config.localBaseUrl.replace(/\/$/, '');
     this.defaultTtl = config.signedUrlTtlSeconds ?? SIGNED_URL_DEFAULT_TTL_SECONDS;
   }
@@ -45,13 +55,29 @@ export class LocalStorageProvider implements StorageProvider {
     return this.signToken(objectKey, expiresAtEpochSeconds, method) === token;
   }
 
+  /**
+   * Map an object key onto the root directory. Keys are bucket paths, never
+   * filesystem paths: `..` segments, absolute paths and backslashes are
+   * rejected outright instead of being "normalized" (which still escaped).
+   */
   private filePath(objectKey: string): string {
-    const safe = path.normalize(objectKey).replace(/^(\.\.[/\\])+/, '');
-    return path.join(this.rootDir, safe);
+    if (
+      objectKey.length === 0 ||
+      objectKey.startsWith('/') ||
+      objectKey.includes('\\') ||
+      objectKey.split('/').some((segment) => segment === '..' || segment === '.')
+    ) {
+      throw new Error(`Invalid object key: ${objectKey}`);
+    }
+    const resolved = path.resolve(this.rootDir, objectKey);
+    if (!resolved.startsWith(`${this.rootDir}${path.sep}`)) {
+      throw new Error(`Invalid object key: ${objectKey}`);
+    }
+    return resolved;
   }
 
   private metaPath(objectKey: string): string {
-    return `${this.filePath(objectKey)}.meta.json`;
+    return `${this.filePath(objectKey)}${META_SUFFIX}`;
   }
 
   async createSignedUpload(input: {
@@ -68,7 +94,11 @@ export class LocalStorageProvider implements StorageProvider {
     return { uploadUrl, objectKey, expiresIn, headers: { 'Content-Type': input.contentType } };
   }
 
-  async putObject(objectKey: string, body: Buffer | Uint8Array, contentType: string): Promise<void> {
+  async putObject(
+    objectKey: string,
+    body: Buffer | Uint8Array,
+    contentType: string,
+  ): Promise<void> {
     const file = this.filePath(objectKey);
     await fs.mkdir(path.dirname(file), { recursive: true });
     await fs.writeFile(file, body);
@@ -106,6 +136,41 @@ export class LocalStorageProvider implements StorageProvider {
 
   async deletePrefix(prefix: string): Promise<void> {
     await fs.rm(this.filePath(prefix), { recursive: true, force: true });
+  }
+
+  /**
+   * Prefixes are key prefixes, not directories (`users/ab` matches `users/abc/x`):
+   * walk from the deepest directory that can contain matches and filter by key.
+   */
+  async *listObjects(prefix: string): AsyncIterable<StorageObjectEntry> {
+    const startDir =
+      prefix === '' || prefix.endsWith('/')
+        ? prefix === ''
+          ? this.rootDir
+          : this.filePath(prefix)
+        : path.dirname(this.filePath(prefix));
+    const stack = [startDir];
+    while (stack.length > 0) {
+      const dir = stack.pop() as string;
+      let entries: Dirent[];
+      try {
+        entries = await fs.readdir(dir, { withFileTypes: true });
+      } catch {
+        continue;
+      }
+      for (const entry of entries) {
+        const full = path.join(dir, entry.name);
+        if (entry.isDirectory()) {
+          stack.push(full);
+          continue;
+        }
+        if (!entry.isFile() || entry.name.endsWith(META_SUFFIX)) continue;
+        const key = path.relative(this.rootDir, full).split(path.sep).join('/');
+        if (!key.startsWith(prefix)) continue;
+        const stat = await fs.stat(full);
+        yield { key, size: stat.size, lastModified: stat.mtime };
+      }
+    }
   }
 
   async exists(objectKey: string): Promise<boolean> {

@@ -1,36 +1,69 @@
-# Masalım — OVH sunucusuna dağıtım (57.129.6.57).
+# Masalım — OVH sunucusuna dağıtım.
 # Kod runner'dan sunucuya rsync'lenir, Docker imajları SUNUCUDA derlenir
 # (katman önbelleği sunucuda kaldığından lockfile değişmedikçe yeniden
 # derlemeler hızlıdır), compose ayağa kaldırılır, sağlık kontrolü yapılır.
 #
 # Gerekli GitHub Secrets (Settings → Secrets and variables → Actions):
 #   SERVER_SSH_KEY       — sunucudaki ~/.ssh/masalim_deploy ÖZEL anahtarı
-#   AI_API_KEY           — OpenAI anahtarı (hikâye + denetim)
+#   ANTHROPIC_API_KEY    — Claude anahtarı (hikâye + denetim + seslendirme
+#                          yönetmeni) — AI_VENDOR=anthropic iken ZORUNLU
+#   AI_API_KEY           — OpenAI anahtarı (aynı üç iş) — yalnızca
+#                          AI_VENDOR=openai (geri dönüş) iken kullanılır
 #   TTS_API_KEY          — ElevenLabs anahtarı (seslendirme)
 #   VOICE_CLONE_API_KEY  — ElevenLabs anahtarı (ses klonlama)
-#   IMAGE_API_KEY        — OpenAI anahtarı (görseller)
+#   IMAGE_API_KEY        — OpenAI anahtarı (görseller — Claude görsel üretmez)
+#   SMTP_URL / MAIL_FROM — (canlıya geçişte) gerçek e-posta; varsa sunucu
+#                          MAIL_PROVIDER=smtp ile çalışır
+# İsteğe bağlı Variables (aynı sayfa → Variables sekmesi):
+#   MASALIM_DOMAIN       — alan adı tabanı (vars. 57-129-6-57.sslip.io);
+#                          api./storage./admin. alt alanları bundan türetilir
+#   MASALIM_SERVER_HOST  — sunucu IP'si (vars. 57.129.6.57)
+#   MASALIM_SSH_HOST_KEY — `ssh-keyscan <ip>` çıktısındaki satır; verilirse
+#                          sunucu kimliği sabitlenir (yoksa ilk-güven)
 # Kurulum adımları: docs/deploy-server.md (Türkçe, adım adım).
 name: Deploy Server
 
 on:
   workflow_dispatch:
+    inputs:
+      story_smoke:
+        description: "Dağıtımdan sonra canlı API'de gerçek bir KISA masal üret (LLM kredisi harcar)"
+        type: boolean
+        default: false
+      run_backup:
+        description: 'Dağıtımdan sonra yedekleme betiğini hemen çalıştır ve doğrula (deploy/backup.sh --check)'
+        type: boolean
+        default: false
   push:
     branches: [main]
     paths:
-      - "apps/api/**"
-      - "apps/admin/**"
-      - "packages/**"
-      - "deploy/**"
-      - "pnpm-lock.yaml"
-      - ".github/workflows/deploy-server.yml"
+      - 'apps/api/**'
+      - 'apps/admin/**'
+      - 'packages/**'
+      - 'deploy/**'
+      - 'pnpm-lock.yaml'
+      - '.github/workflows/deploy-server.yml'
 
 concurrency:
   group: deploy-server
   cancel-in-progress: false
 
 env:
-  SERVER: ubuntu@57.129.6.57
-  API_URL: https://api.57-129-6-57.sslip.io
+  # Alan adı ve sunucu adresi TEK yerden gelir (repo Variables); yoksa sslip.io
+  # varsayılanı. Alan adı değişikliği: docs/go-live.md §7.
+  MASALIM_DOMAIN: ${{ vars.MASALIM_DOMAIN || '57-129-6-57.sslip.io' }}
+  SERVER_HOST: ${{ vars.MASALIM_SERVER_HOST || '57.129.6.57' }}
+  SERVER: ubuntu@${{ vars.MASALIM_SERVER_HOST || '57.129.6.57' }}
+  API_URL: https://api.${{ vars.MASALIM_DOMAIN || '57-129-6-57.sslip.io' }}
+  # Hikâye / güvenlik denetimi / seslendirme yönetmeni LLM'i: anthropic | openai.
+  # Üçü tek anahtarı paylaşır, o yüzden birlikte geçer. Geri dönüş = bu tek
+  # kelimeyi "openai" yapıp main'e itmek (AI_API_KEY secret'ı OpenAI'da kalır).
+  AI_VENDOR: anthropic
+  ANTHROPIC_STORY_MODEL: claude-opus-5-5
+  ANTHROPIC_MODERATION_MODEL: claude-haiku-5-5
+  ANTHROPIC_EFFORT: medium
+  OPENAI_STORY_MODEL: gpt-4o
+  OPENAI_MODERATION_MODEL: gpt-4o-mini
 
 jobs:
   deploy:
@@ -39,12 +72,91 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Sunucuya dokunmadan ÖNCE: seçili sağlayıcının anahtarı var mı ve model
+      # adları o anahtarla gerçekten açılıyor mu? (GET /models — token harcamaz.)
+      # Eksik/geçersiz anahtarla dağıtım yapılmaz; canlı sunucu olduğu gibi kalır.
+      - name: LLM sağlayıcı anahtarını seç ve doğrula
+        id: llm
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.AI_API_KEY }}
+        run: |
+          set -euo pipefail
+          case "$AI_VENDOR" in
+            anthropic)
+              KEY="$ANTHROPIC_API_KEY"; SECRET_NAME="ANTHROPIC_API_KEY"
+              STORY_MODEL="$ANTHROPIC_STORY_MODEL"; MOD_MODEL="$ANTHROPIC_MODERATION_MODEL"
+              PROVIDER="anthropic"; MOD_PROVIDER="llm" ;;
+            openai)
+              KEY="$OPENAI_API_KEY"; SECRET_NAME="AI_API_KEY"
+              STORY_MODEL="$OPENAI_STORY_MODEL"; MOD_MODEL="$OPENAI_MODERATION_MODEL"
+              PROVIDER="openai"; MOD_PROVIDER="openai" ;;
+            *) echo "::error::AI_VENDOR geçersiz: $AI_VENDOR (anthropic | openai)"; exit 1 ;;
+          esac
+          if [ -z "$KEY" ]; then
+            echo "::error::GitHub Secrets'ta $SECRET_NAME yok ya da boş. github.com/${GITHUB_REPOSITORY} → Settings → Secrets and variables → Actions → New repository secret → Name: $SECRET_NAME. Nasıl alınır: docs/deploy-server.md, Adım 7."
+            exit 1
+          fi
+          check_model() {
+            local model="$1" code
+            if [ "$AI_VENDOR" = anthropic ]; then
+              code=$(curl -sS --max-time 20 -o /tmp/model.json -w '%{http_code}' \
+                -H "x-api-key: $KEY" -H "anthropic-version: 2023-06-01" \
+                "https://api.anthropic.com/v1/models/$model" || echo 000)
+            else
+              code=$(curl -sS --max-time 20 -o /tmp/model.json -w '%{http_code}' \
+                -H "Authorization: Bearer $KEY" "https://api.openai.com/v1/models/$model" || echo 000)
+            fi
+            case "$code" in
+              200) echo "✓ $model bu anahtarla erişilebilir" ;;
+              000) echo "::error::Sağlayıcı API'sine ulaşılamadı (ağ/zaman aşımı) — model kontrolü yapılamadı: $model. Biraz sonra yeniden dene."; exit 1 ;;
+              401|403) echo "::error::$SECRET_NAME anahtarı reddedildi (HTTP $code). Anahtarı yeniden oluşturup secret'ı güncelle."; exit 1 ;;
+              404) echo "::error::Model bulunamadı: $model (HTTP 404). Workflow'daki model adını kontrol et."; exit 1 ;;
+              *) echo "::error::Model kontrolü başarısız: $model → HTTP $code: $(head -c 300 /tmp/model.json)"; exit 1 ;;
+            esac
+          }
+          check_model "$STORY_MODEL"
+          check_model "$MOD_MODEL"
+          {
+            echo "provider=$PROVIDER"
+            echo "mod_provider=$MOD_PROVIDER"
+            echo "story_model=$STORY_MODEL"
+            echo "mod_model=$MOD_MODEL"
+          } >> "$GITHUB_OUTPUT"
+          echo "LLM: $PROVIDER / $STORY_MODEL (denetim: $MOD_PROVIDER / $MOD_MODEL)"
+
+      # API gerçek sağlayıcı seçiliyken boş anahtarla açılmayı REDDEDER
+      # (apps/api/src/config/env.ts) — bunu sunucuda değil burada öğrenelim.
+      - name: Sağlayıcı anahtarlarının varlığını doğrula
+        env:
+          TTS_API_KEY: ${{ secrets.TTS_API_KEY }}
+          VOICE_CLONE_API_KEY: ${{ secrets.VOICE_CLONE_API_KEY }}
+          IMAGE_API_KEY: ${{ secrets.IMAGE_API_KEY }}
+        run: |
+          missing=""
+          [ -n "$TTS_API_KEY" ] || missing="$missing TTS_API_KEY"
+          [ -n "$VOICE_CLONE_API_KEY" ] || missing="$missing VOICE_CLONE_API_KEY"
+          [ -n "$IMAGE_API_KEY" ] || missing="$missing IMAGE_API_KEY"
+          if [ -n "$missing" ]; then
+            echo "::error::GitHub Secrets'ta eksik:$missing — bkz. docs/deploy-server.md (secret tablosu)."
+            exit 1
+          fi
+          echo "✓ ElevenLabs / OpenAI görsel anahtarları mevcut"
+
       - name: SSH anahtarını hazırla
+        env:
+          PINNED_HOST_KEY: ${{ vars.MASALIM_SSH_HOST_KEY }}
         run: |
           mkdir -p ~/.ssh
           printf '%s\n' "${{ secrets.SERVER_SSH_KEY }}" > ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519
-          ssh-keyscan -H 57.129.6.57 >> ~/.ssh/known_hosts
+          if [ -n "$PINNED_HOST_KEY" ]; then
+            printf '%s\n' "$PINNED_HOST_KEY" >> ~/.ssh/known_hosts
+            echo "SSH sunucu kimliği sabit (MASALIM_SSH_HOST_KEY)"
+          else
+            ssh-keyscan -H "$SERVER_HOST" >> ~/.ssh/known_hosts
+            echo "::notice::SSH sunucu kimliği ilk-güven ile alındı. Sabitlemek için 'ssh-keyscan $SERVER_HOST' çıktısındaki satırı MASALIM_SSH_HOST_KEY değişkenine koy."
+          fi
 
       - name: Kodu sunucuya eşitle
         run: |
@@ -54,46 +166,103 @@ jobs:
             ./ "$SERVER":/opt/masalim/app/
 
       - name: Sunucu hazırlığı (.env üretimi, ilk seferde)
-        run: ssh "$SERVER" 'bash /opt/masalim/app/deploy/remote-setup.sh'
+        run: ssh "$SERVER" "MASALIM_DOMAIN='$MASALIM_DOMAIN' bash /opt/masalim/app/deploy/remote-setup.sh"
 
-      - name: Sağlayıcı anahtarlarını yaz
+      # .env yalnızca ilk kurulumda üretilir; alan adına bağlı satırlar repo
+      # değişkenini izlesin diye her dağıtımda idempotent güncellenir.
+      - name: Alan adını eşitle
+        run: ssh "$SERVER" "bash /opt/masalim/app/deploy/set-domain.sh '$MASALIM_DOMAIN'"
+
+      # providers.env her dağıtımda yeniden yazılır ve compose'da /opt/masalim/.env
+      # dosyasından SONRA yüklenir → buradaki sağlayıcı seçimi .env'dekini ezer
+      # (.env yalnızca ilk kurulumda üretilir, bkz. deploy/remote-setup.sh).
+      - name: Sağlayıcı seçimini ve anahtarlarını yaz
         env:
-          AI_API_KEY: ${{ secrets.AI_API_KEY }}
+          LLM_KEY: ${{ env.AI_VENDOR == 'anthropic' && secrets.ANTHROPIC_API_KEY || secrets.AI_API_KEY }}
           TTS_API_KEY: ${{ secrets.TTS_API_KEY }}
           VOICE_CLONE_API_KEY: ${{ secrets.VOICE_CLONE_API_KEY }}
           IMAGE_API_KEY: ${{ secrets.IMAGE_API_KEY }}
+          SMTP_URL: ${{ secrets.SMTP_URL }}
+          MAIL_FROM: ${{ secrets.MAIL_FROM }}
         run: |
           {
-            echo "AI_API_KEY=$AI_API_KEY"
+            echo "AI_PROVIDER=${{ steps.llm.outputs.provider }}"
+            echo "AI_MODEL=${{ steps.llm.outputs.story_model }}"
+            echo "AI_EFFORT=$ANTHROPIC_EFFORT"
+            echo "MODERATION_PROVIDER=${{ steps.llm.outputs.mod_provider }}"
+            echo "MODERATION_MODEL=${{ steps.llm.outputs.mod_model }}"
+            echo "AI_API_KEY=$LLM_KEY"
             echo "TTS_API_KEY=$TTS_API_KEY"
             echo "VOICE_CLONE_API_KEY=$VOICE_CLONE_API_KEY"
             echo "IMAGE_API_KEY=$IMAGE_API_KEY"
+            # Host nginx is the single trusted proxy hop: rate limits and login
+            # lockouts must key on the real client IP, not on 127.0.0.1.
+            echo "TRUST_PROXY=1"
+            # Real e-mail switches on the moment the SMTP_URL secret exists
+            # (smtp[s]://user:pass@host:port); without it the mock mailer stays.
+            if [ -n "$SMTP_URL" ]; then
+              echo "MAIL_PROVIDER=smtp"
+              echo "SMTP_URL=$SMTP_URL"
+              [ -n "$MAIL_FROM" ] && echo "MAIL_FROM=$MAIL_FROM"
+            fi
           } | ssh "$SERVER" 'umask 077; cat > /opt/masalim/providers.env'
 
-      # Sunucuda 80/443 host nginx'te (başka projeler de yayında). Masalım'ın
-      # üç sanal sunucusu eklenir, `nginx -t` geçerse yalnızca RELOAD edilir —
-      # diğer siteler kesintiye uğramaz. TLS'i certbot aynı bloklara işler.
+      # Sunucuda 80/443 host nginx'te (başka projeler de yayında). Şablon
+      # (deploy/nginx-masalim.conf.tpl) alan adıyla render edilir; render
+      # değişmediyse ve sertifika yerindeyse HİÇBİR ŞEYE dokunulmaz. Değiştiyse
+      # dosya yazılır, `nginx -t` geçer, ama reload YAPILMAZ: certbot --nginx TLS
+      # bloklarını aynı dosyaya işleyip nginx'i kendisi yeniden yükler — HTTP-only
+      # ara hâli hiçbir an tek başına yüklenmez. Hata olursa önceki dosya geri gelir.
       - name: Nginx sanal sunucuları + TLS sertifikaları
+        run: |
+          ssh "$SERVER" "MASALIM_DOMAIN='$MASALIM_DOMAIN' bash -s" <<'REMOTE'
+          set -euo pipefail
+          D="$MASALIM_DOMAIN"
+          if ! sudo -n true 2>/dev/null; then
+            echo "::error::ubuntu kullanıcısında şifresiz sudo yok — nginx/TLS adımı elle yapılmalı (docs/deploy-server.md)"
+            exit 1
+          fi
+          TPL=/opt/masalim/app/deploy/nginx-masalim.conf.tpl
+          LIVE=/etc/nginx/sites-available/masalim.conf
+          STATE=/opt/masalim/nginx.rendered.sha256
+          CERT="/etc/letsencrypt/live/api.$D/fullchain.pem"
+          RENDERED="$(sed "s/__DOMAIN__/$D/g" "$TPL")"
+          HASH="$(printf '%s\n' "$RENDERED" | sha256sum | cut -c1-64)"
+          if [ -f "$LIVE" ] && [ -f "$CERT" ] && [ "$(cat "$STATE" 2>/dev/null || true)" = "$HASH" ]; then
+            echo "nginx: şablon değişmedi, sertifika yerinde — dokunulmadı"
+            exit 0
+          fi
+          if ! command -v certbot >/dev/null 2>&1; then
+            sudo apt-get update -y
+            sudo apt-get install -y certbot python3-certbot-nginx
+          fi
+          restore() {
+            if [ -f "$LIVE.bak" ]; then
+              sudo cp "$LIVE.bak" "$LIVE"
+              sudo nginx -t && sudo systemctl reload nginx
+              echo "::error::nginx: önceki yapılandırma geri yüklendi"
+            fi
+          }
+          [ -f "$LIVE" ] && sudo cp "$LIVE" "$LIVE.bak"
+          printf '%s\n' "$RENDERED" | sudo tee "$LIVE" >/dev/null
+          sudo ln -sf "$LIVE" /etc/nginx/sites-enabled/masalim.conf
+          if ! sudo nginx -t; then restore; exit 1; fi
+          if ! sudo certbot --nginx --non-interactive --agree-tos --register-unsafely-without-email \
+               --keep-until-expiring --redirect -d "api.$D" -d "storage.$D" -d "admin.$D"; then
+            restore; exit 1
+          fi
+          sudo nginx -t && sudo systemctl reload nginx
+          echo "$HASH" | sudo tee "$STATE" >/dev/null
+          echo "nginx: sanal sunucular + TLS güncellendi ($D)"
+          REMOTE
+
+      - name: Gece yedeği (cron) kurulumu
         run: |
           ssh "$SERVER" '
             set -e
-            if ! sudo -n true 2>/dev/null; then
-              echo "::error::ubuntu kullanıcısında şifresiz sudo yok — nginx/TLS adımı elle yapılmalı (docs/deploy-server.md)"
-              exit 1
-            fi
-            sudo cp /opt/masalim/app/deploy/nginx-masalim.conf /etc/nginx/sites-available/masalim.conf
-            sudo ln -sf /etc/nginx/sites-available/masalim.conf /etc/nginx/sites-enabled/masalim.conf
-            sudo nginx -t
-            sudo systemctl reload nginx
-            if ! command -v certbot >/dev/null 2>&1; then
-              sudo apt-get update -y
-              sudo apt-get install -y certbot python3-certbot-nginx
-            fi
-            sudo certbot --nginx --non-interactive --agree-tos --register-unsafely-without-email \
-              --keep-until-expiring --redirect \
-              -d api.57-129-6-57.sslip.io -d storage.57-129-6-57.sslip.io -d admin.57-129-6-57.sslip.io
-            sudo nginx -t
-            sudo systemctl reload nginx
+            sudo chmod +x /opt/masalim/app/deploy/backup.sh /opt/masalim/app/deploy/set-domain.sh
+            sudo install -m 644 -o root -g root /opt/masalim/app/deploy/masalim-backup.cron /etc/cron.d/masalim-backup
+            echo "yedek cron'u: /etc/cron.d/masalim-backup (her gece 03:30, 14 gün saklanır)"
           '
 
       - name: Derle ve ayağa kaldır
@@ -112,3 +281,49 @@ jobs:
           curl --retry 40 --retry-delay 10 --retry-all-errors -fsS "$API_URL/health"
           echo
           echo "API canlı: $API_URL"
+          echo "LLM: ${{ steps.llm.outputs.provider }} / ${{ steps.llm.outputs.story_model }} — denetim: ${{ steps.llm.outputs.mod_provider }} / ${{ steps.llm.outputs.mod_model }}"
+          if ssh "$SERVER" 'grep -q "^NODE_ENV=production" /opt/masalim/.env'; then
+            echo "Mod: ÜRETİM (NODE_ENV=production — sahte satın alma/ödeme kapalı)"
+          else
+            echo "::warning::TEST MODU: sunucu NODE_ENV=staging — sahte satın alma/ödeme uçları HERKESE açık. Canlıya geçiş adımları: docs/go-live.md"
+          fi
+
+      # Sertleştirmenin gerçekten etkin olduğunu kanıtla: root dışı kullanıcı,
+      # yetki düşürme, salt-okunur kök, yedek cron'u, admin güvenlik başlıkları.
+      - name: Dağıtım sonrası doğrulama
+        run: |
+          ssh "$SERVER" '
+            COMPOSE="docker compose -f /opt/masalim/app/deploy/docker-compose.server.yml --project-directory /opt/masalim"
+            echo "api konteyner kullanıcısı (uid): $($COMPOSE exec -T api id -u)"
+            docker inspect --format "api güvenlik: SecurityOpt={{.HostConfig.SecurityOpt}} ReadonlyRootfs={{.HostConfig.ReadonlyRootfs}} CapDrop={{.HostConfig.CapDrop}}" masalim-api-1
+            docker inspect --format "admin güvenlik: SecurityOpt={{.HostConfig.SecurityOpt}} ReadonlyRootfs={{.HostConfig.ReadonlyRootfs}}" masalim-admin-1
+            ls -l /etc/cron.d/masalim-backup
+          '
+          if curl -sI "https://admin.$MASALIM_DOMAIN/login" | grep -qi "content-security-policy"; then
+            echo "✓ admin Content-Security-Policy başlığı var"
+          else
+            echo "::warning::admin paneli CSP başlığı görünmedi (https://admin.$MASALIM_DOMAIN/login)"
+          fi
+
+      - name: Yedeği şimdi al ve doğrula (run_backup)
+        if: github.event_name == 'workflow_dispatch' && inputs.run_backup
+        run: |
+          ssh "$SERVER" '
+            set -e
+            sudo /opt/masalim/app/deploy/backup.sh
+            sudo /opt/masalim/app/deploy/backup.sh --check
+            echo "--- /var/log/masalim-backup.log (son 20 satır)"
+            sudo tail -n 20 /var/log/masalim-backup.log 2>/dev/null || true
+            echo "--- /opt/masalim/backups"
+            sudo du -sh /opt/masalim/backups/* 2>/dev/null || true
+          '
+
+      # İsteğe bağlı uçtan uca kanıt: canlı API'de sabit smoke hesabıyla KISA
+      # masal üretilir ve sonucu (başlık, sayfa/kelime sayısı) log'a yazılır.
+      # SMOKE_EMAIL/SMOKE_PASSWORD secret'ları yoksa tek seferlik hesap açılır.
+      - name: Canlı masal üretimi (story_smoke)
+        if: github.event_name == 'workflow_dispatch' && inputs.story_smoke
+        env:
+          SMOKE_EMAIL: ${{ secrets.SMOKE_EMAIL }}
+          SMOKE_PASSWORD: ${{ secrets.SMOKE_PASSWORD }}
+        run: bash deploy/smoke-story.sh "$API_URL"

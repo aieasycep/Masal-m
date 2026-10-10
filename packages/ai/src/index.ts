@@ -1,9 +1,17 @@
+// Anthropic defaults shared by the story / moderation / narration-director wiring
+export {
+  DEFAULT_ANTHROPIC_FAST_MODEL,
+  DEFAULT_ANTHROPIC_STORY_MODEL,
+  type AnthropicEffort,
+} from './shared/anthropic';
+
 // Story generation
 export * from './story/types';
 export { buildSystemPrompt, buildUserPrompt, UNSAFE_SENTINEL } from './story/prompt-engine';
 export { AnthropicStoryProvider } from './story/anthropic-provider';
 export { OpenAIStoryProvider } from './story/openai-provider';
 export { MockStoryProvider } from './story/mock-provider';
+export { normalizeGeneratedStory, MAX_PAGE_TEXT_CHARS } from './story/normalize';
 
 // Moderation
 export * from './moderation/types';
@@ -11,6 +19,11 @@ export { LlmContentModerator } from './moderation/llm-moderator';
 export { OpenAIContentModerator } from './moderation/openai-moderator';
 export { MockContentModerator } from './moderation/mock-moderator';
 export { hitsBlocklist } from './moderation/blocklist';
+export {
+  MODERATION_TEXT_WINDOW,
+  moderateWindows,
+  splitForModeration,
+} from './moderation/classifier';
 
 // Text to speech
 export * from './tts/types';

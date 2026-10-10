@@ -1,14 +1,11 @@
 import { HttpStatus, Inject, Injectable } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as argon2 from 'argon2';
-import {
-  AIJobStatus,
-  ErrorCode,
-  OrderStatus,
-  SubscriptionPlan,
-} from '@masalim/types';
+import type Redis from 'ioredis';
+import { AIJobStatus, ErrorCode, OrderStatus, SubscriptionPlan } from '@masalim/types';
 import type {
   AdminAuditLog,
+  AdminChangePasswordInput,
   AdminDashboardStats,
   AdminFeatureFlagPatchInput,
   AdminJob,
@@ -17,6 +14,7 @@ import type {
   AdminListStoriesQuery,
   AdminListUsersQuery,
   AdminLoginInput,
+  AdminMe,
   AdminModerationPatchInput,
   AdminOrderPatchInput,
   AdminSession,
@@ -33,9 +31,16 @@ import { ENV } from '../../config/config.module';
 import type { Env } from '../../config/env';
 import { JobsService } from '../../jobs/jobs.service';
 import { QUEUE_FOR_JOB_TYPE, type QueueJobData } from '../../jobs/queues';
+import { REDIS } from '../../redis/redis.module';
+import { OrdersService, assertOrderTransition } from '../orders/orders.service';
 import type { AuthenticatedAdmin } from './admin-auth.guard';
+import { ADMIN_TOKEN_TTL, adminSigningSecret, type AdminTokenPayload } from './admin-token';
 
 const DAY_MS = 24 * 3600 * 1000;
+
+/** Admin login lockout: failures counted per email+ip, on top of the route throttle. */
+const LOGIN_MAX_FAILURES = 10;
+const LOGIN_WINDOW_SECONDS = 15 * 60;
 
 @Injectable()
 export class AdminService {
@@ -43,32 +48,100 @@ export class AdminService {
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
     private readonly jobs: JobsService,
+    private readonly orders: OrdersService,
+    @Inject(REDIS) private readonly redis: Redis,
     @Inject(ENV) private readonly env: Env,
   ) {}
 
   // ── Auth ──────────────────────────────────────────────────────────────────
 
-  async login(input: AdminLoginInput): Promise<AdminSession> {
-    const admin = await this.prisma.adminUser.findUnique({
-      where: { email: input.email.toLowerCase() },
-    });
+  async login(input: AdminLoginInput, ip: string): Promise<AdminSession> {
+    const email = input.email.toLowerCase();
+    await this.assertNotLockedOut(email, ip);
+
+    const admin = await this.prisma.adminUser.findUnique({ where: { email } });
     const valid =
       admin != null && (await argon2.verify(admin.passwordHash, input.password).catch(() => false));
     if (!valid || admin == null) {
+      await this.recordLoginFailure(email, ip);
       throw new AppException(
         ErrorCode.AUTH_INVALID_CREDENTIALS,
         'Invalid admin credentials',
         HttpStatus.UNAUTHORIZED,
       );
     }
-    const accessToken = await this.jwtService.signAsync(
-      { sub: admin.id, email: admin.email, role: admin.role, type: 'admin' },
-      { secret: this.env.JWT_SECRET, expiresIn: '8h' },
-    );
-    return {
-      accessToken,
-      admin: { id: admin.id, email: admin.email, name: admin.name, role: admin.role },
-    };
+    await this.clearLoginFailures(email, ip);
+
+    const payload: AdminTokenPayload = { sub: admin.id, type: 'admin' };
+    const accessToken = await this.jwtService.signAsync(payload, {
+      secret: adminSigningSecret(this.env.JWT_SECRET),
+      expiresIn: ADMIN_TOKEN_TTL,
+    });
+    const me: AdminMe = { id: admin.id, email: admin.email, name: admin.name, role: admin.role };
+    await this.audit(me, 'admin.login', 'AdminUser', admin.id, { ip });
+    return { accessToken, admin: me };
+  }
+
+  async me(adminId: string): Promise<AdminMe> {
+    const admin = await this.prisma.adminUser.findUnique({
+      where: { id: adminId },
+      select: { id: true, email: true, name: true, role: true },
+    });
+    if (admin == null) throw AppException.notFound('Admin not found');
+    return admin;
+  }
+
+  /** Self-service password change: the current password is re-verified so a hijacked session cannot lock the owner out silently. */
+  async changePassword(admin: AuthenticatedAdmin, input: AdminChangePasswordInput): Promise<void> {
+    const row = await this.prisma.adminUser.findUnique({ where: { id: admin.id } });
+    if (row == null) throw AppException.notFound('Admin not found');
+
+    const currentOk = await argon2
+      .verify(row.passwordHash, input.currentPassword)
+      .catch(() => false);
+    if (!currentOk) {
+      throw new AppException(
+        ErrorCode.AUTH_INVALID_CREDENTIALS,
+        'Current password is incorrect',
+        HttpStatus.UNAUTHORIZED,
+      );
+    }
+    if (input.newPassword === input.currentPassword) {
+      throw AppException.validation('New password must differ from the current password');
+    }
+
+    await this.prisma.adminUser.update({
+      where: { id: row.id },
+      data: { passwordHash: await argon2.hash(input.newPassword) },
+    });
+    await this.audit(admin, 'admin.password.changed', 'AdminUser', row.id);
+  }
+
+  private lockoutKey(email: string, ip: string): string {
+    return `admin:lockout:${email}:${ip}`;
+  }
+
+  private async assertNotLockedOut(email: string, ip: string): Promise<void> {
+    const attempts = await this.redis.get(this.lockoutKey(email, ip));
+    if (attempts != null && parseInt(attempts, 10) >= LOGIN_MAX_FAILURES) {
+      throw new AppException(
+        ErrorCode.AUTH_LOCKED_OUT,
+        'Too many failed attempts, try again later',
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
+    }
+  }
+
+  private async recordLoginFailure(email: string, ip: string): Promise<void> {
+    const key = this.lockoutKey(email, ip);
+    const attempts = await this.redis.incr(key);
+    if (attempts === 1) {
+      await this.redis.expire(key, LOGIN_WINDOW_SECONDS);
+    }
+  }
+
+  private async clearLoginFailures(email: string, ip: string): Promise<void> {
+    await this.redis.del(this.lockoutKey(email, ip));
   }
 
   // ── Audit (§45) ───────────────────────────────────────────────────────────
@@ -91,7 +164,10 @@ export class AdminService {
     });
   }
 
-  async listAuditLogs(page: number, pageSize: number): Promise<{ items: AdminAuditLog[]; meta: PaginatedMeta }> {
+  async listAuditLogs(
+    page: number,
+    pageSize: number,
+  ): Promise<{ items: AdminAuditLog[]; meta: PaginatedMeta }> {
     const [rows, totalItems] = await this.prisma.$transaction([
       this.prisma.auditLog.findMany({
         orderBy: { createdAt: 'desc' },
@@ -144,12 +220,19 @@ export class AdminService {
       this.prisma.aIJob.count({ where: { status: AIJobStatus.RUNNING } }),
       this.prisma.aIJob.count({ where: { status: AIJobStatus.FAILED, updatedAt: { gte: day } } }),
       this.prisma.order.count({
-        where: { status: { in: [OrderStatus.PENDING, OrderStatus.PAID, OrderStatus.IN_PRODUCTION] } },
+        where: {
+          status: { in: [OrderStatus.PENDING, OrderStatus.PAID, OrderStatus.IN_PRODUCTION] },
+        },
       }),
       this.prisma.order.count({
-        where: { status: { in: [OrderStatus.SHIPPED, OrderStatus.DELIVERED] }, updatedAt: { gte: month } },
+        where: {
+          status: { in: [OrderStatus.SHIPPED, OrderStatus.DELIVERED] },
+          updatedAt: { gte: month },
+        },
       }),
-      this.prisma.user.count({ where: { subscriptionPlan: SubscriptionPlan.PREMIUM, deletedAt: null } }),
+      this.prisma.user.count({
+        where: { subscriptionPlan: SubscriptionPlan.PREMIUM, deletedAt: null },
+      }),
     ]);
     return {
       users: { total: usersTotal, last7Days: users7 },
@@ -162,7 +245,9 @@ export class AdminService {
 
   // ── Users (§40) ───────────────────────────────────────────────────────────
 
-  async listUsers(query: AdminListUsersQuery): Promise<{ items: AdminUserSummary[]; meta: PaginatedMeta }> {
+  async listUsers(
+    query: AdminListUsersQuery,
+  ): Promise<{ items: AdminUserSummary[]; meta: PaginatedMeta }> {
     const where: Prisma.UserWhereInput = query.search
       ? {
           OR: [
@@ -328,7 +413,9 @@ export class AdminService {
 
   // ── Stories & moderation (§40) ────────────────────────────────────────────
 
-  async listStories(query: AdminListStoriesQuery): Promise<{ items: AdminStory[]; meta: PaginatedMeta }> {
+  async listStories(
+    query: AdminListStoriesQuery,
+  ): Promise<{ items: AdminStory[]; meta: PaginatedMeta }> {
     const where: Prisma.StoryWhereInput = {
       ...(query.status ? { status: query.status } : {}),
       ...(query.moderationStatus ? { moderationStatus: query.moderationStatus } : {}),
@@ -418,23 +505,25 @@ export class AdminService {
     };
   }
 
+  /**
+   * Manual order update. A status change goes through OrdersService.transition
+   * (lifecycle guard + timeline) so the panel can never skip or revive a state;
+   * `trackingNumber` undefined = untouched, null = cleared.
+   */
   async patchOrder(orderId: string, input: AdminOrderPatchInput) {
     const row = await this.prisma.order.findUnique({ where: { id: orderId } });
     if (row == null) throw AppException.notFound('Order not found');
-    const timeline =
-      input.status != null && input.status !== row.status
-        ? [
-            ...((row.statusTimeline as Array<{ status: string; at: string }>) ?? []),
-            { status: input.status, at: new Date().toISOString() },
-          ]
-        : undefined;
+    const nextStatus = input.status;
+    if (nextStatus != null && nextStatus !== row.status) {
+      assertOrderTransition(row.status, nextStatus);
+      const updated = await this.orders.transition(orderId, nextStatus, {
+        trackingNumber: input.trackingNumber,
+      });
+      return { id: updated.id, status: updated.status, trackingNumber: updated.trackingNumber };
+    }
     const updated = await this.prisma.order.update({
       where: { id: orderId },
-      data: {
-        status: input.status,
-        trackingNumber: input.trackingNumber,
-        ...(timeline ? { statusTimeline: timeline } : {}),
-      },
+      data: { trackingNumber: input.trackingNumber },
     });
     return { id: updated.id, status: updated.status, trackingNumber: updated.trackingNumber };
   }

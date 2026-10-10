@@ -29,7 +29,7 @@ export default function AccountSettings() {
   const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
   const setUser = useAuthStore((state) => state.setUser);
-  const clearSession = useAuthStore((state) => state.clearSession);
+  const signOut = useAuthStore((state) => state.signOut);
 
   const meQuery = useQuery({ queryKey: ['me'], queryFn: () => api.users.me() });
   const me = meQuery.data;
@@ -119,8 +119,8 @@ export default function AccountSettings() {
         confirm: true,
         ...(trimmed.length > 0 ? { password: trimmed } : {}),
       });
-      // The server revokes the session with the deletion request.
-      await clearSession();
+      // The server revokes every session with the deletion request — no remote logout.
+      await signOut({ remote: false });
       router.replace('/(onboarding)/splash' as never);
     } catch (error) {
       setDeleteError(apiErrorMessage(error));

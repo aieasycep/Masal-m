@@ -1,17 +1,27 @@
-# Masalım — tek sunucu canlı ortamı (Ubuntu VPS, 57.129.6.57).
+# Masalım — tek sunucu canlı ortamı (Ubuntu VPS).
 #
 # Bu sunucuda BAŞKA projeler de nginx (host) üzerinden yayında — 80/443 nginx'te
 # kalır. Masalım servisleri yalnızca 127.0.0.1'e açılır ve host nginx'i üç
-# sanal sunucu ile önlerine geçer (deploy/nginx-masalim.conf):
-#   api.57-129-6-57.sslip.io     → 127.0.0.1:8801 (api)
-#   storage.57-129-6-57.sslip.io → 127.0.0.1:8802 (minio)
-#   admin.57-129-6-57.sslip.io   → 127.0.0.1:8803 (admin)
+# sanal sunucu ile önlerine geçer (deploy/nginx-masalim.conf.tpl, alan adı
+# repo değişkeni MASALIM_DOMAIN):
+#   api.<alan adı>     → 127.0.0.1:8801 (api)
+#   storage.<alan adı> → 127.0.0.1:8802 (minio)
+#   admin.<alan adı>   → 127.0.0.1:8803 (admin)
 #
 # Sunucuda /opt/masalim düzeni:
 #   /opt/masalim/app            → repo kopyası (deploy workflow rsync'ler)
-#   /opt/masalim/.env           → üretilmiş sırlar (deploy/remote-setup.sh yazar)
-#   /opt/masalim/providers.env  → AI sağlayıcı anahtarları (GitHub Secrets'tan
-#                                 her dağıtımda yazılır)
+#   /opt/masalim/.env           → üretilmiş sırlar (deploy/remote-setup.sh yazar;
+#                                 compose ${VAR} yerleştirmelerini de buradan okur)
+#   /opt/masalim/providers.env  → AI sağlayıcı seçimi + anahtarları (deploy
+#                                 workflow her dağıtımda yazar; .env'den sonra
+#                                 yüklendiği için oradaki LLM ayarlarını ezer)
+#   /opt/masalim/backups        → gece yedekleri (deploy/backup.sh)
+#
+# Sertleştirme: api/admin imajları `node` kullanıcısıyla (uid 1000) çalışır,
+# yetki yükseltemez (no-new-privileges), api tüm Linux yeteneklerini düşürür ve
+# salt-okunur kökle çalışır (/tmp tmpfs). postgres/minio yalnızca kendi
+# değişkenlerini görür (JWT sırları vb. artık onlara geçmez). Konteyner logları
+# 20 MB × 5 ile sınırlı.
 #
 # Çalıştırma (deploy workflow'un yaptığı):
 #   docker compose -f /opt/masalim/app/deploy/docker-compose.server.yml \
@@ -19,16 +29,27 @@
 
 name: masalim
 
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: '20m'
+    max-file: '5'
+
 services:
   postgres:
     image: postgres:16-alpine
     restart: unless-stopped
-    env_file:
-      - /opt/masalim/.env
+    logging: *logging
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
     volumes:
       - postgres-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U masalim -d masalim"]
+      test: ['CMD-SHELL', 'pg_isready -U masalim -d masalim']
       interval: 5s
       timeout: 5s
       retries: 30
@@ -36,40 +57,55 @@ services:
   redis:
     image: redis:7-alpine
     restart: unless-stopped
-    command: ["redis-server", "--appendonly", "yes"]
+    logging: *logging
+    security_opt:
+      - no-new-privileges:true
+    command: ['redis-server', '--appendonly', 'yes']
     volumes:
       - redis-data:/data
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ['CMD', 'redis-cli', 'ping']
       interval: 5s
       timeout: 5s
       retries: 30
 
   minio:
-    image: minio/minio:latest
+    # MinIO topluluk imajları Ekim 2026'da Docker Hub ve quay.io'dan kaldırıldı; sunucu
+    # daha önce indirdiği imajla çalışır (pull_policy: never → yeniden indirme denenmez).
+    # Canlıya geçmeden önce yönetilen S3 deposuna geçiş: docs/go-live.md §9.
+    image: minio/minio:latest # unpinned-ok: MinIO topluluk imajları artık yayınlanmıyor (Docker Hub/quay.io depoları kaldırıldı, Ekim 2026); sunucu daha önce indirdiği imajı kullanır — bkz. docs/go-live.md §9
+    pull_policy: never
     restart: unless-stopped
+    logging: *logging
+    security_opt:
+      - no-new-privileges:true
     command: server /data
-    env_file:
-      - /opt/masalim/.env
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
     ports:
-      - "127.0.0.1:8802:9000"
+      - '127.0.0.1:8802:9000'
     volumes:
       - minio-data:/data
     healthcheck:
-      test: ["CMD", "mc", "ready", "local"]
+      test: ['CMD', 'mc', 'ready', 'local']
       interval: 5s
       timeout: 5s
       retries: 30
 
   # Tek seferlik: masalim-media bucket'ını oluşturur (varsa dokunmaz).
+  # deploy/backup.sh de medya aynası için bu servisi `run` eder.
   minio-init:
-    image: minio/mc:latest
-    restart: "no"
+    image: minio/mc:latest # unpinned-ok: MinIO topluluk imajları artık yayınlanmıyor (Docker Hub/quay.io depoları kaldırıldı, Ekim 2026); sunucu daha önce indirdiği imajı kullanır — bkz. docs/go-live.md §9
+    pull_policy: never
+    restart: 'no'
+    logging: *logging
     depends_on:
       minio:
         condition: service_healthy
-    env_file:
-      - /opt/masalim/.env
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
     entrypoint: /bin/sh
     command: -c 'mc alias set local http://minio:9000 "$$MINIO_ROOT_USER" "$$MINIO_ROOT_PASSWORD" && mc mb --ignore-existing local/masalim-media'
 
@@ -78,11 +114,38 @@ services:
       context: /opt/masalim/app
       dockerfile: apps/api/Dockerfile
     restart: unless-stopped
+    logging: *logging
+    # Give in-flight AI jobs (story ≈ 1–2 min, narration longer) time to finish
+    # on redeploy instead of being SIGKILLed and re-run (re-billed) by BullMQ.
+    stop_grace_period: 120s
     env_file:
       - /opt/masalim/.env
       - /opt/masalim/providers.env
     ports:
-      - "127.0.0.1:8801:3001"
+      - '127.0.0.1:8801:3001'
+    # İmaj `USER node` ile biter; burada ek olarak yetki yükseltme kapatılır,
+    # tüm yetenekler düşürülür ve kök salt-okunur yapılır. ffmpeg/Chromium/
+    # narration geçici dosyaları /tmp'de (tmpfs), HOME=/tmp/home (Dockerfile).
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp:size=2g,mode=1777
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "fetch('http://127.0.0.1:3001/health').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      # migrations + seed + Nest boot
+      start_period: 120s
     depends_on:
       postgres:
         condition: service_healthy
@@ -96,12 +159,22 @@ services:
       context: /opt/masalim/app
       dockerfile: deploy/admin.Dockerfile
       args:
-        NEXT_PUBLIC_API_URL: https://api.57-129-6-57.sslip.io
+        NEXT_PUBLIC_API_URL: https://api.${MASALIM_DOMAIN}
     restart: unless-stopped
+    logging: *logging
     ports:
-      - "127.0.0.1:8803:3000"
+      - '127.0.0.1:8803:3000'
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp:size=256m,mode=1777
+      - /app/apps/admin/.next/cache:size=256m,mode=1777
     depends_on:
-      - api
+      api:
+        condition: service_healthy
 
 volumes:
   postgres-data:

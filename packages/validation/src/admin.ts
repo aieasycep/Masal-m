@@ -19,16 +19,25 @@ export const adminLoginSchema = z.object({
 });
 export type AdminLoginInput = z.infer<typeof adminLoginSchema>;
 
+export const adminMeSchema = z.object({
+  id: z.string(),
+  email: z.string(),
+  name: z.string(),
+  role: adminRoleSchema,
+});
+export type AdminMe = z.infer<typeof adminMeSchema>;
+
 export const adminSessionSchema = z.object({
   accessToken: z.string(),
-  admin: z.object({
-    id: z.string(),
-    email: z.string(),
-    name: z.string(),
-    role: adminRoleSchema,
-  }),
+  admin: adminMeSchema,
 });
 export type AdminSession = z.infer<typeof adminSessionSchema>;
+
+export const adminChangePasswordSchema = z.object({
+  currentPassword: z.string().min(1).max(128),
+  newPassword: z.string().min(12).max(128),
+});
+export type AdminChangePasswordInput = z.infer<typeof adminChangePasswordSchema>;
 
 export const adminDashboardStatsSchema = z.object({
   users: z.object({ total: z.number().int(), last7Days: z.number().int() }),
@@ -37,7 +46,11 @@ export const adminDashboardStatsSchema = z.object({
     last7Days: z.number().int(),
     failed7Days: z.number().int(),
   }),
-  jobs: z.object({ queued: z.number().int(), running: z.number().int(), failed24h: z.number().int() }),
+  jobs: z.object({
+    queued: z.number().int(),
+    running: z.number().int(),
+    failed24h: z.number().int(),
+  }),
   orders: z.object({ open: z.number().int(), shipped30Days: z.number().int() }),
   subscriptions: z.object({ premium: z.number().int() }),
 });
@@ -63,14 +76,21 @@ export type AdminUserSummary = z.infer<typeof adminUserSummarySchema>;
 
 export const adminUserDetailSchema = adminUserSummarySchema.extend({
   children: z.array(z.object({ id: z.string(), name: z.string(), ageRange: z.string() })),
-  voiceProfiles: z.array(
-    z.object({ id: z.string(), displayName: z.string(), status: z.string() }),
-  ),
+  voiceProfiles: z.array(z.object({ id: z.string(), displayName: z.string(), status: z.string() })),
   orders: z.array(
-    z.object({ id: z.string(), orderNumber: z.string(), status: z.nativeEnum(OrderStatus), total: z.string() }),
+    z.object({
+      id: z.string(),
+      orderNumber: z.string(),
+      status: z.nativeEnum(OrderStatus),
+      total: z.string(),
+    }),
   ),
   subscription: z
-    .object({ plan: z.nativeEnum(SubscriptionPlan), status: z.string(), expiresAt: z.string().nullable() })
+    .object({
+      plan: z.nativeEnum(SubscriptionPlan),
+      status: z.string(),
+      expiresAt: z.string().nullable(),
+    })
     .nullable(),
 });
 export type AdminUserDetail = z.infer<typeof adminUserDetailSchema>;

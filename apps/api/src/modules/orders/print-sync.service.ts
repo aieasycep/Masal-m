@@ -59,27 +59,54 @@ export class PrintSyncService implements OnModuleInit, OnApplicationShutdown {
       take: 50,
     });
     for (const order of active) {
-      const state = await this.printProvider.getOrder(order.printProviderOrderId as string);
-      const mapped = STATUS_MAP[state.status];
-      if (mapped == null || mapped === order.status) {
-        if (state.trackingNumber != null && order.trackingNumber == null) {
-          await this.prisma.order.update({
-            where: { id: order.id },
-            data: {
-              trackingNumber: state.trackingNumber,
-              carrier: state.carrier ?? undefined,
-              trackingUrl: state.trackingUrl ?? undefined,
-            },
-          });
-        }
-        continue;
+      // One order's bad provider state must not stall the rest of the batch.
+      try {
+        await this.syncOrder(order);
+      } catch (error) {
+        this.logger.warn({ err: error as Error, orderId: order.id }, 'print sync skipped order');
       }
-      await this.orders.transition(order.id, mapped, {
-        trackingNumber: state.trackingNumber ?? order.trackingNumber,
-        carrier: state.carrier ?? order.carrier,
-        trackingUrl: state.trackingUrl ?? order.trackingUrl,
-      });
-      if (mapped === OrderStatus.SHIPPED) {
+    }
+  }
+
+  private async syncOrder(order: {
+    id: string;
+    userId: string;
+    orderNumber: string;
+    status: OrderStatus;
+    printProviderOrderId: string | null;
+    trackingNumber: string | null;
+    carrier: string | null;
+    trackingUrl: string | null;
+  }): Promise<void> {
+    const state = await this.printProvider.getOrder(order.printProviderOrderId as string);
+    const mapped = STATUS_MAP[state.status];
+    if (mapped == null || mapped === order.status) {
+      if (state.trackingNumber != null && order.trackingNumber == null) {
+        await this.prisma.order.update({
+          where: { id: order.id },
+          data: {
+            trackingNumber: state.trackingNumber,
+            carrier: state.carrier ?? undefined,
+            trackingUrl: state.trackingUrl ?? undefined,
+          },
+        });
+      }
+      return;
+    }
+    const tracking = {
+      trackingNumber: state.trackingNumber ?? order.trackingNumber,
+      carrier: state.carrier ?? order.carrier,
+      trackingUrl: state.trackingUrl ?? order.trackingUrl,
+    };
+    // A provider may report DELIVERED before a SHIPPED poll ever ran; the
+    // lifecycle (and the shipping push) still passes through SHIPPED.
+    const steps =
+      mapped === OrderStatus.DELIVERED && order.status === OrderStatus.IN_PRODUCTION
+        ? [OrderStatus.SHIPPED, OrderStatus.DELIVERED]
+        : [mapped];
+    for (const step of steps) {
+      await this.orders.transition(order.id, step, tracking);
+      if (step === OrderStatus.SHIPPED) {
         await this.notifications.notify(
           order.userId,
           NotificationType.ORDER_SHIPPED,

@@ -253,16 +253,16 @@ Local `.env` = `.env.example` + generated JWT secrets (already present, gitignor
   constant — client enforces now, API tightens on merge; LOCAL take playback
   in review via preview-player file URI; consent rewrite + child-clone
   notice; level meter), wizard guest-child ("Başka bir çocuk" in-wizard name)
-  + general branch, StoryResult 5 tiles 3-per-row, checkout single flow
-  configure→address→review (3-label StepBar), paywall copy (no "Sınırsız"),
-  settings/audio.tsx (rate 0.8–1.5x + autoFollowPage in app-prefs, player
-  seeded). V2 pass (KendiHikayem_UIUX_V2_Delta.zip): entry-point child
-  continuity (hero CTA resets stale different-child drafts), recommendation
-  cards seed themes+idea via applySuggestion pre-initialize, step-4 age
-  hidden for registered children ("Yaş bilgisi profilden alınıyor"), result
-  narrate tile "Sesi Değiştir" when narrations exist, Kitap Yap routes to
-  illustrate when no READY set, suggestions-header "Tümü" removed. PR #4
-  draft later became the promotion PR and was merged Sep 1.
+  - general branch, StoryResult 5 tiles 3-per-row, checkout single flow
+    configure→address→review (3-label StepBar), paywall copy (no "Sınırsız"),
+    settings/audio.tsx (rate 0.8–1.5x + autoFollowPage in app-prefs, player
+    seeded). V2 pass (KendiHikayem_UIUX_V2_Delta.zip): entry-point child
+    continuity (hero CTA resets stale different-child drafts), recommendation
+    cards seed themes+idea via applySuggestion pre-initialize, step-4 age
+    hidden for registered children ("Yaş bilgisi profilden alınıyor"), result
+    narrate tile "Sesi Değiştir" when narrations exist, Kitap Yap routes to
+    illustrate when no READY set, suggestions-header "Tümü" removed. PR #4
+    draft later became the promotion PR and was merged Sep 1.
 - **NEW UI PROMOTED TO PRODUCTION (Sep 1)** — user gave the explicit "Yeni
   UI'yı onaylıyorum, production'a al" → PR #4 (uiux-review→main) merged @
   401d18b. SINGLE app again: package `com.masalim.app` / "Masalım" carries the
@@ -272,10 +272,10 @@ Local `.env` = `.env.example` + generated JWT secrets (already present, gitignor
   pre-review rollback) left in place. VOICE_RECORDING 45s floor now enforced
   by the API too (shared constant landed via the merge).
 - **Post-review fix train (all MERGED to main, Aug 29–Sep 1)**: PR #5 OpenAI
-  moderation provider (staging is now ALL-GPT: AI_PROVIDER=openai,
+  moderation provider (staging was ALL-GPT Aug 29 → Oct 9: AI_PROVIDER=openai,
   AI_MODEL=gpt-4o via cross-vendor model guard in providers.module.ts,
-  MODERATION_PROVIDER=openai/gpt-4o-mini; AI_API_KEY holds the OpenAI key —
-  reverting to Claude = flip those 3 env values back). PR #6 expressive
+  MODERATION_PROVIDER=openai/gpt-4o-mini; AI_API_KEY secret = OpenAI key —
+  superseded by the Claude switch below). PR #6 expressive
   narration: TTS_MODEL defaults to eleven_v3 + NarrationDirector LLM pass
   inserts v3 audio tags per chunk (tag-only guard — story words never change;
   auto-fallback to eleven_multilingual_v2 + plain text; v2 path uses
@@ -292,10 +292,146 @@ Local `.env` = `.env.example` + generated JWT secrets (already present, gitignor
   (Android fires momentum-end for programmatic scrolls too — the reader's own
   page turn was mistaken for a swipe), follow re-engages per new narration,
   chip shows explicit açık/kapalı states.
-- **GitHub cron NEVER fires keepalive.yml** (state active, zero scheduled
-  runs) → Render still spins down after 15 idle min; user advised UptimeRobot
-  free 5-min monitor on /health (or Render Starter). Manual dispatch works.
+- **STORY/MODERATION/DIRECTOR → CLAUDE (Oct 9, on PR #17)** — user: "görüntü ve
+  hikaye oluşturmak için claude kullanalım". Claude has NO image generation →
+  images stay OpenAI gpt-image-1 (IMAGE_API_KEY); Claude now writes the per-page
+  illustration prompts (part of the story JSON). Models verified against
+  platform.claude.com (Oct 2026): story `claude-opus-5-5` ($4/$20, effort
+  medium via new env AI_EFFORT), moderation + narration director
+  `claude-haiku-5-5` ($0.10/$0.50, effort low). Claude 5.5 facts baked into
+  packages/ai/src/shared/anthropic.ts: thinking ALWAYS on (can't disable;
+  tokens billed as output, share max_tokens → story 16k / classifier 512 /
+  director 4096), `temperature` rejected, text blocks selected by type
+  (thinking blocks come first), effort omitted for pre-4.6 models. Story
+  provider now `messages.create` + manual parse (stop_reason checked FIRST:
+  refusal→REFUSED, max_tokens→INVALID_OUTPUT), one schema-repair round + one
+  length-expand round, usage summed over all calls; 20 new vitest cases mock
+  the SDK. Deploy: deploy-server.yml `AI_VENDOR: anthropic` (rollback = the
+  word `openai`), pre-deploy step validates the key + both model ids via
+  GET /v1/models (no tokens) and FAILS before touching the server if secret
+  `ANTHROPIC_API_KEY` is missing; providers.env now carries AI_PROVIDER/
+  AI_MODEL/AI_EFFORT/MODERATION_* (overrides the server's one-time .env);
+  workflow_dispatch input `story_smoke` runs deploy/smoke-story.sh (fresh
+  account → SHORT story → job poll → title/pages in the log). USER HAD NO
+  Anthropic API key at hand-over → docs/deploy-server.md "Adım 7" (Console →
+  Billing credits → API Keys → GitHub secret). Until the secret exists the
+  deploy stops at step 1 and the VPS keeps running GPT.
+- **SECURITY AUDIT + FIX TRAIN (Oct 10, on PR #17)** — user: "kodu sıfırdan test et…
+  yoksa canlıya geçelim". Verdict: NOT ready. Method: 3 explore sweeps → 48 candidates
+  (scratchpad/audit/candidates.md) → runtime probes against a local API
+  (scratchpad/audit/audit-probes.sh, all 10 reproduced) → Workflow-tool adversarial
+  verification on a frozen worktree → fixes by 3 parallel agents + me. Container
+  quirks learned: NO root .env (export env from scratchpad/audit/env.sh); native
+  Postgres 16 + Redis 7 exist (`service postgresql/redis-server start`, role
+  masalim/masalim, CREATEDB) — no Docker needed; journeys.spec leaves
+  `physical_books` ON (reset before smoke-monetization); Workflow tool runs only
+  2 agents at a time here (4 CPUs) and background work dies on container restarts
+  (resume via resumeFromRunId). User decisions: mock purchase + SMTP stay for
+  testing and are closed AT go-live (docs/go-live.md is the switch list); admin
+  password changed from the panel (new Ayarlar page). Fixed in this train:
+  Google audience fail-closed, social-login linking policy (no auto-link to
+  password accounts), first narration/illustration free PER STORY (title edits
+  no longer bump version), TRUST_PROXY env (+providers.env=1) so throttles key on
+  the client IP, reset-code hardening (single valid code, 5 attempts), lockout
+  email+ip, atomic refresh rotation + owner-scoped logout, Swagger/CORS tightened,
+  admin realm key + DB re-check + lockout + password change endpoint, demo user
+  disabled outside dev/test, avatar key prefix guard, edit-time moderation +
+  prompt isolation tags + whole-text moderation window (20k), payments
+  idempotency scoping + iyzico numeric amount, RevenueCat timing-safe + SANDBOX
+  reject in production, account-deletion worker (anonymize user row, purge
+  content/storage/provider voices, hourly sweep; login during grace cancels),
+  local storage key hardening + dev upload cap, smoke-story.sh fixed account +
+  Python fix, TRUNCATED story code (no retry), moderator truncation → retryable
+  error, director model/fallback logging, effort-support list (Sonnet 4.6 kept).
+  SECOND BATCH (same PR, from the Workflow verification's 46 new findings):
+  generate() CAS claim via `story.updateMany(status in [DRAFT,FAILED] → GENERATING)`
+  so a double-tap charges once (returns the active job; stale GENERATING without a
+  live job is reclaimed); first-free narration/illustration count+insert inside
+  `$transaction` + `pg_advisory_xact_lock(hashtext(storyId))`; narration/
+  illustration processors refund on deleted-story early return (illustration also
+  refunds the regen ref); voice remove() keeps providerVoiceId when the provider
+  delete fails and the hourly deletion sweep retries orphans
+  (`retryOrphanedProviderVoices`); Dockerfile `exec node` + compose
+  `stop_grace_period: 120s` so in-flight jobs finish on deploy; blocklist is
+  whole-word (TR `term\p{L}{0,4}`, EN plural) — "kasap" no longer trips "kas";
+  seed updates system voices only on provider/providerVoiceId; MailService smtp
+  adapter via nodemailer (`MAIL_PROVIDER=smtp` requires `SMTP_URL`, env
+  superRefine) and deploy-server.yml writes MAIL_PROVIDER=smtp + SMTP_URL +
+  MAIL_FROM into providers.env whenever the `SMTP_URL` secret exists → SMTP at
+  go-live = add one secret. Integration journeys: 14/14.
+  NOT done (next PR): non-root containers/Chromium sandbox, admin CSP, MinIO tag
+  pin (Docker Hub tag API unreachable from here), book render queue key, push
+  token ownership (+ projectId), orphan upload cleanup, Apple nonce, email
+  verification (needs SMTP), RevenueCat Purchases.logIn (mobile, needs store),
+  mobile logout without refresh token + api-client sign-out on any non-2xx
+  refresh, 426 handling, Premium quota calendar-month vs billing period,
+  narration per-chunk cache, illustration retry idempotency, page-count ceiling,
+  nginx vhost cp-before-certbot window, sslip hostname, DB backups.
+- **DEFERRED HARDENING BATCH (Oct 10, PR #17, commits 31113d3…)** — user: "kaldığın
+  yerden devam et"; scope = everything needing no external input (AskUserQuestion
+  decisions: sslip stays but hostname is ONE setting; e-mail verification auto-on with
+  SMTP, gift only after verify, old accounts see a banner; nightly on-server backups
+  14 days; FREE user buying `_member` pack → pro-rated credits; cloned voice needs
+  Premium at narration time; print_pdf = Premium). Executed as Track 0 (shared files,
+  me) + parallel same-tree Agent subagents B/C/D/E/F with strict file ownership and
+  per-track DBs (`masalim_b/c/d`, Redis db 1/3/2; helper
+  scratchpad/track-env.sh) + Track A (me). Landed: schema additions
+  (User.emailVerifiedAt, EmailVerification, Subscription.currentPeriodStartedAt,
+  AIJob.result, Payment.providerTransactionId; migration followup_hardening);
+  `test/integration/helpers.ts` `createApp(overrides)` + 3 new journey files
+  (journeys-auth/-jobs/-commerce, run `--runInBand` — they share DB/Redis and flip
+  `physical_books`); e-mail verification (`POST /auth/email/verification|verify`,
+  only enforced when MAIL_PROVIDER=smtp); Apple nonce (`POST /auth/apple/nonce`,
+  Redis GETDEL, sha256 compare; mobile hashes with @noble/hashes — nonce REQUIRED);
+  push token format + 10/user cap + ticket receipts (`push:tickets` list → hourly
+  maintenance); uploads must exist in storage; `JobsService.enqueue` P2002-safe;
+  book render key `book:{id}:render:{kind}` + HD gate; story output persisted in
+  `AIJob.result` before moderation (retry never re-bills Opus) + page normalization
+  (`packages/ai/src/story/normalize.ts`) + windowed moderation; narration chunk cache
+  (`StorageKeys.narrationChunkCache`), illustration rows created after upload (no
+  'pending'); `MaintenanceModule` (queue `maintenance`, hourly/daily schedulers:
+  auth-row prune, push receipts, orphan uploads, voice raw retention); AIUsageLog for
+  TTS/director/alignment/moderation/clone; Premium quota anchored to billing period;
+  order transition rules (`ORDER_STATUS_TRANSITIONS`) in OrdersService + admin;
+  snapshot/print hand-off split; iyzico refund tx id; admin nonce CSP via
+  `apps/admin/src/middleware.ts` (routes now dynamic) + security headers; mobile:
+  single `signOut()` (device-scoped logout), update-required gate (426),
+  RevenueCat identify/logOut with platform keys, push projectId (release builds
+  skip push without `extra.eas.projectId`), verify-email screen + banner,
+  api-client refresh semantics (`TransientError`, sign-out only on 401/403).
+  Deploy: `vars.MASALIM_DOMAIN` (+ MASALIM_SERVER_HOST, MASALIM_SSH_HOST_KEY) feeds
+  both workflows, `deploy/nginx-masalim.conf.tpl` (hash-compare, no reload before
+  certbot, .bak restore), `deploy/set-domain.sh` (write-once .env follows the var),
+  `deploy/backup.sh` + `masalim-backup.cron` (03:30, pg_dump -Fc + mc mirror +
+  hard-link snapshots, 14 d, `--check`; workflow input `run_backup`), non-root
+  images (USER node, boot without pnpm, HOME=/tmp/home), compose hardening
+  (no-new-privileges, cap_drop ALL, read_only+tmpfs, scoped secrets, log caps, api
+  healthcheck), MinIO/mc pinned to RELEASE tags (CI `infra-checks` job verifies
+  manifests, shellcheck, compose config, nginx template, backup dry run), /health
+  503 when db/redis down. Docs: go-live §2/§3/§5/§7/§8, deploy-server variables +
+  backup/restore. STILL EXTERNAL: EAS projectId + FCM creds, RevenueCat keys, SMTP,
+  real domain DNS, Play keystore, ANTHROPIC_API_KEY. Follow-ups: Chromium seccomp
+  sandbox, admin token → httpOnly cookie realm, off-server backup copy,
+  **MinIO: community images were REMOVED from Docker Hub and quay.io (Oct 2026)** —
+  server compose keeps `minio/minio:latest`/`minio/mc:latest` with `pull_policy: never`
+  (cached image; CI pin check accepts `unpinned-ok:` annotated lines); fresh servers
+  cannot be set up → go-live §9 proposes moving media to R2/B2 (S3 provider already
+  supported),
+  `push_token_unavailable` analytics event, 426 `details.minSupportedVersion`.
+- **keepalive.yml REMOVED (Sep 14)**. The repo's DEFAULT BRANCH is the claude
+  branch (`git ls-remote --symref origin HEAD`), so GitHub cron ran it there
+  every ~2–4 h (never the 10-min schedule) and reported a `ping` check on PR
+  #17's head. Render stopped answering Sep 12 19:26Z → 12 consecutive red
+  `ping` checks, each waking this session. User then asked to cancel the PR
+  subscriptions (#17/#18 unsubscribed) and the keep-warm → file deleted. No
+  Render pinger anywhere now; Render service deletion is the user's manual step.
 - Artifact downloads need a logged-in GitHub tab (incognito hides the link).
+- **Phone-friendly APK links (Sep 3)**: the crash-log workflow now FAILS on a bad
+  verdict and, on success, republishes the verified APK as the moving pre-release
+  `test-latest` (asset `Masalim.apk`, direct download, no zip/expiry):
+  https://github.com/aieasycep/Masal-m/releases/tag/test-latest — the review
+  workflow's smoke job does the same as `design-review-latest`
+  (`Masalim-Design-Review.apk`). Hand THESE links to the user, not run links.
   APK builds: android-apk.yml (push on claude/* + workflow_dispatch on main).
   Verify EVERY handed-over APK via android-crash-log.yml (input apk_run_id).
 
@@ -320,8 +456,8 @@ Local `.env` = `.env.example` + generated JWT secrets (already present, gitignor
   from this container — server access ONLY via GitHub Actions. VPS DB started
   EMPTY (fresh seed: monetization_v1 config, physical_books OFF; Render test
   data not migrated unless asked). android-apk.yml default EXPO_PUBLIC_API_URL
-  now the VPS URL (3a532f4). REMAINING: user tests the VPS APK a few days →
-  then delete Render services + keepalive.yml (+ UptimeRobot). User reminded
+  now the VPS URL (3a532f4). REMAINING: user deletes the Render services
+  (+ UptimeRobot if set up); keepalive.yml already gone (Sep 14). User reminded
   to rotate server password + regenerate the SSH deploy key (private key was
   visible in a screenshot).
 
@@ -335,37 +471,61 @@ Local `.env` = `.env.example` + generated JWT secrets (already present, gitignor
   ("ayda 1 kısa masal"); purchased credits never expire; yearly DEFERRED.
   Backend: CreditLedger (quota/balance split, idempotent refund/grant) +
   User.creditBalance; EntitlementService.consumeCredits (kota→bakiye, CAS tx)
-  + INSUFFICIENT_CREDITS (402); prices in PricingConfig row monetization_v1
-  (runtime-read → change without app update); /subscription/offerings serves
-  plan-priced packs (_std/_member DOUBLE products — stores can't per-user
-  price); NON_RENEWING_PURCHASE grants via same normalized webhook/mock
-  pipeline. Mobile: comparison-table paywall (user's screenshot layout, NO
-  time trial), quota.tsx → "Kredilerim" wallet (packs in-place),
-  credit-aware Home banner, wizard duration cards show 3/6/10 badges,
-  INSUFFICIENT_CREDITS routes to wallet everywhere. **Regenerate = 1 kredi
-  (Sep 2, user: "her tekrarı 1 kredi", no free retries)**:
-  ILLUSTRATION_REGENERATE_CREDIT_COST in types; regenerate() consumes up
-  front (ref illustration_regen/`${illustrationId}:${uuid}`, payload
-  creditRefId), processor refunds THAT ref on terminal failure (never the
-  set's); mobile ConfirmSheet + "1 kredi" chip on illustrate + cover editor.
-  Wallet discoverability fix (same PR): Profile "Kredilerim" row (live
-  count), Home header 🎟 pill (all plans), paywall "Kredilerimi Gör" link —
-  before this the wallet was reachable ONLY via the low-credit banner.
-  Verified:
-  scratchpad/smoke-monetization.sh (gift→kota→bakiye→insufficient→pack→
-  resume→print gate) + premium path (30 kr kota, member packs).
+  - INSUFFICIENT_CREDITS (402); prices in PricingConfig row monetization_v1
+    (runtime-read → change without app update); /subscription/offerings serves
+    plan-priced packs (_std/_member DOUBLE products — stores can't per-user
+    price); NON_RENEWING_PURCHASE grants via same normalized webhook/mock
+    pipeline. Mobile: comparison-table paywall (user's screenshot layout, NO
+    time trial), quota.tsx → "Kredilerim" wallet (packs in-place),
+    credit-aware Home banner, wizard duration cards show 3/6/10 badges,
+    INSUFFICIENT_CREDITS routes to wallet everywhere. **Regenerate = 1 kredi
+    (Sep 2, user: "her tekrarı 1 kredi", no free retries)**:
+    ILLUSTRATION_REGENERATE_CREDIT_COST in types; regenerate() consumes up
+    front (ref illustration_regen/`${illustrationId}:${uuid}`, payload
+    creditRefId), processor refunds THAT ref on terminal failure (never the
+    set's); mobile ConfirmSheet + "1 kredi" chip on illustrate + cover editor.
+    Wallet discoverability fix (same PR): Profile "Kredilerim" row (live
+    count), Home header 🎟 pill (all plans), paywall "Kredilerimi Gör" link —
+    before this the wallet was reachable ONLY via the low-credit banner.
+    Verified:
+    scratchpad/smoke-monetization.sh (gift→kota→bakiye→insufficient→pack→
+    resume→print gate) + premium path (30 kr kota, member packs).
 - **BOOK PRINT = "YAKINDA" (launch decision)**: physical_books flag seeds
   DISABLED (create-only — existing DBs keep value; admin panel toggles);
   orders quote/create throw FEATURE_DISABLED server-side; mobile preview
   print CTA shows YAKINDA badge + note instead of checkout. Digital
   books/preview untouched.
+- **Sep 2 test-feedback train (PR #17, open)**: karaoke word timings (ElevenLabs
+  forced-alignment → `Narration.wordTimings`), recommendations `?limit=`, style-
+  sample thumbnails on the picker (generated via style-samples.yml → assets/
+  style-samples/*.webp), reader "Devamı için kaydır" cue + follow scroll, and
+  **KeepScreenAwake** in the reader (whole session) + player (only while
+  playing) — user reported the screen sleeping mid-listen. Every mobile fix is
+  cherry-picked onto `design-review` too (PR #18, side-by-side review APK).
+  Verified stable APK: android-apk run 33634640078 (a36b2a7); review APK: design-
+  review run 33634657762 (0ef8e6f). design-review-apk.yml smoke job now has a
+  hard Verdict step (APP_ALIVE + SMOKE_ALIVE + `[player-smoke] DONE`), prints
+  ReactNativeJS lines, and re-fires the deep link once (a missing marker on
+  build #6 was a timing flake, not an app bug).
+- **Motion-storybook video (PARKED as phase 2, Sep 2)**: user asked whether an
+  "animation" premium tier is feasible; I proposed tier 1 (Ken Burns storybook
+  video from existing illustrations + narration + karaoke subtitles, ffmpeg)
+  and tier 2 (image-to-video per page, ~₺150–₺450/story). Built a real demo
+  on the throwaway branch `demo/motion-video` (scripts in
+  apps/api/scripts/motion-demo/: story.json, make-assets.mjs [local espeak
+  or real gpt-image-1 + ElevenLabs + forced alignment], render.mjs
+  [1080×1920, zoompan + xfade + ASS karaoke, apad=whole_dur — plain apad
+  spins ffmpeg forever]; workflow motion-demo.yml commits the MP4 to the
+  branch). Verdict: "bu haliyle güzel değil" — same as the player screen, so
+  parked; PR #19 closed, branch kept as reference. Follow-up instead: bigger
+  responsive cover on the night player (629aeb1, cherry-picked to review).
 - **Illustration style fix**: STYLE_TEMPLATES rewritten as mutually exclusive
   medium specs with negatives; style now LEADS sheet+edit prompts; edit
   prompt carries "reference = identity only" + quality tier. Root cause of
   "hep aynı tarz görsel": near-synonym templates + 'Character sheet:' anchor
-  + edit call's preserve-the-reference dominance. Picker descriptions now
-  concrete (Pixar tarzı / suluboya kâğıdı vs.). Style-sample thumbnails on
-  picker cards = open idea (needs IMAGE_API_KEY one-off generation).
+  - edit call's preserve-the-reference dominance. Picker descriptions now
+    concrete (Pixar tarzı / suluboya kâğıdı vs.). Style-sample thumbnails on
+    picker cards = open idea (needs IMAGE_API_KEY one-off generation).
 
 ## Environment gotchas
 

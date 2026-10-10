@@ -23,9 +23,7 @@ type SpendReason =
   | typeof CreditReason.EXTRA_ILLUSTRATION_SPEND;
 
 type GrantReason =
-  | typeof CreditReason.SIGNUP_GIFT
-  | typeof CreditReason.PURCHASE
-  | typeof CreditReason.ADMIN_ADJUST;
+  typeof CreditReason.SIGNUP_GIFT | typeof CreditReason.PURCHASE | typeof CreditReason.ADMIN_ADJUST;
 
 const SPEND_REASONS = [
   CreditReason.STORY_SPEND,
@@ -33,10 +31,62 @@ const SPEND_REASONS = [
   CreditReason.EXTRA_ILLUSTRATION_SPEND,
 ] as const;
 
-/** First day of the current month (UTC) — the quota period anchor. */
-function currentPeriodStart(): Date {
-  const now = new Date();
+/** First day of the month containing `now` (UTC) — the FREE quota period anchor. */
+function calendarMonthStart(now: Date): Date {
   return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+}
+
+/**
+ * Latest monthly anchor at or before `now`, stepping whole months forward
+ * from `anchor` (the billing-period start) while keeping its day-of-month and
+ * time; the day is clamped to the target month's length, so a Jan 31 purchase
+ * yields Feb 28/29, Mar 31, … Stepping instead of trusting the last RENEWAL
+ * webhook keeps the Premium quota period right when a renewal event was
+ * missed or arrived late. An anchor in the future is returned as is.
+ */
+export function latestMonthlyAnchorAtOrBefore(now: Date, anchor: Date): Date {
+  if (anchor.getTime() >= now.getTime()) return anchor;
+  const stepped = (months: number): Date => {
+    const year = anchor.getUTCFullYear();
+    const month = anchor.getUTCMonth() + months;
+    const daysInMonth = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
+    return new Date(
+      Date.UTC(
+        year,
+        month,
+        Math.min(anchor.getUTCDate(), daysInMonth),
+        anchor.getUTCHours(),
+        anchor.getUTCMinutes(),
+        anchor.getUTCSeconds(),
+        anchor.getUTCMilliseconds(),
+      ),
+    );
+  };
+  const elapsedMonths =
+    (now.getUTCFullYear() - anchor.getUTCFullYear()) * 12 +
+    (now.getUTCMonth() - anchor.getUTCMonth());
+  const candidate = stepped(elapsedMonths);
+  return candidate.getTime() <= now.getTime() ? candidate : stepped(elapsedMonths - 1);
+}
+
+type SubscriptionRow = {
+  plan: SubscriptionPlan;
+  status: SubscriptionStatus;
+  expiresAt: Date | null;
+  startedAt: Date;
+  currentPeriodStartedAt: Date | null;
+};
+
+/** Effective plan: an unexpired ACTIVE/TRIALING/GRACE (or cancelled-but-paid) sub = PREMIUM. */
+function planFromSubscription(sub: SubscriptionRow | null, now: Date): SubscriptionPlan {
+  if (sub == null) return SubscriptionPlan.FREE;
+  const unexpired = sub.expiresAt == null || sub.expiresAt.getTime() > now.getTime();
+  const active =
+    sub.status === SubscriptionStatus.ACTIVE ||
+    sub.status === SubscriptionStatus.TRIALING ||
+    sub.status === SubscriptionStatus.GRACE ||
+    (sub.status === SubscriptionStatus.CANCELLED && unexpired);
+  return active && unexpired ? sub.plan : SubscriptionPlan.FREE;
 }
 
 function isUniqueViolation(error: unknown): boolean {
@@ -46,9 +96,14 @@ function isUniqueViolation(error: unknown): boolean {
 /**
  * Backend entitlement + credit engine (§37): the single source of truth for
  * plan features and credits. Spending draws from the monthly quota first
- * (resets each month, no rollover), then from the purchased balance (never
+ * (resets each period, no rollover), then from the purchased balance (never
  * expires); every balance change is an append-only CreditLedger row, and
  * refunds reverse the exact quota/balance split of the original spend.
+ *
+ * Quota period: FREE accounts reset on the UTC calendar month; PREMIUM
+ * accounts reset on their billing period (anchored on the purchase/renewal
+ * time stored in `Subscription.currentPeriodStartedAt`), so a subscriber who
+ * bought on the 15th gets a full 30 credits from the 15th to the 15th.
  */
 @Injectable()
 export class EntitlementService {
@@ -57,21 +112,31 @@ export class EntitlementService {
   /** Effective plan: an unexpired ACTIVE/TRIALING/GRACE (or cancelled-but-paid) sub = PREMIUM. */
   async planFor(userId: string): Promise<SubscriptionPlan> {
     const sub = await this.prisma.subscription.findUnique({ where: { userId } });
-    if (sub == null) return SubscriptionPlan.FREE;
-    const now = Date.now();
-    const unexpired = sub.expiresAt == null || sub.expiresAt.getTime() > now;
-    const active =
-      sub.status === SubscriptionStatus.ACTIVE ||
-      sub.status === SubscriptionStatus.TRIALING ||
-      sub.status === SubscriptionStatus.GRACE ||
-      (sub.status === SubscriptionStatus.CANCELLED && unexpired);
-    return active && unexpired ? sub.plan : SubscriptionPlan.FREE;
+    return planFromSubscription(sub, new Date());
+  }
+
+  /**
+   * Plan + the quota period it is currently in, from a single subscription
+   * read: PREMIUM → the latest billing-period anchor at or before now (the
+   * renewal day-of-month, stepped forward so missed RENEWAL webhooks cannot
+   * strand the period in the past); FREE → the UTC calendar-month start.
+   */
+  private async periodContext(
+    userId: string,
+  ): Promise<{ plan: SubscriptionPlan; periodStart: Date }> {
+    const now = new Date();
+    const sub = await this.prisma.subscription.findUnique({ where: { userId } });
+    const plan = planFromSubscription(sub, now);
+    if (plan === SubscriptionPlan.PREMIUM && sub != null) {
+      const anchor = sub.currentPeriodStartedAt ?? sub.startedAt;
+      return { plan, periodStart: latestMonthlyAnchorAtOrBefore(now, anchor) };
+    }
+    return { plan, periodStart: calendarMonthStart(now) };
   }
 
   async resolve(userId: string): Promise<EntitlementsResponse> {
-    const plan = await this.planFor(userId);
+    const { plan, periodStart } = await this.periodContext(userId);
     const matrix = PLAN_ENTITLEMENTS[plan];
-    const periodStart = currentPeriodStart();
     const [usage, user] = await Promise.all([
       this.prisma.entitlementUsage.findUnique({
         where: {
@@ -128,10 +193,9 @@ export class EntitlementService {
     ref: { type: string; id: string },
   ): Promise<void> {
     if (amount <= 0) return;
-    const plan = await this.planFor(userId);
+    const { plan, periodStart } = await this.periodContext(userId);
     const limit = PLAN_ENTITLEMENTS[plan].monthlyCreditQuota;
     const key = EntitlementKey.CREDIT_MONTHLY_QUOTA;
-    const periodStart = currentPeriodStart();
 
     await this.prisma.entitlementUsage.upsert({
       where: { userId_key_periodStart: { userId, key, periodStart } },
@@ -212,7 +276,7 @@ export class EntitlementService {
    * Reverse the most recent spend recorded for a reference (job failed after
    * enqueue). Idempotent: the refund row's unique key is derived from the
    * spend row, so a double refund silently no-ops. Quota is returned into the
-   * CURRENT period (floor 0) — if the month rolled over in between, the user
+   * CURRENT period (floor 0) — if the period rolled over in between, the user
    * simply gets the allowance back where it is still usable.
    */
   async refundCreditsForRef(userId: string, refType: string, refId: string): Promise<void> {
@@ -224,7 +288,7 @@ export class EntitlementService {
     const balancePart = -spend.delta;
     const quotaPart = spend.quotaPart;
     const key = EntitlementKey.CREDIT_MONTHLY_QUOTA;
-    const periodStart = currentPeriodStart();
+    const { periodStart } = await this.periodContext(userId);
 
     try {
       await this.prisma.$transaction(async (tx) => {

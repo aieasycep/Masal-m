@@ -73,19 +73,30 @@ export class TokenService {
       );
     }
 
-    await this.prisma.refreshToken.update({
-      where: { id: stored.id },
+    // Compare-and-set: two concurrent refreshes of the same token race on the
+    // read above — only the one that flips revokedAt wins, the other is reuse.
+    const claimed = await this.prisma.refreshToken.updateMany({
+      where: { id: stored.id, revokedAt: null },
       data: { revokedAt: new Date() },
     });
+    if (claimed.count === 0) {
+      await this.revokeAllForUser(stored.userId);
+      throw new AppException(
+        ErrorCode.AUTH_TOKEN_INVALID,
+        'Refresh token reuse detected',
+        HttpStatus.UNAUTHORIZED,
+      );
+    }
     return this.issueTokens(
       { id: stored.userId, email: stored.user.email },
       stored.deviceId ?? undefined,
     );
   }
 
-  async revoke(refreshToken: string): Promise<void> {
+  /** Revokes one token, but only if it belongs to the caller — never another user's. */
+  async revokeForUser(userId: string, refreshToken: string): Promise<void> {
     await this.prisma.refreshToken.updateMany({
-      where: { tokenHash: hashToken(refreshToken), revokedAt: null },
+      where: { tokenHash: hashToken(refreshToken), userId, revokedAt: null },
       data: { revokedAt: new Date() },
     });
   }

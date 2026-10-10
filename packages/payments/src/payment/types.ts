@@ -35,9 +35,28 @@ export interface CreatePaymentResult {
 export interface VerifyPaymentResult {
   status: 'SUCCEEDED' | 'FAILED' | 'PENDING';
   providerPaymentId: string;
-  /** Paid amount as reported by the provider — MUST be compared to the expected amount (§82). */
+  /**
+   * Paid amount as reported by the provider, normalised to a 2-decimal string
+   * ("649.00") — MUST be compared to the expected amount (§82).
+   */
   paidAmount: string | null;
+  /** Provider-echoed order reference (iyzico basketId) — compared to the order number when present. */
+  basketId?: string | null;
+  /**
+   * Provider-side transaction id of the paid basket item (iyzico
+   * `itemTransactions[0].paymentTransactionId`) — the id a refund must name.
+   * Null when the provider has no such notion; persisted for later refunds.
+   */
+  providerTransactionId: string | null;
   rawResponse: unknown;
+}
+
+export interface RefundInput {
+  providerPaymentId: string;
+  /** Amount as a decimal string, e.g. "649.00". */
+  amount: string;
+  /** Transaction id captured at verify time; providers that need it fall back to `providerPaymentId` without it. */
+  providerTransactionId?: string | null;
 }
 
 export interface PaymentProvider {
@@ -45,7 +64,7 @@ export interface PaymentProvider {
   createPayment(input: CreatePaymentInput): Promise<CreatePaymentResult>;
   /** Verify a completed checkout using the provider token from the callback. */
   verifyPayment(providerToken: string): Promise<VerifyPaymentResult>;
-  refund(providerPaymentId: string, amount: string): Promise<{ refunded: boolean }>;
+  refund(input: RefundInput): Promise<{ refunded: boolean }>;
 }
 
 export class PaymentError extends Error {

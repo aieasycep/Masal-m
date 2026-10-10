@@ -3,6 +3,12 @@ export interface StorageObjectMeta {
   contentLength: number;
 }
 
+export interface StorageObjectEntry {
+  key: string;
+  size: number;
+  lastModified: Date;
+}
+
 export interface SignedUpload {
   uploadUrl: string;
   objectKey: string;
@@ -41,6 +47,9 @@ export interface StorageProvider {
   exists(objectKey: string): Promise<boolean>;
 
   headObject(objectKey: string): Promise<StorageObjectMeta | null>;
+
+  /** Enumerate objects under a key prefix (maintenance sweeps); order unspecified. */
+  listObjects(prefix: string): AsyncIterable<StorageObjectEntry>;
 }
 
 export interface StorageConfig {

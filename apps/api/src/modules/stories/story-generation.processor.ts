@@ -1,14 +1,9 @@
-import {
-  Inject,
-  Injectable,
-  Logger,
-  OnApplicationShutdown,
-  OnModuleInit,
-} from '@nestjs/common';
+import { Inject, Injectable, Logger, OnApplicationShutdown, OnModuleInit } from '@nestjs/common';
 import { UnrecoverableError, Worker, Job } from 'bullmq';
 import type Redis from 'ioredis';
 import {
   AIJobType,
+  DURATION_TARGETS,
   ErrorCode,
   ModerationStatus,
   NotificationType,
@@ -19,9 +14,12 @@ import {
   ContentModerator,
   StoryGenerationInput,
   StoryGenerationProvider,
+  normalizeGeneratedStory,
+  splitForModeration,
 } from '@masalim/ai';
 import { PushRoutes } from '@masalim/notifications';
-import type { AIJob as AIJobRow } from '@masalim/database';
+import { generatedStorySchema, type GeneratedStory } from '@masalim/validation';
+import type { AIJob as AIJobRow, Prisma } from '@masalim/database';
 import { PrismaService } from '../../prisma/prisma.service';
 import { REDIS } from '../../redis/redis.module';
 import { ENV } from '../../config/config.module';
@@ -33,10 +31,24 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { EntitlementService } from '../subscription/entitlement.service';
 
 /**
- * Story generation worker (§16/§17): prompt → LLM structured output → safety
- * post-check → persist pages → notify. Progress values are real pipeline
- * milestones streamed to the generating screen. Moderation rejections are
- * unrecoverable (no retry); provider failures retry with backoff.
+ * A failure that depends only on the (persisted) model output: retrying the
+ * job would replay the same output and fail the same way.
+ */
+class DeterministicOutputError extends Error {
+  constructor(override readonly cause: StoryGenerationError) {
+    super(cause.message);
+    this.name = 'DeterministicOutputError';
+  }
+}
+
+/**
+ * Story generation worker (§16/§17): prompt → LLM structured output → persist
+ * the raw output on the job → normalize pages → safety post-check → persist
+ * pages → notify. Progress values are real pipeline milestones streamed to
+ * the generating screen. The raw output is stored on `AIJob.result` before
+ * anything that can fail transiently (moderation, the page transaction), so a
+ * retry reuses it instead of paying the model again. Moderation rejections
+ * are unrecoverable (no retry); provider failures retry with backoff.
  */
 @Injectable()
 export class StoryGenerationProcessor implements OnModuleInit, OnApplicationShutdown {
@@ -56,11 +68,10 @@ export class StoryGenerationProcessor implements OnModuleInit, OnApplicationShut
 
   onModuleInit(): void {
     if (this.env.WORKER_MODE === 'separate') return; // API-only process
-    this.worker = new Worker<QueueJobData>(
-      QueueName.STORY_GENERATION,
-      (job) => this.process(job),
-      { connection: this.redis, concurrency: 2 },
-    );
+    this.worker = new Worker<QueueJobData>(QueueName.STORY_GENERATION, (job) => this.process(job), {
+      connection: this.redis,
+      concurrency: 2,
+    });
     this.worker.on('failed', (job, error) => {
       this.logger.error(
         { err: error, aiJobId: job?.data.aiJobId },
@@ -79,6 +90,8 @@ export class StoryGenerationProcessor implements OnModuleInit, OnApplicationShut
       include: { child: true },
     });
     if (story == null || story.deletedAt != null) {
+      // Deleted while queued: the credits were charged at enqueue — give them back.
+      await this.entitlements.refundCreditsForRef(aiJob.userId, 'story', aiJob.entityId);
       await this.jobs.fail(aiJob.id, ErrorCode.NOT_FOUND, 'Story was deleted');
       throw new UnrecoverableError('Story missing');
     }
@@ -126,11 +139,40 @@ export class StoryGenerationProcessor implements OnModuleInit, OnApplicationShut
         recentStories,
       };
 
-      const result = await this.storyAi.generateStory(input);
+      const generated = await this.obtainGeneration(aiJob, story.userId, input);
       await this.jobs.setProgress(aiJob.id, 70);
 
-      const fullText = result.story.pages.map((page) => page.text).join('\n\n');
-      const verdict = await this.moderator.checkStoryText(fullText, input.language);
+      // Duplicate / gapped page numbers from the model would violate the
+      // (storyId, pageNumber) key below; shape them once, deterministically.
+      let normalized: GeneratedStory;
+      try {
+        normalized = normalizeGeneratedStory(
+          generated,
+          DURATION_TARGETS[input.durationTarget].pages,
+        );
+      } catch (error) {
+        if (error instanceof StoryGenerationError) throw new DeterministicOutputError(error);
+        throw error;
+      }
+
+      const fullText = normalized.pages.map((page) => page.text).join('\n\n');
+      // Moderate everything the child or the image model will see — the title,
+      // summary and illustration prompts are model-written too.
+      const moderatedText = [
+        normalized.title,
+        normalized.summary,
+        fullText,
+        normalized.coverIllustrationPrompt,
+        ...normalized.pages.map((page) => page.illustrationPrompt),
+      ].join('\n\n');
+      // The story is already paid for and generated: a transient moderation
+      // failure must not throw the whole job into a (re-billed) regeneration.
+      const verdict = await this.moderateWithRetry(
+        aiJob,
+        story.userId,
+        moderatedText,
+        input.language,
+      );
       await this.jobs.setProgress(aiJob.id, 85);
       if (!verdict.safe) {
         await this.rejectByModeration(aiJob, story.id, story.userId, verdict.category);
@@ -140,7 +182,7 @@ export class StoryGenerationProcessor implements OnModuleInit, OnApplicationShut
       await this.prisma.$transaction(async (tx) => {
         await tx.storyPage.deleteMany({ where: { storyId: story.id } });
         await tx.storyPage.createMany({
-          data: result.story.pages.map((page) => ({
+          data: normalized.pages.map((page) => ({
             storyId: story.id,
             pageNumber: page.pageNumber,
             text: page.text,
@@ -150,43 +192,37 @@ export class StoryGenerationProcessor implements OnModuleInit, OnApplicationShut
         await tx.story.update({
           where: { id: story.id },
           data: {
-            title: result.story.title,
-            summary: result.story.summary,
+            title: normalized.title,
+            summary: normalized.summary,
             storyText: fullText,
-            coverIllustrationPrompt: result.story.coverIllustrationPrompt,
+            coverIllustrationPrompt: normalized.coverIllustrationPrompt,
             status: StoryStatus.READY,
             moderationStatus: ModerationStatus.APPROVED,
           },
         });
       });
 
-      await this.prisma.aIUsageLog.create({
-        data: {
-          userId: story.userId,
-          jobId: aiJob.id,
-          provider: this.storyAi.name,
-          model: result.usage.model,
-          type: AIJobType.STORY_GENERATION,
-          success: true,
-          inputTokens: result.usage.inputTokens,
-          outputTokens: result.usage.outputTokens,
-        },
-      });
-
       await this.jobs.complete(aiJob.id, story.id);
       await this.notifications.notify(
         story.userId,
         NotificationType.STORY_READY,
-        { storyTitle: result.story.title },
+        { storyTitle: normalized.title },
         PushRoutes.storyReady(story.id),
         { storyId: story.id },
       );
     } catch (error) {
       const isLastAttempt = job.attemptsMade + 1 >= (job.opts.attempts ?? 1);
-      const refused =
-        error instanceof StoryGenerationError && error.code === 'REFUSED';
+      const refused = error instanceof StoryGenerationError && error.code === 'REFUSED';
       if (refused) {
         await this.rejectByModeration(aiJob, story.id, story.userId, 'refused');
+        return;
+      }
+      // A truncated output repeats deterministically; retrying would bill the
+      // whole output budget twice more for the same failure. The same holds
+      // for a persisted output that cannot be normalized into pages.
+      const truncated = error instanceof StoryGenerationError && error.code === 'TRUNCATED';
+      if (truncated || error instanceof DeterministicOutputError) {
+        await this.finalizeFailure(aiJob, story.id, story.userId, error);
         return;
       }
       if (isLastAttempt) {
@@ -194,6 +230,85 @@ export class StoryGenerationProcessor implements OnModuleInit, OnApplicationShut
       }
       throw error;
     }
+  }
+
+  /**
+   * The model output for this job: reused from `AIJob.result` when an earlier
+   * attempt already paid for it, otherwise generated now and persisted before
+   * anything else can fail. The usage log is written only for a real call.
+   */
+  private async obtainGeneration(
+    aiJob: AIJobRow,
+    userId: string,
+    input: StoryGenerationInput,
+  ): Promise<GeneratedStory> {
+    const persisted = (aiJob.result as { story?: unknown } | null)?.story;
+    const parsed = persisted != null ? generatedStorySchema.safeParse(persisted) : null;
+    if (parsed?.success) {
+      this.logger.log({ aiJobId: aiJob.id }, 'reusing persisted generation');
+      return parsed.data;
+    }
+
+    const result = await this.storyAi.generateStory(input);
+    const persistedResult: Prisma.InputJsonObject = {
+      story: result.story,
+      usage: {
+        inputTokens: result.usage.inputTokens ?? null,
+        outputTokens: result.usage.outputTokens ?? null,
+        model: result.usage.model ?? null,
+      },
+    };
+    await this.prisma.aIJob.update({
+      where: { id: aiJob.id },
+      data: { result: persistedResult },
+    });
+    await this.prisma.aIUsageLog.create({
+      data: {
+        userId,
+        jobId: aiJob.id,
+        provider: this.storyAi.name,
+        model: result.usage.model,
+        type: AIJobType.STORY_GENERATION,
+        success: true,
+        inputTokens: result.usage.inputTokens,
+        outputTokens: result.usage.outputTokens,
+      },
+    });
+    return result.story;
+  }
+
+  private async moderateWithRetry(
+    aiJob: AIJobRow,
+    userId: string,
+    text: string,
+    language: 'tr' | 'en',
+  ): Promise<{ safe: boolean; category?: string }> {
+    const windows = splitForModeration(text).length;
+    const logUsage = (success: boolean) =>
+      this.prisma.aIUsageLog.create({
+        data: {
+          userId,
+          jobId: aiJob.id,
+          provider: this.moderator.name,
+          type: 'MODERATION',
+          success,
+          units: Math.max(1, windows),
+        },
+      });
+    let lastError: unknown;
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      try {
+        const verdict = await this.moderator.checkStoryText(text, language);
+        await logUsage(true);
+        return verdict;
+      } catch (error) {
+        lastError = error;
+        this.logger.warn({ err: error, attempt }, 'story moderation call failed, retrying');
+        await new Promise((resolve) => setTimeout(resolve, attempt * 2000));
+      }
+    }
+    await logUsage(false);
+    throw lastError;
   }
 
   private async rejectByModeration(

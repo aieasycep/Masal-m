@@ -243,11 +243,15 @@ model User {
   /// Purchased/gifted credit balance (never expires). Monthly quota lives in
   /// EntitlementUsage; every change to this column has a CreditLedger row.
   creditBalance       Int       @default(0)
+  /// Set when the address was confirmed with a mailed code (or trusted from a
+  /// social provider). Null = unverified; only enforced while MAIL_PROVIDER=smtp.
+  emailVerifiedAt     DateTime?
   createdAt           DateTime  @default(now())
   updatedAt           DateTime  @updatedAt
   deletedAt           DateTime?
 
   identities        AuthIdentity[]
+  emailVerifications EmailVerification[]
   refreshTokens     RefreshToken[]
   children          Child[]
   voiceProfiles     VoiceProfile[]
@@ -300,6 +304,24 @@ model RefreshToken {
 model PasswordReset {
   id        String    @id @default(cuid())
   userId    String
+  codeHash  String
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+/// One-time e-mail verification codes. Kept apart from PasswordReset on purpose:
+/// a shared table would let a verification code pass as a reset code unless every
+/// query remembered to filter by purpose. `email` pins the code to the address it
+/// was mailed to, so a later address change invalidates it.
+model EmailVerification {
+  id        String    @id @default(cuid())
+  userId    String
+  email     String
   codeHash  String
   expiresAt DateTime
   usedAt    DateTime?
@@ -482,6 +504,8 @@ model Narration {
   audioKey       String?
   duration       Float?
   timings        Json?
+  /// Karaoke word timeline `{ source, words: [{t,p,i,s,e}] }` — see @masalim/validation.
+  wordTimings    Json?
   status         NarrationStatus @default(QUEUED)
   error          String?
   createdAt      DateTime        @default(now())
@@ -639,6 +663,8 @@ model Payment {
   orderId           String
   provider          String
   providerPaymentId String?
+  /// Provider-side transaction id (iyzico paymentTransactionId) — refunds need it.
+  providerTransactionId String?
   amount            Decimal       @db.Decimal(10, 2)
   currency          String        @default("TRY")
   status            PaymentStatus @default(PENDING)
@@ -675,6 +701,9 @@ model Subscription {
   startedAt          DateTime
   expiresAt          DateTime?
   trialEndsAt        DateTime?
+  /// Start of the current billing period (purchase/renewal time) — anchors the
+  /// monthly Premium credit quota instead of the calendar month.
+  currentPeriodStartedAt DateTime?
   latestEventAt      DateTime           @default(now())
   createdAt          DateTime           @default(now())
   updatedAt          DateTime           @updatedAt
@@ -760,6 +789,9 @@ model AIJob {
   errorMessage String?
   payload      Json        @default("{}")
   resultRef    String?
+  /// Intermediate provider output persisted before post-processing (e.g. the
+  /// generated story before moderation) so a retry never repeats a paid call.
+  result       Json?
   queueJobId   String?     @unique
   createdAt    DateTime    @default(now())
   updatedAt    DateTime    @updatedAt

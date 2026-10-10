@@ -1,17 +1,8 @@
-import {
-  Body,
-  Controller,
-  Get,
-  Headers,
-  HttpCode,
-  HttpStatus,
-  Inject,
-  Post,
-} from '@nestjs/common';
+import { Body, Controller, Get, Headers, HttpCode, HttpStatus, Inject, Post } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { createZodDto } from 'nestjs-zod';
 import { z } from 'zod';
-import { randomUUID } from 'node:crypto';
+import { randomUUID, timingSafeEqual } from 'node:crypto';
 import { CREDIT_PACK_PRODUCT_IDS, ErrorCode } from '@masalim/types';
 import {
   mockPurchaseSchema,
@@ -40,12 +31,22 @@ const revenueCatWebhookSchema = z.object({
     product_id: z.string().nullish(),
     event_timestamp_ms: z.number().int(),
     expiration_at_ms: z.number().int().nullish(),
+    /** Purchase/renewal time — anchors the Premium quota period (D.1). */
+    purchased_at_ms: z.number().int().nullish(),
     environment: z.enum(['SANDBOX', 'PRODUCTION']).default('PRODUCTION'),
   }),
 });
 
 class MockPurchaseDto extends createZodDto(mockPurchaseSchema) {}
 class RevenueCatWebhookDto extends createZodDto(revenueCatWebhookSchema) {}
+
+/** Constant-time secret comparison; a length mismatch is simply "no match". */
+function secretMatches(provided: string | undefined, expected: string): boolean {
+  if (provided == null) return false;
+  const a = Buffer.from(provided);
+  const b = Buffer.from(expected);
+  return a.length === b.length && timingSafeEqual(a, b);
+}
 
 const SUPPORTED_EVENTS = new Set<SubscriptionEvent['eventType']>([
   'INITIAL_PURCHASE',
@@ -93,12 +94,16 @@ export class SubscriptionController {
     @Body() body: RevenueCatWebhookDto,
   ): Promise<{ received: boolean }> {
     const secret = this.env.REVENUECAT_WEBHOOK_SECRET;
-    if (!secret || authorization !== secret) {
+    if (!secret || !secretMatches(authorization, secret)) {
       throw new AppException(
         ErrorCode.AUTH_TOKEN_INVALID,
         'Invalid webhook credentials',
         HttpStatus.UNAUTHORIZED,
       );
+    }
+    // Sandbox purchases must never grant production entitlements.
+    if (this.env.NODE_ENV === 'production' && body.event.environment === 'SANDBOX') {
+      return { received: true };
     }
     const eventType = body.event.type as SubscriptionEvent['eventType'];
     if (!SUPPORTED_EVENTS.has(eventType)) {
@@ -112,6 +117,7 @@ export class SubscriptionController {
         productId: body.event.product_id ?? 'unknown',
         eventTimeMs: body.event.event_timestamp_ms,
         expirationAtMs: body.event.expiration_at_ms ?? null,
+        purchasedAtMs: body.event.purchased_at_ms ?? null,
         environment: body.event.environment,
         eventId: body.event.id ?? null,
       }),
@@ -139,6 +145,7 @@ export class SubscriptionController {
             productId: body.productId,
             eventTimeMs: Date.now(),
             expirationAtMs: null,
+            purchasedAtMs: Date.now(),
             environment: 'SANDBOX',
             eventId: `mock:${randomUUID()}`,
           }
@@ -148,6 +155,7 @@ export class SubscriptionController {
             productId: body.productId,
             eventTimeMs: Date.now(),
             expirationAtMs: Date.now() + 30 * 24 * 3600 * 1000,
+            purchasedAtMs: Date.now(),
             environment: 'SANDBOX',
           },
       'mock',
@@ -165,6 +173,7 @@ export class SubscriptionController {
         productId: 'masalim_premium_monthly',
         eventTimeMs: Date.now(),
         expirationAtMs: Date.now(),
+        purchasedAtMs: null,
         environment: 'SANDBOX',
       },
       'mock',

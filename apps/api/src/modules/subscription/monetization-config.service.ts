@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { z } from 'zod';
 import { DEFAULT_MONETIZATION, SubscriptionPlan } from '@masalim/types';
 import type { OfferingsResponse } from '@masalim/validation';
@@ -33,6 +33,7 @@ const CACHE_TTL_MS = 60_000;
  */
 @Injectable()
 export class MonetizationConfigService {
+  private readonly logger = new Logger(MonetizationConfigService.name);
   private cached: { value: MonetizationConfig; at: number } | null = null;
 
   constructor(private readonly prisma: PrismaService) {}
@@ -45,6 +46,15 @@ export class MonetizationConfigService {
       where: { key: CONFIG_KEY, active: true },
     });
     const parsed = row == null ? null : configSchema.safeParse(row.value);
+    if (parsed != null && !parsed.success) {
+      // A hand-edited row that no longer parses silently sold at code-default
+      // prices before; the parse runs once per cache window, so this logs once
+      // per window rather than on every read.
+      this.logger.error(
+        { key: CONFIG_KEY, issues: parsed.error.issues },
+        'monetization_v1 invalid — using code defaults',
+      );
+    }
     const value = parsed?.success ? parsed.data : configSchema.parse(DEFAULT_MONETIZATION);
     this.cached = { value, at: Date.now() };
     return value;

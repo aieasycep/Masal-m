@@ -8,9 +8,9 @@ fast instead of silently mocking.
 
 | Concern | Env | Real adapter | Mock behavior |
 |---|---|---|---|
-| Story LLM | `AI_PROVIDER=mock\|anthropic\|openai`, `AI_API_KEY`, `AI_MODEL` | Anthropic (`messages.parse` + zod output format, default `claude-opus-5`) / OpenAI (JSON mode + 2 repair retries) | Deterministic Turkish story from theme motifs, ~2s delay |
-| Moderation | `MODERATION_PROVIDER=mock\|llm\|openai`, `MODERATION_MODEL` | Blocklist + LLM classifier ("SAFE"/"UNSAFE:<cat>"): `llm` = Anthropic (default `claude-opus-5`), `openai` = OpenAI chat (default `gpt-4o-mini`); both share `AI_API_KEY` | Blocklist only |
-| TTS | `TTS_PROVIDER=mock\|elevenlabs`, `TTS_API_KEY`, `TTS_MODEL` | ElevenLabs, default `eleven_v3` (expressive): chunks are annotated with v3 audio tags by a NarrationDirector LLM pass (tag-only guard — story words never change), auto-fallback to `eleven_multilingual_v2` + plain text if v3 rejects; v2 models use storytelling voice settings (stability 0.35, style 0.45). Set `TTS_MODEL=eleven_multilingual_v2` to opt out of v3. | Playable WAV melody whose length tracks the text (whole narration pipeline works) |
+| Story LLM | `AI_PROVIDER=mock\|anthropic\|openai`, `AI_API_KEY`, `AI_MODEL`, `AI_EFFORT` | Anthropic (structured output via `output_config.format`, default `claude-opus-5-5`, adaptive thinking at `AI_EFFORT` low/medium/high — default medium; stop_reason checked first: refusal → REFUSED, max_tokens → INVALID_OUTPUT; one schema-repair round + one length-expand round) / OpenAI (JSON mode + 2 repair retries, default `gpt-4o`) | Deterministic Turkish story from theme motifs, ~2s delay |
+| Moderation | `MODERATION_PROVIDER=mock\|llm\|openai`, `MODERATION_MODEL` | Blocklist + LLM classifier ("SAFE"/"UNSAFE:<cat>"): `llm` = Anthropic (default `claude-haiku-5-5`, low effort), `openai` = OpenAI chat (default `gpt-4o-mini`); both share `AI_API_KEY` | Blocklist only |
+| TTS | `TTS_PROVIDER=mock\|elevenlabs`, `TTS_API_KEY`, `TTS_MODEL` | ElevenLabs, default `eleven_v3` (expressive): chunks are annotated with v3 audio tags by a NarrationDirector LLM pass (follows `AI_PROVIDER`/`AI_API_KEY`: Claude `claude-haiku-5-5` at low effort, or `gpt-4o-mini`; tag-only guard — story words never change), auto-fallback to `eleven_multilingual_v2` + plain text if v3 rejects; v2 models use storytelling voice settings (stability 0.35, style 0.45). Set `TTS_MODEL=eleven_multilingual_v2` to opt out of v3. After concat the FINAL file is force-aligned (`POST /v1/forced-alignment`, works for v3 + cloned voices) against the clean story text → `Narration.wordTimings` (karaoke); alignment failure degrades to an estimated timeline, never fails the narration. | Playable WAV melody whose length tracks the text (whole narration pipeline works); word timeline is estimated from chunk durations |
 | Voice clone | `VOICE_CLONE_PROVIDER=mock\|elevenlabs`, `VOICE_CLONE_API_KEY` | ElevenLabs IVC (`/v1/voices/add`), real `deleteVoice` | Instant clone (rejects empty audio) |
 | Images | `IMAGE_PROVIDER=mock\|openai`, `IMAGE_API_KEY`, `IMAGE_MODEL` | OpenAI gpt-image-1, character-sheet reference via `images.edit` | Style-tinted SVG→PNG via sharp |
 | Storage | `STORAGE_PROVIDER=s3\|local` + S3 creds | Any S3 API (MinIO locally, R2/S3 in prod), signed PUT/GET | Local disk + HMAC-signed dev URLs served by the API |
@@ -21,10 +21,27 @@ fast instead of silently mocking.
 | Mail | `MAIL_PROVIDER=mock\|smtp`, `SMTP_URL` | SMTP-ready service | OTPs logged to console |
 
 Cross-vendor model guard: `AI_MODEL`/`MODERATION_MODEL` values that don't match
-the selected vendor (e.g. a leftover `claude-*` model with `AI_PROVIDER=openai`)
-fall back to the vendor default in `providers.module.ts` instead of failing every
-request. All-OpenAI staging recipe: `AI_PROVIDER=openai`, `AI_MODEL=gpt-4o`,
-`MODERATION_PROVIDER=openai`, `MODERATION_MODEL=gpt-4o-mini`, `AI_API_KEY=<OpenAI key>`.
+the selected vendor (e.g. a leftover `gpt-*` model with `AI_PROVIDER=anthropic`)
+fall back to the vendor default in `providers.module.ts` (with a boot-time
+warning) instead of failing every request.
+
+**Story + moderation + narration director share `AI_API_KEY`, so they switch
+vendor together.** Claude cannot generate images — `IMAGE_PROVIDER` stays on
+OpenAI with its own `IMAGE_API_KEY`; the per-page English illustration prompts
+are written by the story LLM, so they come from Claude once it is selected.
+
+- Live (Claude) recipe: `AI_PROVIDER=anthropic`, `AI_MODEL=claude-opus-5-5`,
+  `AI_EFFORT=medium`, `MODERATION_PROVIDER=llm`, `MODERATION_MODEL=claude-haiku-5-5`,
+  `AI_API_KEY=<Anthropic key>`. The VPS gets these from
+  `.github/workflows/deploy-server.yml` (`AI_VENDOR: anthropic` + the
+  `ANTHROPIC_API_KEY` secret) via `/opt/masalim/providers.env`.
+- OpenAI rollback recipe: `AI_PROVIDER=openai`, `AI_MODEL=gpt-4o`,
+  `MODERATION_PROVIDER=openai`, `MODERATION_MODEL=gpt-4o-mini`,
+  `AI_API_KEY=<OpenAI key>` (on the VPS: `AI_VENDOR: openai`, uses the
+  `AI_API_KEY` secret).
+- Claude 5.5 models: thinking is always on and billed as output; `temperature`
+  is rejected; `max_tokens` covers thinking + text (story 16k, classifier 512,
+  director 4096). Sending `AI_EFFORT` to a pre-4.6 model is skipped automatically.
 
 Mobile-side purchases (`apps/mobile/src/lib/purchases.ts`):
 `EXPO_PUBLIC_PURCHASES_PROVIDER=mock|revenuecat` — mock drives

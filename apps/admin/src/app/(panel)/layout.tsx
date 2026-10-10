@@ -23,6 +23,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: '/system-voices', label: 'Sistem Sesleri', roles: ['ADMIN'] },
   { href: '/feature-flags', label: 'Özellik Bayrakları', roles: ['ADMIN'] },
   { href: '/audit-logs', label: 'Denetim Kaydı', roles: ['ADMIN'] },
+  { href: '/settings', label: 'Ayarlar', roles: ['ADMIN', 'SUPPORT', 'OPERATIONS'] },
 ];
 
 export default function PanelLayout({ children }: { children: React.ReactNode }) {
@@ -44,7 +45,8 @@ export default function PanelLayout({ children }: { children: React.ReactNode })
 
   // Nav hiding is UX only — the API enforces RBAC on every endpoint.
   const role = admin?.role;
-  const visibleItems = role != null ? NAV_ITEMS.filter((item) => item.roles.includes(role)) : NAV_ITEMS;
+  const visibleItems =
+    role != null ? NAV_ITEMS.filter((item) => item.roles.includes(role)) : NAV_ITEMS;
 
   function handleLogout() {
     clearSession();

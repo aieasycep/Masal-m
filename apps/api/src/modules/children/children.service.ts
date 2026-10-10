@@ -1,11 +1,17 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { AgeRange } from '@masalim/types';
-import type { Child, CreateChildInput, Recommendation, UpdateChildInput } from '@masalim/validation';
+import type {
+  Child,
+  CreateChildInput,
+  Recommendation,
+  UpdateChildInput,
+} from '@masalim/validation';
 import type { Child as ChildRow } from '@masalim/database';
 import type { StorageProvider } from '@masalim/storage';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AppException } from '../../common/errors/app.exception';
 import { STORAGE } from '../../providers/providers.module';
+import { assertOwnAvatarKey } from '../users/users.service';
 
 @Injectable()
 export class ChildrenService {
@@ -32,6 +38,8 @@ export class ChildrenService {
   }
 
   async create(userId: string, input: CreateChildInput): Promise<Child> {
+    if (input.avatarObjectKey != null)
+      await this.assertAvatarUploaded(userId, input.avatarObjectKey);
     const row = await this.prisma.child.create({
       data: {
         userId,
@@ -47,7 +55,9 @@ export class ChildrenService {
   }
 
   async update(userId: string, childId: string, input: UpdateChildInput): Promise<Child> {
-    await this.findOwned(userId, childId);
+    const current = await this.findOwned(userId, childId);
+    if (input.avatarObjectKey != null)
+      await this.assertAvatarUploaded(userId, input.avatarObjectKey);
     const row = await this.prisma.child.update({
       where: { id: childId },
       data: {
@@ -64,6 +74,14 @@ export class ChildrenService {
         preferences: input.preferences,
       },
     });
+    // The replaced (or cleared) picture is garbage now — best effort.
+    if (
+      input.avatarObjectKey !== undefined &&
+      current.avatarKey != null &&
+      current.avatarKey !== input.avatarObjectKey
+    ) {
+      await this.storage.deleteObject(current.avatarKey).catch(() => undefined);
+    }
     const storyCount = await this.prisma.story.count({
       where: { childId: row.id, deletedAt: null },
     });
@@ -79,7 +97,7 @@ export class ChildrenService {
    * Recommendation v0 (§38): interests → seeded templates, excluding the
    * child's most recent story themes so suggestions stay fresh.
    */
-  async recommendations(userId: string, childId: string): Promise<Recommendation[]> {
+  async recommendations(userId: string, childId: string, limit = 3): Promise<Recommendation[]> {
     const child = await this.findOwned(userId, childId);
     const recentStories = await this.prisma.story.findMany({
       where: { childId, deletedAt: null },
@@ -93,11 +111,11 @@ export class ChildrenService {
       where: { enabled: true, interest: { in: child.interests } },
     });
     const fallback =
-      templates.length >= 3
+      templates.length >= limit
         ? []
         : await this.prisma.recommendationTemplate.findMany({
             where: { enabled: true, interest: { notIn: child.interests } },
-            take: 6,
+            take: Math.max(6, limit * 2),
           });
 
     const ranked = [...templates, ...fallback]
@@ -106,7 +124,7 @@ export class ChildrenService {
         staleThemes: template.themes.filter((theme) => recentThemes.has(theme)).length,
       }))
       .sort((a, b) => a.staleThemes - b.staleThemes)
-      .slice(0, 3);
+      .slice(0, limit);
 
     return ranked.map(({ template }) => ({
       title: template.title.includes(child.name)
@@ -116,6 +134,14 @@ export class ChildrenService {
       promptSeed: template.promptSeed,
       emoji: template.emoji,
     }));
+  }
+
+  /** Own prefix AND an object behind it: a signed PUT URL alone proves nothing. */
+  private async assertAvatarUploaded(userId: string, key: string): Promise<void> {
+    assertOwnAvatarKey(userId, key);
+    if (!(await this.storage.exists(key))) {
+      throw AppException.validation('Avatar upload not found');
+    }
   }
 
   /** Ownership policy (§79): every child access goes through this single check. */

@@ -2,11 +2,23 @@ import { HttpStatus, Inject, Injectable } from '@nestjs/common';
 import * as argon2 from 'argon2';
 import { ACCOUNT_DELETION_GRACE_DAYS, ErrorCode } from '@masalim/types';
 import type { DeleteAccountInput, Me, UpdateMeInput } from '@masalim/validation';
-import type { StorageProvider } from '@masalim/storage';
+import { StorageKeys, type StorageProvider } from '@masalim/storage';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AppException } from '../../common/errors/app.exception';
 import { STORAGE } from '../../providers/providers.module';
 import { TokenService } from '../auth/token.service';
+
+/**
+ * Avatar keys are later signed for reading, so a client-supplied key must sit
+ * under the caller's own upload prefix (child avatars upload there too) —
+ * otherwise any private object could be re-signed by naming its key.
+ */
+export function assertOwnAvatarKey(userId: string, key: string): void {
+  const prefix = `${StorageKeys.avatar(userId)}/`;
+  if (key.includes('..') || !key.startsWith(prefix)) {
+    throw AppException.forbiddenOwnership('Avatar object does not belong to this account');
+  }
+}
 
 @Injectable()
 export class UsersService {
@@ -39,6 +51,8 @@ export class UsersService {
       timezone: user.timezone,
       onboardingCompleted: user.onboardingCompleted,
       subscriptionPlan: user.subscriptionPlan,
+      // Social-only accounts carry a placeholder address — nothing to verify.
+      emailVerified: user.emailVerifiedAt != null || user.email.endsWith('@users.masalim.app'),
       notificationPrefs: (user.notificationPrefs as Me['notificationPrefs']) ?? {},
       pendingDeletion: pending
         ? {
@@ -51,6 +65,23 @@ export class UsersService {
   }
 
   async updateMe(userId: string, input: UpdateMeInput): Promise<Me> {
+    let previousAvatarKey: string | null = null;
+    if (input.avatarObjectKey !== undefined) {
+      if (input.avatarObjectKey != null) {
+        assertOwnAvatarKey(userId, input.avatarObjectKey);
+        // A signed PUT URL proves nothing was uploaded: refuse a dangling key
+        // instead of serving a broken avatar forever.
+        if (!(await this.storage.exists(input.avatarObjectKey))) {
+          throw AppException.validation('Avatar upload not found');
+        }
+      }
+      const current = await this.prisma.user.findUnique({
+        where: { id: userId },
+        select: { avatarKey: true },
+      });
+      if (current == null) throw AppException.notFound('User not found');
+      previousAvatarKey = current.avatarKey;
+    }
     await this.prisma.user.update({
       where: { id: userId },
       data: {
@@ -62,6 +93,10 @@ export class UsersService {
         notificationPrefs: input.notificationPrefs,
       },
     });
+    // The replaced (or cleared) picture is garbage now — best effort.
+    if (previousAvatarKey != null && previousAvatarKey !== input.avatarObjectKey) {
+      await this.storage.deleteObject(previousAvatarKey).catch(() => undefined);
+    }
     return this.getMe(userId);
   }
 
@@ -71,8 +106,7 @@ export class UsersService {
     if (user == null) throw AppException.notFound('User not found');
 
     if (user.passwordHash != null) {
-      const ok =
-        input.password != null && (await argon2.verify(user.passwordHash, input.password));
+      const ok = input.password != null && (await argon2.verify(user.passwordHash, input.password));
       if (!ok) {
         throw new AppException(
           ErrorCode.AUTH_INVALID_CREDENTIALS,

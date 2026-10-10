@@ -3,6 +3,21 @@ export interface SpeechResult {
   contentType: string;
 }
 
+/** One timed unit of a forced alignment (seconds into the aligned audio). */
+export interface AlignedSpan {
+  text: string;
+  start: number;
+  end: number;
+}
+
+export interface WordAlignment {
+  /** Every character of the aligned text, in order (may be empty for word-only providers). */
+  characters: AlignedSpan[];
+  words: AlignedSpan[];
+  /** Provider confidence/loss for the whole transcript, lower is better. */
+  loss?: number;
+}
+
 export interface TextToSpeechProvider {
   readonly name: string;
   /**
@@ -19,6 +34,13 @@ export interface TextToSpeechProvider {
     providerVoiceId: string;
     language: 'tr' | 'en';
   }): Promise<SpeechResult>;
+
+  /**
+   * Optional: align a FINISHED audio file to its clean transcript and return
+   * per-character / per-word timestamps (karaoke text sync). Providers without
+   * alignment omit it; the narration pipeline then estimates a timeline.
+   */
+  alignWords?(input: { audio: Buffer; contentType: string; text: string }): Promise<WordAlignment>;
 }
 
 export class TtsError extends Error {

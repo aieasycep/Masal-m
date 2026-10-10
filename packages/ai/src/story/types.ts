@@ -41,10 +41,15 @@ export interface StoryGenerationProvider {
   generateStory(input: StoryGenerationInput): Promise<StoryGenerationResult>;
 }
 
+/**
+ * INVALID_OUTPUT / PROVIDER_ERROR are worth a retry; REFUSED is a moderation
+ * outcome; TRUNCATED (output hit max_tokens) repeats deterministically and
+ * must NOT be retried — each attempt would bill the full output budget again.
+ */
 export class StoryGenerationError extends Error {
   constructor(
     message: string,
-    readonly code: 'INVALID_OUTPUT' | 'PROVIDER_ERROR' | 'REFUSED',
+    readonly code: 'INVALID_OUTPUT' | 'PROVIDER_ERROR' | 'REFUSED' | 'TRUNCATED',
     override readonly cause?: unknown,
   ) {
     super(message);

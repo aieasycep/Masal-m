@@ -9,12 +9,15 @@ const envSchema = z
     API_PORT: z.coerce.number().int().default(3001),
     API_PUBLIC_URL: z.string().url().default('http://localhost:3001'),
     CORS_ORIGINS: z.string().default('http://localhost:3000'),
+    /** Hops of trusted reverse proxies in front of the API (VPS nginx = 1); 0 = none. */
+    TRUST_PROXY: z.coerce.number().int().min(0).default(0),
 
     DATABASE_URL: z.string().min(1),
     REDIS_URL: z.string().min(1).default('redis://localhost:6379'),
 
     JWT_SECRET: z.string().min(16),
-    JWT_REFRESH_SECRET: z.string().min(16),
+    /** Legacy — refresh tokens are opaque random strings; kept so existing .env files stay valid. */
+    JWT_REFRESH_SECRET: z.string().min(16).optional(),
     APPLE_BUNDLE_ID: z.string().default('com.masalim.app'),
     GOOGLE_CLIENT_ID: z.string().default(''),
 
@@ -24,15 +27,21 @@ const envSchema = z
     STORAGE_ENDPOINT: z.string().optional(),
     STORAGE_ACCESS_KEY: z.string().optional(),
     STORAGE_SECRET_KEY: z.string().optional(),
-    STORAGE_FORCE_PATH_STYLE: z.coerce.boolean().default(false),
+    // z.coerce.boolean() would turn the string "false" into true.
+    STORAGE_FORCE_PATH_STYLE: z
+      .enum(['true', 'false', '1', '0', ''])
+      .default('false')
+      .transform((value) => value === 'true' || value === '1'),
     SIGNED_URL_TTL_SECONDS: z.coerce.number().int().default(900),
     STORAGE_LOCAL_DIR: z.string().default('.local-storage'),
 
     AI_PROVIDER: providerEnum(['mock', 'anthropic', 'openai']).default('mock'),
     AI_API_KEY: z.string().default(''),
-    AI_MODEL: z.string().default('claude-opus-5'),
+    AI_MODEL: z.string().default('claude-opus-5-5'),
+    /** Claude thinking depth for story generation (ignored by other vendors). */
+    AI_EFFORT: providerEnum(['low', 'medium', 'high']).default('medium'),
     MODERATION_PROVIDER: providerEnum(['mock', 'llm', 'openai']).default('mock'),
-    MODERATION_MODEL: z.string().default('claude-opus-5'),
+    MODERATION_MODEL: z.string().default('claude-haiku-5-5'),
     TTS_PROVIDER: providerEnum(['mock', 'elevenlabs']).default('mock'),
     TTS_API_KEY: z.string().default(''),
     TTS_MODEL: z.string().default('eleven_v3'),
@@ -101,8 +110,78 @@ const envSchema = z
           message: 'STORAGE_PROVIDER=local is not allowed in production',
         });
       }
+    }
+    // A real mail provider without its connection string would only fail at the
+    // first password reset — refuse to boot instead.
+    if (env.MAIL_PROVIDER === 'smtp' && env.SMTP_URL === '') {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['SMTP_URL'],
+        message: 'MAIL_PROVIDER=smtp requires SMTP_URL',
+      });
       // PRINT_PROVIDER intentionally allows mock everywhere until a Turkish
       // print API is selected (§33); the flow is feature-flagged.
+    }
+    // A real provider with an empty credential would only fail at the first
+    // paid call (and refund the user's credits) — refuse to boot instead.
+    const requiredKeys: Array<{ when: boolean; key: string; value: string; because: string }> = [
+      {
+        when: env.AI_PROVIDER !== 'mock',
+        key: 'AI_API_KEY',
+        value: env.AI_API_KEY,
+        because: `AI_PROVIDER=${env.AI_PROVIDER}`,
+      },
+      {
+        when: env.MODERATION_PROVIDER !== 'mock',
+        key: 'AI_API_KEY',
+        value: env.AI_API_KEY,
+        because: `MODERATION_PROVIDER=${env.MODERATION_PROVIDER}`,
+      },
+      {
+        when: env.TTS_PROVIDER === 'elevenlabs',
+        key: 'TTS_API_KEY',
+        value: env.TTS_API_KEY,
+        because: 'TTS_PROVIDER=elevenlabs',
+      },
+      {
+        when: env.VOICE_CLONE_PROVIDER === 'elevenlabs',
+        key: 'VOICE_CLONE_API_KEY',
+        value: env.VOICE_CLONE_API_KEY,
+        because: 'VOICE_CLONE_PROVIDER=elevenlabs',
+      },
+      {
+        when: env.IMAGE_PROVIDER === 'openai',
+        key: 'IMAGE_API_KEY',
+        value: env.IMAGE_API_KEY,
+        because: 'IMAGE_PROVIDER=openai',
+      },
+      {
+        when: env.SUBSCRIPTION_PROVIDER === 'revenuecat',
+        key: 'REVENUECAT_WEBHOOK_SECRET',
+        value: env.REVENUECAT_WEBHOOK_SECRET,
+        because: 'SUBSCRIPTION_PROVIDER=revenuecat',
+      },
+      {
+        when: env.PAYMENT_PROVIDER === 'iyzico',
+        key: 'IYZICO_API_KEY',
+        value: env.IYZICO_API_KEY,
+        because: 'PAYMENT_PROVIDER=iyzico',
+      },
+      {
+        when: env.PAYMENT_PROVIDER === 'iyzico',
+        key: 'IYZICO_SECRET',
+        value: env.IYZICO_SECRET,
+        because: 'PAYMENT_PROVIDER=iyzico',
+      },
+    ];
+    for (const { when, key, value, because } of requiredKeys) {
+      if (when && value === '') {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: [key],
+          message: `${key} is required when ${because}`,
+        });
+      }
     }
   });
 
