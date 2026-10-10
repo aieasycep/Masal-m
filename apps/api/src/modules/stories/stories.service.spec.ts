@@ -94,6 +94,27 @@ function buildService(
           return withRelations();
         },
       ),
+      // Compare-and-set used by generate(): only the expected status wins.
+      updateMany: jest.fn(
+        async ({
+          where,
+          data,
+        }: {
+          where: { id: string; status?: StoryStatus | { in: StoryStatus[] } };
+          data: { status?: StoryStatus; moderationStatus?: string };
+        }) => {
+          const allowed =
+            where.status == null
+              ? true
+              : typeof where.status === 'string'
+                ? where.status === story.status
+                : where.status.in.includes(story.status);
+          if (where.id !== story.id || !allowed) return { count: 0 };
+          if (data.status != null) story.status = data.status;
+          if (data.moderationStatus != null) story.moderationStatus = data.moderationStatus;
+          return { count: 1 };
+        },
+      ),
     },
     storyPage: {
       findMany: jest.fn(async () => pages.map((page) => ({ ...page }))),
@@ -140,7 +161,7 @@ function buildService(
   } as unknown as StorageProvider;
 
   const service = new StoriesService(prisma, jobs, entitlements, children, storage, moderator);
-  return { service, story, pages, revisions, tx, prisma, moderator };
+  return { service, story, pages, revisions, tx, prisma, moderator, entitlements, jobs };
 }
 
 describe('StoriesService.update', () => {
@@ -264,5 +285,17 @@ describe('StoriesService.generate idea pre-check', () => {
     await service.generate('u1', 's1');
 
     expect(moderator.checkStoryIdea).toHaveBeenCalledWith('Kaptan', 'tr');
+  });
+
+  it('charges credits only once when the same draft is generated twice', async () => {
+    const { service, entitlements, prisma } = buildService({ status: StoryStatus.DRAFT });
+
+    const first = await service.generate('u1', 's1');
+    // The second call finds the story already claimed and the job still live.
+    (prisma.aIJob.findFirst as jest.Mock).mockResolvedValueOnce({ id: first.jobId });
+    const second = await service.generate('u1', 's1');
+
+    expect(second.jobId).toBe(first.jobId);
+    expect(entitlements.consumeCredits).toHaveBeenCalledTimes(1);
   });
 });

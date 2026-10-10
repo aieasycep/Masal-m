@@ -121,19 +121,26 @@ export class VoiceProfilesService {
     deleteProviderVoice: (providerVoiceId: string) => Promise<void>,
   ): Promise<void> {
     const row = await this.findOwned(userId, voiceId);
+    // A failed provider delete keeps the id on the (soft-deleted) row so the
+    // hourly deletion sweep can retry it — orphaned clones would otherwise
+    // silently eat the ElevenLabs voice slots.
+    let providerDeleted = row.providerVoiceId == null;
     if (row.providerVoiceId != null) {
-      await deleteProviderVoice(row.providerVoiceId).catch(() => {
-        // Provider deletion is retried by ops tooling; local purge still proceeds.
-      });
+      providerDeleted = await deleteProviderVoice(row.providerVoiceId).then(
+        () => true,
+        () => false,
+      );
     }
-    if (row.recordingKey != null) await this.storage.deleteObject(row.recordingKey).catch(() => undefined);
-    if (row.previewKey != null) await this.storage.deleteObject(row.previewKey).catch(() => undefined);
+    if (row.recordingKey != null)
+      await this.storage.deleteObject(row.recordingKey).catch(() => undefined);
+    if (row.previewKey != null)
+      await this.storage.deleteObject(row.previewKey).catch(() => undefined);
     await this.prisma.voiceProfile.update({
       where: { id: voiceId },
       data: {
         status: VoiceProfileStatus.DELETED,
         deletedAt: new Date(),
-        providerVoiceId: null,
+        providerVoiceId: providerDeleted ? null : row.providerVoiceId,
         recordingKey: null,
         previewKey: null,
       },

@@ -343,10 +343,30 @@ Local `.env` = `.env.example` + generated JWT secrets (already present, gitignor
   local storage key hardening + dev upload cap, smoke-story.sh fixed account +
   Python fix, TRUNCATED story code (no retry), moderator truncation → retryable
   error, director model/fallback logging, effort-support list (Sonnet 4.6 kept).
+  SECOND BATCH (same PR, from the Workflow verification's 46 new findings):
+  generate() CAS claim via `story.updateMany(status in [DRAFT,FAILED] → GENERATING)`
+  so a double-tap charges once (returns the active job; stale GENERATING without a
+  live job is reclaimed); first-free narration/illustration count+insert inside
+  `$transaction` + `pg_advisory_xact_lock(hashtext(storyId))`; narration/
+  illustration processors refund on deleted-story early return (illustration also
+  refunds the regen ref); voice remove() keeps providerVoiceId when the provider
+  delete fails and the hourly deletion sweep retries orphans
+  (`retryOrphanedProviderVoices`); Dockerfile `exec node` + compose
+  `stop_grace_period: 120s` so in-flight jobs finish on deploy; blocklist is
+  whole-word (TR `term\p{L}{0,4}`, EN plural) — "kasap" no longer trips "kas";
+  seed updates system voices only on provider/providerVoiceId; MailService smtp
+  adapter via nodemailer (`MAIL_PROVIDER=smtp` requires `SMTP_URL`, env
+  superRefine) and deploy-server.yml writes MAIL_PROVIDER=smtp + SMTP_URL +
+  MAIL_FROM into providers.env whenever the `SMTP_URL` secret exists → SMTP at
+  go-live = add one secret. Integration journeys: 14/14.
   NOT done (next PR): non-root containers/Chromium sandbox, admin CSP, MinIO tag
   pin (Docker Hub tag API unreachable from here), book render queue key, push
-  token ownership, orphan upload cleanup, Apple nonce, email verification (needs
-  SMTP), RevenueCat Purchases.logIn (mobile, needs store).
+  token ownership (+ projectId), orphan upload cleanup, Apple nonce, email
+  verification (needs SMTP), RevenueCat Purchases.logIn (mobile, needs store),
+  mobile logout without refresh token + api-client sign-out on any non-2xx
+  refresh, 426 handling, Premium quota calendar-month vs billing period,
+  narration per-chunk cache, illustration retry idempotency, page-count ceiling,
+  nginx vhost cp-before-certbot window, sslip hostname, DB backups.
 - **keepalive.yml REMOVED (Sep 14)**. The repo's DEFAULT BRANCH is the claude
   branch (`git ls-remote --symref origin HEAD`), so GitHub cron ran it there
   every ~2–4 h (never the 10-min schedule) and reported a `ping` check on PR

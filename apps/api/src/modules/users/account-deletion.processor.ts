@@ -90,7 +90,42 @@ export class AccountDeletionProcessor implements OnModuleInit, OnApplicationShut
       });
     }
     if (due.length > 0) this.logger.log(`deletion sweep enqueued ${due.length} account purge(s)`);
+    await this.retryOrphanedProviderVoices();
     return due.length;
+  }
+
+  /**
+   * Voice profiles deleted while the provider call failed keep their provider
+   * id; retry those deletes so orphaned clones do not occupy voice slots.
+   */
+  async retryOrphanedProviderVoices(): Promise<number> {
+    const orphans = await this.prisma.voiceProfile.findMany({
+      where: { deletedAt: { not: null }, providerVoiceId: { not: null } },
+      select: { id: true, providerVoiceId: true },
+      take: 50,
+    });
+    let cleaned = 0;
+    for (const voice of orphans) {
+      const ok = await this.voiceClone.deleteVoice(voice.providerVoiceId as string).then(
+        () => true,
+        (error: unknown) => {
+          this.logger.warn(
+            { err: error, voiceProfileId: voice.id },
+            'provider voice delete retry failed',
+          );
+          return false;
+        },
+      );
+      if (ok) {
+        await this.prisma.voiceProfile.update({
+          where: { id: voice.id },
+          data: { providerVoiceId: null },
+        });
+        cleaned += 1;
+      }
+    }
+    if (cleaned > 0) this.logger.log(`removed ${cleaned} orphaned provider voice(s)`);
+    return cleaned;
   }
 
   private async process(job: Job<QueueJobData>): Promise<void> {

@@ -524,14 +524,43 @@ describe('critical journeys (integration)', () => {
       .send({ style: 'PASTEL' })
       .expect(201);
 
-    const entitlements = await http()
+    const afterSets = await http()
       .get('/subscription/entitlements')
       .set(...V)
       .set(...auth)
       .expect(200);
     // SHORT story: 3 from quota; first set included; second set = 2 extra credits.
-    expect(entitlements.body.credits.quota.used).toBe(3);
-    expect(entitlements.body.credits.balance).toBe(4);
+    expect(afterSets.body.credits.quota.used).toBe(3);
+    expect(afterSets.body.credits.balance).toBe(4);
+
+    // Same rule for narrations: the first one is included, the second costs 2.
+    const voices = await http()
+      .get('/voices/system')
+      .set(...V)
+      .set(...auth)
+      .expect(200);
+    const free = (voices.body as Array<{ id: string; premiumOnly: boolean }>).filter(
+      (voice) => !voice.premiumOnly,
+    );
+    expect(free.length).toBeGreaterThanOrEqual(2);
+    await http()
+      .post(`/stories/${storyId}/narrations`)
+      .set(...V)
+      .set(...auth)
+      .send({ systemVoiceId: free[0]!.id })
+      .expect(201);
+    await http()
+      .post(`/stories/${storyId}/narrations`)
+      .set(...V)
+      .set(...auth)
+      .send({ systemVoiceId: free[1]!.id })
+      .expect(201);
+    const afterNarrations = await http()
+      .get('/subscription/entitlements')
+      .set(...V)
+      .set(...auth)
+      .expect(200);
+    expect(afterNarrations.body.credits.balance).toBe(2);
   });
 
   it("rejects an avatar object key outside the caller's own prefix (403)", async () => {

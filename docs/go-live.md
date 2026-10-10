@@ -13,12 +13,20 @@ dağıtım ilk adımda durur.
 
 ## 2. E-posta gönderimi (SMTP)
 
-Şifre sıfırlama ve e-posta doğrulama gerçek e-posta ister. Ücretsiz katmanı
-olan bir servis seç (örn. Resend, Brevo); SMTP bilgilerini al; bana söyle —
-`MAIL_PROVIDER=smtp` adaptörünü + e-posta doğrulamayı (hediye kredi ancak
-doğrulanmış e-postaya verilecek şekilde) ekleyip `SMTP_URL` secret'ını
-dağıtıma bağlarım. Bu olmadan `NODE_ENV=production` açılmaz (üretim mock
-e-postayı reddeder).
+Şifre sıfırlama kodu gerçek e-posta ister. Ücretsiz katmanı olan bir servis
+seç (örn. Resend, Brevo); SMTP bilgilerini al ve GitHub secret olarak ekle:
+
+- `SMTP_URL` → `smtps://KULLANICI:ŞİFRE@smtp.sunucu.com:465` biçiminde
+  (servisin verdiği kullanıcı adı/şifre; 587 portu için `smtp://…:587`).
+- `MAIL_FROM` → gönderen adresi (örn. `no-reply@masalim.app`; alan adının
+  o serviste doğrulanmış olması gerekir). Boş bırakılırsa varsayılan kalır.
+
+Secret eklendikten sonraki ilk dağıtımda sunucu kendiliğinden `MAIL_PROVIDER=smtp`
+ile çalışır (adaptör kodda hazır: nodemailer). Secret yokken sahte e-posta kalır
+ve kodlar yalnızca geliştirici bilgisayarında loglanır (sunucu logunda görünmez).
+E-posta doğrulama (hediye kredinin ancak doğrulanmış e-postaya verilmesi) ayrı
+bir iş — SMTP çalışınca eklenir. Bu olmadan `NODE_ENV=production` açılmaz
+(üretim sahte e-postayı reddeder).
 
 ## 3. Gerçek mağaza satın alma
 
@@ -66,7 +74,19 @@ Demo kullanıcı (`demo@masalim.local`) test modu dışında otomatik devre dı�
 Hesap ele geçirme, kredi atlatma, başkasının dosyasına erişim, şifre sıfırlama
 kodu deneme, oran sınırı/kilitleme, admin oturumu, hesap silme işlemcisi,
 moderasyon kapsamı ve dağıtım betikleri düzeltildi — ayrıntı: PR açıklaması.
+İkinci tur (bağımsız doğrulamanın bulduğu yeni açıklar): aynı taslağın iki kez
+üretilmesi artık iki kez kredi düşmüyor (durum kilidi); eşzamanlı iki istek
+"ilk ücretsiz" anlatımı/görsel setini iki kez alamıyor (hikâye başına kilit);
+masal silinince kuyruktaki anlatım/görsel işleri krediyi iade ediyor; parçalı
+ses dosyası silinemezse saatlik süpürme ElevenLabs'teki klonu tekrar siliyor;
+sunucu güncellemesinde süren işler 120 sn tamamlanma süresi alıyor; blok
+listesi tam kelime eşliyor ("kasap" artık "kas" yüzünden engellenmiyor);
+sistem sesleri seed'i kullanıcı görünür alanları ezmiyor; SMTP adaptörü hazır.
 Sonraki PR'a kalan düşük öncelikliler: konteynerlerin root dışı kullanıcıyla
 çalışması + Chromium sandbox, admin paneline CSP, MinIO imaj sürümü
 sabitleme (doğrulanmış etiket gerekiyor), kitap render kuyruk anahtarı,
-push token sahipliği, kullanılmayan yüklemelerin temizliği, Apple nonce.
+push token sahipliği, kullanılmayan yüklemelerin temizliği, Apple nonce,
+mobilde çıkışta refresh token iptali, Premium aylık kotanın takvim ayı yerine
+fatura dönemine bağlanması, anlatım parça önbelleği (yeniden denemede TTS
+kredisi), nginx vhost kopyası ile certbot arasındaki kısa pencere, sslip.io
+yerine gerçek alan adı, veritabanı yedeği.

@@ -153,19 +153,47 @@ export class StoriesService {
       }
     }
 
-    // Credit cost scales with length (1 kredi ≈ 1 dakika): SHORT 3 / MEDIUM 6 /
-    // LONG 10. The story's first narration + first illustration set are included.
-    await this.entitlements.consumeCredits(
-      userId,
-      STORY_CREDIT_COSTS[story.durationTarget],
-      CreditReason.STORY_SPEND,
-      { type: 'story', id: storyId },
-    );
-    try {
-      await this.prisma.story.update({
-        where: { id: storyId },
-        data: { status: StoryStatus.GENERATING, moderationStatus: ModerationStatus.PENDING },
+    // Claim the story with a compare-and-set on its status BEFORE charging, so
+    // two concurrent generate calls (double tap, retry) cannot both consume
+    // credits for a single generation — the loser sees the running job.
+    const claimed = await this.prisma.story.updateMany({
+      where: { id: storyId, status: { in: [StoryStatus.DRAFT, StoryStatus.FAILED] } },
+      data: { status: StoryStatus.GENERATING, moderationStatus: ModerationStatus.PENDING },
+    });
+    if (claimed.count === 0) {
+      const active = await this.prisma.aIJob.findFirst({
+        where: {
+          entityId: storyId,
+          type: AIJobType.STORY_GENERATION,
+          status: { in: ['QUEUED', 'RUNNING'] },
+        },
+        orderBy: { createdAt: 'desc' },
       });
+      if (active != null) return { jobId: active.id };
+      // GENERATING without a live job is a lost job (worker died): re-claiming
+      // and charging again is the legitimate recovery, not a double submit.
+      const reclaimed = await this.prisma.story.updateMany({
+        where: { id: storyId, status: StoryStatus.GENERATING },
+        data: { moderationStatus: ModerationStatus.PENDING },
+      });
+      if (reclaimed.count === 0) {
+        throw new AppException(
+          ErrorCode.VALIDATION_FAILED,
+          'Story generation is already in progress',
+          HttpStatus.CONFLICT,
+        );
+      }
+    }
+
+    try {
+      // Credit cost scales with length (1 kredi ≈ 1 dakika): SHORT 3 / MEDIUM 6 /
+      // LONG 10. The story's first narration + first illustration set are included.
+      await this.entitlements.consumeCredits(
+        userId,
+        STORY_CREDIT_COSTS[story.durationTarget],
+        CreditReason.STORY_SPEND,
+        { type: 'story', id: storyId },
+      );
       const job = await this.jobs.enqueue({
         userId,
         type: AIJobType.STORY_GENERATION,

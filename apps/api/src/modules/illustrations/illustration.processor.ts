@@ -7,11 +7,7 @@ import {
 } from '@nestjs/common';
 import { UnrecoverableError, Worker, type Job } from 'bullmq';
 import Redis from 'ioredis';
-import {
-  ErrorCode,
-  IllustrationSetStatus,
-  NotificationType,
-} from '@masalim/types';
+import { ErrorCode, IllustrationSetStatus, NotificationType } from '@masalim/types';
 import type { CharacterBible, ImageGenerationProvider } from '@masalim/ai';
 import type { Prisma } from '@masalim/database';
 import type { StorageProvider } from '@masalim/storage';
@@ -80,15 +76,25 @@ export class IllustrationProcessor implements OnModuleInit, OnApplicationShutdow
         illustrations: true,
       },
     });
-    if (set == null || set.story.deletedAt != null) {
-      await this.jobs.fail(aiJob.id, ErrorCode.NOT_FOUND, 'Illustration set missing');
-      throw new UnrecoverableError('Set missing');
-    }
-
     const payload = (aiJob.payload ?? {}) as {
       regenerateForIllustrationId?: string;
       creditRefId?: string;
     };
+    if (set == null || set.story.deletedAt != null) {
+      // Story deleted while queued: whatever was charged for this job (an
+      // extra set, or a 1-credit regenerate) goes back — both refunds no-op
+      // when nothing was spent under that reference.
+      await this.entitlements.refundCreditsForRef(aiJob.userId, 'illustration_set', aiJob.entityId);
+      if (payload.creditRefId != null) {
+        await this.entitlements.refundCreditsForRef(
+          aiJob.userId,
+          REGENERATE_CREDIT_REF_TYPE,
+          payload.creditRefId,
+        );
+      }
+      await this.jobs.fail(aiJob.id, ErrorCode.NOT_FOUND, 'Illustration set missing');
+      throw new UnrecoverableError('Set missing');
+    }
     if (payload.regenerateForIllustrationId != null) {
       await this.processRegeneration(
         aiJob.id,
@@ -139,13 +145,10 @@ export class IllustrationProcessor implements OnModuleInit, OnApplicationShutdow
       await tick();
 
       // 2. Cover (skip targets that already exist — retries stay idempotent).
-      const existingTargets = new Set(
-        set.illustrations.map((item) => item.storyPageId ?? 'cover'),
-      );
+      const existingTargets = new Set(set.illustrations.map((item) => item.storyPageId ?? 'cover'));
       if (!existingTargets.has('cover')) {
         const coverPrompt =
-          story.coverIllustrationPrompt ??
-          `book cover illustration for the story "${story.title}"`;
+          story.coverIllustrationPrompt ?? `book cover illustration for the story "${story.title}"`;
         await this.renderTarget(set.id, story, null, coverPrompt, set.style, bible, characterRef);
       }
       await tick();
@@ -153,8 +156,7 @@ export class IllustrationProcessor implements OnModuleInit, OnApplicationShutdow
       // 3. Pages in order.
       for (const page of story.pages) {
         if (!existingTargets.has(page.id)) {
-          const prompt =
-            page.illustrationPrompt ?? `illustration of: ${page.text.slice(0, 240)}`;
+          const prompt = page.illustrationPrompt ?? `illustration of: ${page.text.slice(0, 240)}`;
           await this.renderTarget(set.id, story, page.id, prompt, set.style, bible, characterRef);
         }
         await tick();
@@ -220,8 +222,8 @@ export class IllustrationProcessor implements OnModuleInit, OnApplicationShutdow
       throw new UnrecoverableError('Regeneration target missing');
     }
     await this.jobs.markRunning(aiJobId, 20);
-    const bible = (set.characterBible ?? buildCharacterBible(set.story, set.story.child)) as
-      unknown as CharacterBible;
+    const bible = (set.characterBible ??
+      buildCharacterBible(set.story, set.story.child)) as unknown as CharacterBible;
     try {
       await this.renderTarget(
         set.id,

@@ -90,10 +90,17 @@ async function seedSystemVoices() {
       where: { displayName: voice.displayName },
     });
     if (existing) {
+      // Only the provider binding is owned by the seed; description, category,
+      // premium flag, sort order and enabled state are edited in the admin
+      // panel and must survive the boot-time re-seed.
       const idChanged = existing.providerVoiceId !== voice.providerVoiceId;
       await prisma.systemVoice.update({
         where: { id: existing.id },
-        data: idChanged ? { ...voice, previewKey: null } : voice,
+        data: {
+          provider: voice.provider,
+          providerVoiceId: voice.providerVoiceId,
+          ...(idChanged ? { previewKey: null } : {}),
+        },
       });
     } else {
       await prisma.systemVoice.create({ data: voice });

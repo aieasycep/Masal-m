@@ -20,4 +20,6 @@ RUN pnpm install --frozen-lockfile \
   && pnpm turbo build --filter=@masalim/api...
 
 # Migrations + idempotent seed on boot, then the API (workers run inline).
-CMD ["sh", "-c", "pnpm --filter @masalim/database db:migrate:deploy && pnpm --filter @masalim/database db:seed && node apps/api/dist/main.js"]
+# `exec` makes node PID 1 so SIGTERM reaches Nest's shutdown hooks and the
+# BullMQ workers can finish their in-flight (paid) jobs before a redeploy.
+CMD ["sh", "-c", "pnpm --filter @masalim/database db:migrate:deploy && pnpm --filter @masalim/database db:seed && exec node apps/api/dist/main.js"]

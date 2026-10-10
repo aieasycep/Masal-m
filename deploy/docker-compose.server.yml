@@ -79,6 +79,9 @@ services:
       context: /opt/masalim/app
       dockerfile: apps/api/Dockerfile
     restart: unless-stopped
+    # Give in-flight AI jobs (story ≈ 1–2 min, narration longer) time to finish
+    # on redeploy instead of being SIGKILLed and re-run (re-billed) by BullMQ.
+    stop_grace_period: 120s
     env_file:
       - /opt/masalim/.env
       - /opt/masalim/providers.env

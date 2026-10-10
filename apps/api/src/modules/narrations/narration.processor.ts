@@ -21,7 +21,11 @@ import { NARRATION_DIRECTOR, STORAGE, TTS } from '../../providers/providers.modu
 import { JobsService } from '../../jobs/jobs.service';
 import { EntitlementService } from '../subscription/entitlement.service';
 import { QueueName, type QueueJobData } from '../../jobs/queues';
-import { estimateWordTimings, fullStoryText, wordTimingsFromAlignment } from '../../audio/word-timings';
+import {
+  estimateWordTimings,
+  fullStoryText,
+  wordTimingsFromAlignment,
+} from '../../audio/word-timings';
 import { NotificationsService } from '../notifications/notifications.service';
 import {
   chunkStoryPages,
@@ -77,6 +81,8 @@ export class NarrationProcessor implements OnModuleInit, OnApplicationShutdown {
       },
     });
     if (narration == null || narration.story.deletedAt != null) {
+      // Story deleted while queued: an extra narration was charged at enqueue.
+      await this.entitlements.refundCreditsForRef(aiJob.userId, 'narration', aiJob.entityId);
       await this.jobs.fail(aiJob.id, ErrorCode.NOT_FOUND, 'Narration or story missing');
       throw new UnrecoverableError('Narration missing');
     }
@@ -222,7 +228,11 @@ export class NarrationProcessor implements OnModuleInit, OnApplicationShutdown {
     return estimateWordTimings(pages, timings);
   }
 
-  private async finalizeFailure(aiJobId: string, narrationId: string, message: string): Promise<void> {
+  private async finalizeFailure(
+    aiJobId: string,
+    narrationId: string,
+    message: string,
+  ): Promise<void> {
     const row = await this.prisma.narration.update({
       where: { id: narrationId },
       data: { status: NarrationStatus.FAILED, error: message.slice(0, 300) },

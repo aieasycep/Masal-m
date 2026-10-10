@@ -77,15 +77,16 @@ Tarayıcıda: **github.com/aieasycep/Masal-m → Settings → Secrets and
 variables → Actions → New repository secret**. Sırayla şu kayıtları oluştur
 (Name kısmını aynen yaz):
 
-| Name                             | Ne için?                                                                                                                | Value (nereden?)                          |
-| -------------------------------- | ----------------------------------------------------------------------------------------------------------------------- | ----------------------------------------- |
-| `SERVER_SSH_KEY`                 | Sunucuya giriş                                                                                                          | Adım 1'de kopyaladığın anahtar metni      |
-| `ANTHROPIC_API_KEY`              | **Claude** — hikâye + güvenlik denetimi + seslendirme yönetmeni                                                         | Adım 7'deki gibi platform.claude.com'dan  |
-| `TTS_API_KEY`                    | ElevenLabs seslendirme                                                                                                  | ElevenLabs → API Keys                     |
-| `VOICE_CLONE_API_KEY`            | ElevenLabs ses klonlama                                                                                                 | ElevenLabs → aynı anahtar olabilir        |
-| `IMAGE_API_KEY`                  | OpenAI görseller (Claude görsel üretmez)                                                                                | platform.openai.com → API keys            |
-| `AI_API_KEY`                     | _(isteğe bağlı)_ OpenAI'ye geri dönüş anahtarı                                                                          | platform.openai.com → API keys            |
-| `SMOKE_EMAIL` / `SMOKE_PASSWORD` | _(isteğe bağlı)_ `story_smoke` dağıtım testinin kullandığı sabit test hesabı (yoksa her çalıştırmada yeni hesap açılır) | Uygulamada kendin açtığın bir test hesabı |
+| Name                             | Ne için?                                                                                                                | Value (nereden?)                           |
+| -------------------------------- | ----------------------------------------------------------------------------------------------------------------------- | ------------------------------------------ |
+| `SERVER_SSH_KEY`                 | Sunucuya giriş                                                                                                          | Adım 1'de kopyaladığın anahtar metni       |
+| `ANTHROPIC_API_KEY`              | **Claude** — hikâye + güvenlik denetimi + seslendirme yönetmeni                                                         | Adım 7'deki gibi platform.claude.com'dan   |
+| `TTS_API_KEY`                    | ElevenLabs seslendirme                                                                                                  | ElevenLabs → API Keys                      |
+| `VOICE_CLONE_API_KEY`            | ElevenLabs ses klonlama                                                                                                 | ElevenLabs → aynı anahtar olabilir         |
+| `IMAGE_API_KEY`                  | OpenAI görseller (Claude görsel üretmez)                                                                                | platform.openai.com → API keys             |
+| `AI_API_KEY`                     | _(isteğe bağlı)_ OpenAI'ye geri dönüş anahtarı                                                                          | platform.openai.com → API keys             |
+| `SMOKE_EMAIL` / `SMOKE_PASSWORD` | _(isteğe bağlı)_ `story_smoke` dağıtım testinin kullandığı sabit test hesabı (yoksa her çalıştırmada yeni hesap açılır) | Uygulamada kendin açtığın bir test hesabı  |
+| `SMTP_URL` / `MAIL_FROM`         | _(canlıya geçişte)_ Gerçek e-posta: varsa sunucu `MAIL_PROVIDER=smtp` ile çalışır — bkz. `docs/go-live.md` §2           | E-posta servisin (Resend/Brevo) SMTP ayarı |
 
 > Render'daki değerleri görmek için: dashboard.render.com → masalim-api →
 > Environment sekmesi → değerin yanındaki göz simgesi.

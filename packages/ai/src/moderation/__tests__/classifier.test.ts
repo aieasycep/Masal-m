@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { parseVerdict } from '../classifier';
+import { hitsBlocklist } from '../blocklist';
 import { OpenAIContentModerator } from '../openai-moderator';
 
 describe('parseVerdict', () => {
@@ -29,5 +30,30 @@ describe('OpenAIContentModerator', () => {
       safe: false,
       category: 'blocklist',
     });
+  });
+});
+
+describe('hitsBlocklist', () => {
+  it.each([
+    ['cinayet dolu bir hikaye', true],
+    ['Cinayeti kim işledi?', true],
+    ['Kumarı bırak', true],
+    ['kendini öldürmek isteyen kahraman', true],
+    ['a story about murder', true],
+    ['two murders in the castle', true],
+    ['SEX education', true],
+  ])('blocks %s', (text, expected) => {
+    expect(hitsBlocklist(text)).toBe(expected);
+  });
+
+  it.each([
+    'Esrarengiz bir orman',
+    'Ege üzüm (grape) topluyor',
+    'Perdeyi (drape) açtı',
+    'Kumaş toplarından bir kale',
+    'The sextet played a lullaby',
+    'Bir masal dinle',
+  ])('does not block innocent text: %s', (text) => {
+    expect(hitsBlocklist(text)).toBe(false);
   });
 });

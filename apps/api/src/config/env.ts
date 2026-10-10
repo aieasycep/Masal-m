@@ -105,6 +105,15 @@ const envSchema = z
           message: 'STORAGE_PROVIDER=local is not allowed in production',
         });
       }
+    }
+    // A real mail provider without its connection string would only fail at the
+    // first password reset — refuse to boot instead.
+    if (env.MAIL_PROVIDER === 'smtp' && env.SMTP_URL === '') {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['SMTP_URL'],
+        message: 'MAIL_PROVIDER=smtp requires SMTP_URL',
+      });
       // PRINT_PROVIDER intentionally allows mock everywhere until a Turkish
       // print API is selected (§33); the flow is feature-flagged.
     }

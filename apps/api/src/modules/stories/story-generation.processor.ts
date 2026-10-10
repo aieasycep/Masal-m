@@ -72,6 +72,8 @@ export class StoryGenerationProcessor implements OnModuleInit, OnApplicationShut
       include: { child: true },
     });
     if (story == null || story.deletedAt != null) {
+      // Deleted while queued: the credits were charged at enqueue — give them back.
+      await this.entitlements.refundCreditsForRef(aiJob.userId, 'story', aiJob.entityId);
       await this.jobs.fail(aiJob.id, ErrorCode.NOT_FOUND, 'Story was deleted');
       throw new UnrecoverableError('Story missing');
     }
@@ -132,7 +134,9 @@ export class StoryGenerationProcessor implements OnModuleInit, OnApplicationShut
         result.story.coverIllustrationPrompt,
         ...result.story.pages.map((page) => page.illustrationPrompt),
       ].join('\n\n');
-      const verdict = await this.moderator.checkStoryText(moderatedText, input.language);
+      // The story is already paid for and generated: a transient moderation
+      // failure must not throw the whole job into a (re-billed) regeneration.
+      const verdict = await this.moderateWithRetry(moderatedText, input.language);
       await this.jobs.setProgress(aiJob.id, 85);
       if (!verdict.safe) {
         await this.rejectByModeration(aiJob, story.id, story.userId, verdict.category);
@@ -202,6 +206,23 @@ export class StoryGenerationProcessor implements OnModuleInit, OnApplicationShut
       }
       throw error;
     }
+  }
+
+  private async moderateWithRetry(
+    text: string,
+    language: 'tr' | 'en',
+  ): Promise<{ safe: boolean; category?: string }> {
+    let lastError: unknown;
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      try {
+        return await this.moderator.checkStoryText(text, language);
+      } catch (error) {
+        lastError = error;
+        this.logger.warn({ err: error, attempt }, 'story moderation call failed, retrying');
+        await new Promise((resolve) => setTimeout(resolve, attempt * 2000));
+      }
+    }
+    throw lastError;
   }
 
   private async rejectByModeration(

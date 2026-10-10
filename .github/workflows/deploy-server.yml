@@ -135,6 +135,8 @@ jobs:
           TTS_API_KEY: ${{ secrets.TTS_API_KEY }}
           VOICE_CLONE_API_KEY: ${{ secrets.VOICE_CLONE_API_KEY }}
           IMAGE_API_KEY: ${{ secrets.IMAGE_API_KEY }}
+          SMTP_URL: ${{ secrets.SMTP_URL }}
+          MAIL_FROM: ${{ secrets.MAIL_FROM }}
         run: |
           {
             echo "AI_PROVIDER=${{ steps.llm.outputs.provider }}"
@@ -149,6 +151,13 @@ jobs:
             # Host nginx is the single trusted proxy hop: rate limits and login
             # lockouts must key on the real client IP, not on 127.0.0.1.
             echo "TRUST_PROXY=1"
+            # Real e-mail switches on the moment the SMTP_URL secret exists
+            # (smtp[s]://user:pass@host:port); without it the mock mailer stays.
+            if [ -n "$SMTP_URL" ]; then
+              echo "MAIL_PROVIDER=smtp"
+              echo "SMTP_URL=$SMTP_URL"
+              [ -n "$MAIL_FROM" ] && echo "MAIL_FROM=$MAIL_FROM"
+            fi
           } | ssh "$SERVER" 'umask 077; cat > /opt/masalim/providers.env'
 
       # Sunucuda 80/443 host nginx'te (başka projeler de yayında). Masalım'ın

@@ -90,23 +90,29 @@ export class IllustrationsService {
 
     // The story's FIRST illustration set is included in its story credits ONCE
     // per story, not per version (a title edit must not reset the allowance);
-    // every further set costs half the story price.
-    const priorSets = await this.prisma.illustrationSet.count({
-      where: {
-        storyId,
-        status: { in: ['QUEUED', 'GENERATING', 'READY'] },
-      },
-    });
-    const creditCost = priorSets === 0 ? 0 : EXTRA_ACTION_CREDIT_COSTS[story.durationTarget];
-
-    const set = await this.prisma.illustrationSet.create({
-      data: {
-        storyId,
-        storyVersion: story.version,
-        style: input.style,
-        status: IllustrationSetStatus.QUEUED,
-      },
-      include: { illustrations: true },
+    // every further set costs half the story price. Count + insert run under a
+    // per-story advisory lock so concurrent requests cannot both come out free.
+    const { set, creditCost } = await this.prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${storyId}))`;
+      const priorSets = await tx.illustrationSet.count({
+        where: {
+          storyId,
+          status: { in: ['QUEUED', 'GENERATING', 'READY'] },
+        },
+      });
+      const created = await tx.illustrationSet.create({
+        data: {
+          storyId,
+          storyVersion: story.version,
+          style: input.style,
+          status: IllustrationSetStatus.QUEUED,
+        },
+        include: { illustrations: true },
+      });
+      return {
+        set: created,
+        creditCost: priorSets === 0 ? 0 : EXTRA_ACTION_CREDIT_COSTS[story.durationTarget],
+      };
     });
     if (creditCost > 0) {
       try {

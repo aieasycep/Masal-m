@@ -160,25 +160,34 @@ export class NarrationsService {
 
     // The story's FIRST narration is included in its story credits ONCE per
     // story, not per version (a title edit must not reset the allowance);
-    // every further narration costs half the story price.
-    const priorNarrations = await this.prisma.narration.count({
-      where: {
-        storyId,
-        status: { in: [NarrationStatus.QUEUED, NarrationStatus.PROCESSING, NarrationStatus.READY] },
-      },
-    });
-    const creditCost = priorNarrations === 0 ? 0 : EXTRA_ACTION_CREDIT_COSTS[story.durationTarget];
-
-    const narration = await this.prisma.narration.create({
-      data: {
-        storyId,
-        storyVersion: story.version,
-        voiceProfileId: input.voiceProfileId ?? null,
-        systemVoiceId: input.systemVoiceId ?? null,
-        provider: 'pending',
-        status: NarrationStatus.QUEUED,
-      },
-      include: NARRATION_INCLUDE,
+    // every further narration costs half the story price. The count and the
+    // insert run under a per-story advisory lock so two concurrent requests
+    // cannot both see "no prior narration" and both come out free.
+    const { narration, creditCost } = await this.prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${storyId}))`;
+      const priorNarrations = await tx.narration.count({
+        where: {
+          storyId,
+          status: {
+            in: [NarrationStatus.QUEUED, NarrationStatus.PROCESSING, NarrationStatus.READY],
+          },
+        },
+      });
+      const created = await tx.narration.create({
+        data: {
+          storyId,
+          storyVersion: story.version,
+          voiceProfileId: input.voiceProfileId ?? null,
+          systemVoiceId: input.systemVoiceId ?? null,
+          provider: 'pending',
+          status: NarrationStatus.QUEUED,
+        },
+        include: NARRATION_INCLUDE,
+      });
+      return {
+        narration: created,
+        creditCost: priorNarrations === 0 ? 0 : EXTRA_ACTION_CREDIT_COSTS[story.durationTarget],
+      };
     });
     if (creditCost > 0) {
       try {
