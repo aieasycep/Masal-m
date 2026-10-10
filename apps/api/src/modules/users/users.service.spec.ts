@@ -15,6 +15,7 @@ function buildService() {
     timezone: 'Europe/Istanbul',
     onboardingCompleted: true,
     subscriptionPlan: 'FREE',
+    emailVerifiedAt: null as Date | null,
     notificationPrefs: {},
     createdAt: new Date('2024-01-01T00:00:00Z'),
     deletionRequests: [],
@@ -30,9 +31,16 @@ function buildService() {
   } as unknown as PrismaService;
   const storage = {
     getSignedUrl: jest.fn(async (key: string) => `signed:${key}`),
-  } as unknown as StorageProvider;
-  const service = new UsersService(prisma, {} as TokenService, storage);
-  return { service, prisma, user };
+    // Only keys named "missing" have no object behind them.
+    exists: jest.fn(async (key: string) => !key.includes('missing')),
+    deleteObject: jest.fn(async () => undefined),
+  };
+  const service = new UsersService(
+    prisma,
+    {} as TokenService,
+    storage as unknown as StorageProvider,
+  );
+  return { service, prisma, storage, user };
 }
 
 describe('UsersService.updateMe avatar guard', () => {
@@ -63,6 +71,16 @@ describe('UsersService.updateMe avatar guard', () => {
     expect(prisma.user.update).not.toHaveBeenCalled();
   });
 
+  it('rejects an own-prefixed key with no uploaded object behind it', async () => {
+    const { service, prisma, storage } = buildService();
+
+    await expect(
+      service.updateMe('u1', { avatarObjectKey: 'users/u1/avatars/missing.jpg' }),
+    ).rejects.toMatchObject({ code: ErrorCode.VALIDATION_FAILED, status: 400 });
+    expect(storage.exists).toHaveBeenCalledWith('users/u1/avatars/missing.jpg');
+    expect(prisma.user.update).not.toHaveBeenCalled();
+  });
+
   it('still allows clearing the avatar with null', async () => {
     const { service, user } = buildService();
     user.avatarKey = 'users/u1/avatars/old.jpg';
@@ -70,6 +88,41 @@ describe('UsersService.updateMe avatar guard', () => {
     await service.updateMe('u1', { avatarObjectKey: null });
 
     expect(user.avatarKey).toBeNull();
+  });
+});
+
+describe('UsersService.updateMe previous avatar cleanup', () => {
+  it('deletes the replaced object and, later, the cleared one', async () => {
+    const { service, storage, user } = buildService();
+    user.avatarKey = 'users/u1/avatars/old.jpg';
+
+    await service.updateMe('u1', { avatarObjectKey: 'users/u1/avatars/new.jpg' });
+    expect(storage.deleteObject).toHaveBeenCalledWith('users/u1/avatars/old.jpg');
+
+    await service.updateMe('u1', { avatarObjectKey: null });
+    expect(storage.deleteObject).toHaveBeenCalledWith('users/u1/avatars/new.jpg');
+    expect(storage.deleteObject).toHaveBeenCalledTimes(2);
+  });
+
+  it('keeps the object when the same key is sent again or the avatar is not touched', async () => {
+    const { service, storage, user } = buildService();
+    user.avatarKey = 'users/u1/avatars/same.jpg';
+
+    await service.updateMe('u1', { avatarObjectKey: 'users/u1/avatars/same.jpg' });
+    await service.updateMe('u1', { name: 'Ayşe Yılmaz' });
+
+    expect(storage.deleteObject).not.toHaveBeenCalled();
+    expect(storage.exists).toHaveBeenCalledTimes(1);
+  });
+
+  it('survives a failed delete of the old object', async () => {
+    const { service, storage, user } = buildService();
+    user.avatarKey = 'users/u1/avatars/old.jpg';
+    storage.deleteObject.mockRejectedValueOnce(new Error('s3 down'));
+
+    await expect(
+      service.updateMe('u1', { avatarObjectKey: 'users/u1/avatars/new.jpg' }),
+    ).resolves.toMatchObject({ avatarUrl: 'signed:users/u1/avatars/new.jpg' });
   });
 });
 

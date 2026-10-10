@@ -23,7 +23,9 @@ function buildService() {
         id: 'c2',
         avatarKey: data.avatarKey ?? null,
       })),
-      findFirst: jest.fn(async () => child),
+      // findOwned reads the row BEFORE the update: hand back a snapshot so the
+      // service sees the previous avatar key, like a real database would.
+      findFirst: jest.fn(async () => ({ ...child })),
       update: jest.fn(async ({ data }: { data: { avatarKey?: string | null } }) => {
         if (data.avatarKey !== undefined) child.avatarKey = data.avatarKey;
         return child;
@@ -33,9 +35,12 @@ function buildService() {
   } as unknown as PrismaService;
   const storage = {
     getSignedUrl: jest.fn(async (key: string) => `signed:${key}`),
-  } as unknown as StorageProvider;
-  const service = new ChildrenService(prisma, storage);
-  return { service, prisma, child };
+    // Only keys named "missing" have no object behind them.
+    exists: jest.fn(async (key: string) => !key.includes('missing')),
+    deleteObject: jest.fn(async () => undefined),
+  };
+  const service = new ChildrenService(prisma, storage as unknown as StorageProvider);
+  return { service, prisma, storage, child };
 }
 
 const baseCreate = { name: 'Ada', interests: [], preferences: {} };
@@ -61,6 +66,16 @@ describe('ChildrenService avatar guard', () => {
     expect(prisma.child.create).not.toHaveBeenCalled();
   });
 
+  it('create rejects an own key with nothing uploaded behind it', async () => {
+    const { service, prisma, storage } = buildService();
+
+    await expect(
+      service.create('u1', { ...baseCreate, avatarObjectKey: 'users/u1/avatars/missing.jpg' }),
+    ).rejects.toMatchObject({ code: ErrorCode.VALIDATION_FAILED, status: 400 });
+    expect(storage.exists).toHaveBeenCalledWith('users/u1/avatars/missing.jpg');
+    expect(prisma.child.create).not.toHaveBeenCalled();
+  });
+
   it('update rejects a foreign or traversing key even for an owned child', async () => {
     const { service, prisma, child } = buildService();
 
@@ -74,6 +89,17 @@ describe('ChildrenService avatar guard', () => {
     expect(child.avatarKey).toBeNull();
   });
 
+  it('update rejects a dangling key and keeps the current avatar', async () => {
+    const { service, prisma, child } = buildService();
+    child.avatarKey = 'users/u1/avatars/current.jpg';
+
+    await expect(
+      service.update('u1', 'c1', { avatarObjectKey: 'users/u1/avatars/missing.jpg' }),
+    ).rejects.toMatchObject({ code: ErrorCode.VALIDATION_FAILED });
+    expect(prisma.child.update).not.toHaveBeenCalled();
+    expect(child.avatarKey).toBe('users/u1/avatars/current.jpg');
+  });
+
   it('update accepts an own key and allows clearing with null', async () => {
     const { service, child } = buildService();
 
@@ -82,5 +108,29 @@ describe('ChildrenService avatar guard', () => {
 
     await service.update('u1', 'c1', { avatarObjectKey: null });
     expect(child.avatarKey).toBeNull();
+  });
+});
+
+describe('ChildrenService previous avatar cleanup', () => {
+  it('deletes the replaced object, then the cleared one', async () => {
+    const { service, storage, child } = buildService();
+    child.avatarKey = 'users/u1/avatars/old.jpg';
+
+    await service.update('u1', 'c1', { avatarObjectKey: 'users/u1/avatars/new.jpg' });
+    expect(storage.deleteObject).toHaveBeenCalledWith('users/u1/avatars/old.jpg');
+
+    await service.update('u1', 'c1', { avatarObjectKey: null });
+    expect(storage.deleteObject).toHaveBeenCalledWith('users/u1/avatars/new.jpg');
+    expect(storage.deleteObject).toHaveBeenCalledTimes(2);
+  });
+
+  it('keeps the object when the key is unchanged or the avatar is not part of the update', async () => {
+    const { service, storage, child } = buildService();
+    child.avatarKey = 'users/u1/avatars/same.jpg';
+
+    await service.update('u1', 'c1', { avatarObjectKey: 'users/u1/avatars/same.jpg' });
+    await service.update('u1', 'c1', { name: 'Ege Can' });
+
+    expect(storage.deleteObject).not.toHaveBeenCalled();
   });
 });

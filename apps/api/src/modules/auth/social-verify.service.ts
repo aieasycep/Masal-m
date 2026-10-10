@@ -21,11 +21,15 @@ export class SocialVerifyService {
     this.googleClient = new OAuth2Client(this.env.GOOGLE_CLIENT_ID || undefined);
   }
 
-  async verifyApple(identityToken: string, nonce?: string): Promise<VerifiedSocialIdentity> {
+  /**
+   * `hashedNonce` is the SHA-256 hex of the raw nonce the server issued: Apple
+   * stores that digest in the token and the library compares it verbatim.
+   */
+  async verifyApple(identityToken: string, hashedNonce: string): Promise<VerifiedSocialIdentity> {
     try {
       const payload = await appleSignin.verifyIdToken(identityToken, {
         audience: this.env.APPLE_BUNDLE_ID,
-        nonce,
+        nonce: hashedNonce,
         ignoreExpiration: false,
       });
       return {

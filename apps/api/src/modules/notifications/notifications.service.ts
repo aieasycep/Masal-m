@@ -1,16 +1,22 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import type { NotificationType } from '@masalim/types';
+import type Redis from 'ioredis';
+import { PUSH_DEVICES_PER_USER_MAX, type NotificationType } from '@masalim/types';
 import type { PushProvider } from '@masalim/notifications';
-import type {
-  NotificationItem,
-  PaginationQuery,
-  RegisterDeviceInput,
-} from '@masalim/validation';
+import type { NotificationItem, PaginationQuery, RegisterDeviceInput } from '@masalim/validation';
 import type { Notification as NotificationRow } from '@masalim/database';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AppException } from '../../common/errors/app.exception';
 import { PUSH } from '../../providers/providers.module';
+import { REDIS } from '../../redis/redis.module';
 import { notificationCopy } from './notification-copy';
+
+/**
+ * Redis list of push tickets awaiting a receipt check. Each entry is the JSON
+ * `{ ticketId: string; token: string; at: number /* epoch ms *\/ }`; the
+ * maintenance sweep RPOP/LRANGEs them, calls `PushProvider.getReceipts` and
+ * prunes the tokens whose receipt says the device is gone.
+ */
+export const PUSH_TICKETS_KEY = 'push:tickets';
 
 /**
  * Job-completion notifications (§7): one in-app row + Expo push to every
@@ -23,6 +29,7 @@ export class NotificationsService {
   constructor(
     private readonly prisma: PrismaService,
     @Inject(PUSH) private readonly push: PushProvider,
+    @Inject(REDIS) private readonly redis: Redis,
   ) {}
 
   async notify(
@@ -67,6 +74,15 @@ export class NotificationsService {
           where: { expoPushToken: { in: report.deadTokens } },
         });
       }
+      if (report.tickets.length > 0) {
+        const at = Date.now();
+        await this.redis.rpush(
+          PUSH_TICKETS_KEY,
+          ...report.tickets.map((ticket) =>
+            JSON.stringify({ ticketId: ticket.id, token: ticket.token, at }),
+          ),
+        );
+      }
     } catch (error) {
       // Push failure must never fail the calling job — the in-app row is durable.
       this.logger.warn({ err: error as Error, userId, type }, 'push send failed');
@@ -76,7 +92,10 @@ export class NotificationsService {
   async list(
     userId: string,
     query: PaginationQuery,
-  ): Promise<{ items: NotificationItem[]; meta: { page: number; pageSize: number; totalItems: number; totalPages: number } }> {
+  ): Promise<{
+    items: NotificationItem[];
+    meta: { page: number; pageSize: number; totalItems: number; totalPages: number };
+  }> {
     const [rows, totalItems] = await this.prisma.$transaction([
       this.prisma.notification.findMany({
         where: { userId },
@@ -115,6 +134,19 @@ export class NotificationsService {
       create: { userId, expoPushToken: input.expoPushToken, platform: input.platform },
       update: { userId, platform: input.platform, lastSeenAt: new Date() },
     });
+    // Cap per account: a client re-registering with ever-new tokens must not
+    // grow the fan-out without bound. The least recently seen go first.
+    const stale = await this.prisma.deviceToken.findMany({
+      where: { userId },
+      orderBy: { lastSeenAt: 'desc' },
+      skip: PUSH_DEVICES_PER_USER_MAX,
+      select: { id: true },
+    });
+    if (stale.length > 0) {
+      await this.prisma.deviceToken.deleteMany({
+        where: { id: { in: stale.map((device) => device.id) } },
+      });
+    }
   }
 
   async removeDevice(userId: string, expoPushToken: string): Promise<void> {

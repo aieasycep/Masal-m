@@ -26,6 +26,8 @@ export class AppConfigController {
         android: this.env.ANDROID_STORE_URL || null,
       },
       maintenanceMode: false,
+      // Verification only exists when codes can actually be mailed.
+      emailVerificationRequired: this.env.MAIL_PROVIDER === 'smtp',
       features: Object.fromEntries(flags.map((flag) => [flag.key, flag.enabled])),
     };
   }

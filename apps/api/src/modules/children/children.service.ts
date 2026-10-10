@@ -38,7 +38,8 @@ export class ChildrenService {
   }
 
   async create(userId: string, input: CreateChildInput): Promise<Child> {
-    if (input.avatarObjectKey != null) assertOwnAvatarKey(userId, input.avatarObjectKey);
+    if (input.avatarObjectKey != null)
+      await this.assertAvatarUploaded(userId, input.avatarObjectKey);
     const row = await this.prisma.child.create({
       data: {
         userId,
@@ -54,8 +55,9 @@ export class ChildrenService {
   }
 
   async update(userId: string, childId: string, input: UpdateChildInput): Promise<Child> {
-    await this.findOwned(userId, childId);
-    if (input.avatarObjectKey != null) assertOwnAvatarKey(userId, input.avatarObjectKey);
+    const current = await this.findOwned(userId, childId);
+    if (input.avatarObjectKey != null)
+      await this.assertAvatarUploaded(userId, input.avatarObjectKey);
     const row = await this.prisma.child.update({
       where: { id: childId },
       data: {
@@ -72,6 +74,14 @@ export class ChildrenService {
         preferences: input.preferences,
       },
     });
+    // The replaced (or cleared) picture is garbage now — best effort.
+    if (
+      input.avatarObjectKey !== undefined &&
+      current.avatarKey != null &&
+      current.avatarKey !== input.avatarObjectKey
+    ) {
+      await this.storage.deleteObject(current.avatarKey).catch(() => undefined);
+    }
     const storyCount = await this.prisma.story.count({
       where: { childId: row.id, deletedAt: null },
     });
@@ -124,6 +134,14 @@ export class ChildrenService {
       promptSeed: template.promptSeed,
       emoji: template.emoji,
     }));
+  }
+
+  /** Own prefix AND an object behind it: a signed PUT URL alone proves nothing. */
+  private async assertAvatarUploaded(userId: string, key: string): Promise<void> {
+    assertOwnAvatarKey(userId, key);
+    if (!(await this.storage.exists(key))) {
+      throw AppException.validation('Avatar upload not found');
+    }
   }
 
   /** Ownership policy (§79): every child access goes through this single check. */

@@ -1,6 +1,6 @@
 import { HttpStatus, Inject, Injectable } from '@nestjs/common';
 import type Redis from 'ioredis';
-import { ErrorCode } from '@masalim/types';
+import { EMAIL_VERIFICATION, ErrorCode } from '@masalim/types';
 import { REDIS } from '../../redis/redis.module';
 import { AppException } from '../../common/errors/app.exception';
 
@@ -15,12 +15,26 @@ export const MAX_RESET_CODE_ATTEMPTS = 5;
 /** Reset codes and their guess counter share one lifetime. */
 export const RESET_CODE_TTL_SECONDS = 15 * 60;
 
+/** One-time-code flows that share the guess-budget mechanics. */
+export type CodeScope = 'reset' | 'verify';
+
+const CODE_BUDGETS: Record<CodeScope, { maxAttempts: number; windowSeconds: number }> = {
+  reset: { maxAttempts: MAX_RESET_CODE_ATTEMPTS, windowSeconds: RESET_CODE_TTL_SECONDS },
+  verify: {
+    maxAttempts: EMAIL_VERIFICATION.MAX_ATTEMPTS,
+    windowSeconds: EMAIL_VERIFICATION.CODE_TTL_SECONDS,
+  },
+};
+
 /**
  * Brute-force protection in Redis (§11, §45).
  *
  * Login failures are counted per email+ip (the real lock) and per email (a
  * wide cap for distributed guessing). Keying by email alone would let anyone
  * lock a victim out by sending junk passwords.
+ *
+ * One-time codes (password reset, e-mail verification) get a per-account
+ * guess budget keyed by scope; the counter's window equals the code lifetime.
  */
 @Injectable()
 export class LockoutService {
@@ -34,8 +48,8 @@ export class LockoutService {
     return `auth:lockout:email:${email}`;
   }
 
-  private resetKey(userId: string): string {
-    return `auth:reset-attempts:${userId}`;
+  private codeKey(scope: CodeScope, userId: string): string {
+    return `auth:${scope}-attempts:${userId}`;
   }
 
   async assertNotLockedOut(email: string, ip: string): Promise<void> {
@@ -64,18 +78,32 @@ export class LockoutService {
     await this.redis.del(...keys);
   }
 
+  async codeAttemptsExhausted(scope: CodeScope, userId: string): Promise<boolean> {
+    return (await this.count(this.codeKey(scope, userId))) >= CODE_BUDGETS[scope].maxAttempts;
+  }
+
+  /** Counts a wrong code; returns the attempts so far (≥ max ⇒ the budget is spent). */
+  async recordCodeFailure(scope: CodeScope, userId: string): Promise<number> {
+    return this.bump(this.codeKey(scope, userId), CODE_BUDGETS[scope].windowSeconds);
+  }
+
+  async clearCodeAttempts(scope: CodeScope, userId: string): Promise<void> {
+    await this.redis.del(this.codeKey(scope, userId));
+  }
+
+  // ── password-reset wrappers (kept for the existing reset flow) ──────────────
+
   async resetAttemptsExhausted(userId: string): Promise<boolean> {
-    return (await this.count(this.resetKey(userId))) >= MAX_RESET_CODE_ATTEMPTS;
+    return this.codeAttemptsExhausted('reset', userId);
   }
 
   /** Counts a wrong reset code; true once the account has hit the guess cap. */
   async recordResetFailure(userId: string): Promise<boolean> {
-    const attempts = await this.bump(this.resetKey(userId), RESET_CODE_TTL_SECONDS);
-    return attempts >= MAX_RESET_CODE_ATTEMPTS;
+    return (await this.recordCodeFailure('reset', userId)) >= MAX_RESET_CODE_ATTEMPTS;
   }
 
   async clearResetAttempts(userId: string): Promise<void> {
-    await this.redis.del(this.resetKey(userId));
+    await this.clearCodeAttempts('reset', userId);
   }
 
   private async count(key: string): Promise<number> {
@@ -83,12 +111,16 @@ export class LockoutService {
     return raw == null ? 0 : parseInt(raw, 10);
   }
 
+  /**
+   * INCR + EXPIRE NX in one round trip: the window starts at the first failure
+   * and is not extended by later ones. A separate `if (attempts === 1) expire`
+   * left a counter without a TTL whenever the process died in between — a
+   * permanent lockout.
+   */
   private async bump(key: string, windowSeconds: number): Promise<number> {
-    const attempts = await this.redis.incr(key);
-    // The window starts at the first failure and is not extended by later ones.
-    if (attempts === 1) {
-      await this.redis.expire(key, windowSeconds);
-    }
-    return attempts;
+    const results = await this.redis.multi().incr(key).expire(key, windowSeconds, 'NX').exec();
+    const [incrError, attempts] = results?.[0] ?? [new Error('redis multi returned nothing'), 0];
+    if (incrError != null) throw incrError;
+    return Number(attempts);
   }
 }

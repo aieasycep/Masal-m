@@ -1,20 +1,33 @@
-import { createHash, randomInt } from 'node:crypto';
-import { HttpStatus, Injectable } from '@nestjs/common';
+import { createHash, randomBytes, randomInt } from 'node:crypto';
+import { HttpStatus, Inject, Injectable, Logger } from '@nestjs/common';
 import * as argon2 from 'argon2';
-import { AuthProvider, ErrorCode, CreditReason, SIGNUP_GIFT_CREDITS } from '@masalim/types';
+import type Redis from 'ioredis';
+import {
+  AuthProvider,
+  ErrorCode,
+  CreditReason,
+  EMAIL_VERIFICATION,
+  SIGNUP_GIFT_CREDITS,
+} from '@masalim/types';
 import type {
   AppleAuthInput,
+  AppleNonceResponse,
   AuthSession,
   AuthTokens,
+  EmailVerificationSendResponse,
   ForgotPasswordInput,
   GoogleAuthInput,
   LoginInput,
   RegisterInput,
   ResetPasswordInput,
+  VerifyEmailResponse,
 } from '@masalim/validation';
 import type { User } from '@masalim/database';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AppException } from '../../common/errors/app.exception';
+import { ENV } from '../../config/config.module';
+import type { Env } from '../../config/env';
+import { REDIS } from '../../redis/redis.module';
 import { MailService } from '../../providers/mail.service';
 import { EntitlementService } from '../subscription/entitlement.service';
 import { LockoutService, RESET_CODE_TTL_SECONDS } from './lockout.service';
@@ -22,9 +35,14 @@ import { SocialVerifyService } from './social-verify.service';
 import { TokenService } from './token.service';
 
 const RESET_CODE_TTL_MS = RESET_CODE_TTL_SECONDS * 1000;
+const VERIFICATION_CODE_TTL_MS = EMAIL_VERIFICATION.CODE_TTL_SECONDS * 1000;
+/** A server-issued Apple nonce must be used within this window (one sign-in dialog). */
+const APPLE_NONCE_TTL_SECONDS = 10 * 60;
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly tokens: TokenService,
@@ -32,6 +50,8 @@ export class AuthService {
     private readonly lockout: LockoutService,
     private readonly mail: MailService,
     private readonly entitlements: EntitlementService,
+    @Inject(ENV) private readonly env: Env,
+    @Inject(REDIS) private readonly redis: Redis,
   ) {}
 
   async register(input: RegisterInput): Promise<AuthSession> {
@@ -54,7 +74,13 @@ export class AuthService {
         },
       },
     });
-    await this.grantSignupGift(user.id);
+    await this.maybeGrantSignupGift(user, { socialVerified: false });
+    if (this.verificationRequired()) {
+      // The first code goes out with registration; the client offers a resend.
+      await this.sendVerificationCode(user.id).catch((error: unknown) => {
+        this.logger.warn({ err: error, userId: user.id }, 'verification mail failed at register');
+      });
+    }
     return this.buildSession(user);
   }
 
@@ -78,8 +104,28 @@ export class AuthService {
     return this.buildSession(user);
   }
 
+  /**
+   * Apple sign-in nonce (§11): the client asks for one, hands its SHA-256 to
+   * Apple, and sends the raw value back with the identity token. Single use
+   * and short-lived, so a captured token cannot be replayed against us.
+   */
+  async issueAppleNonce(): Promise<AppleNonceResponse> {
+    const nonce = randomBytes(32).toString('hex');
+    await this.redis.set(this.appleNonceKey(nonce), '1', 'EX', APPLE_NONCE_TTL_SECONDS);
+    return { nonce };
+  }
+
   async loginWithApple(input: AppleAuthInput): Promise<AuthSession> {
-    const identity = await this.social.verifyApple(input.identityToken, input.nonce);
+    const consumed = await this.redis.getdel(this.appleNonceKey(input.nonce));
+    if (consumed == null) {
+      throw new AppException(
+        ErrorCode.AUTH_PROVIDER_TOKEN_INVALID,
+        'Unknown or replayed nonce',
+        HttpStatus.UNAUTHORIZED,
+      );
+    }
+    // Apple stores the hashed nonce in the token; the verifier compares exactly.
+    const identity = await this.social.verifyApple(input.identityToken, sha256(input.nonce));
     const user = await this.findOrCreateSocialUser(
       AuthProvider.APPLE,
       identity.providerUserId,
@@ -179,6 +225,109 @@ export class AuthService {
     await this.tokens.revokeAllForUser(user.id);
   }
 
+  // ── e-mail verification (§11) ────────────────────────────────────────────────
+
+  /**
+   * Verification only exists when codes can actually be mailed: with the mock
+   * mailer nobody could ever confirm, so the flow (and the gift gate) is off.
+   */
+  private verificationRequired(): boolean {
+    return this.env.MAIL_PROVIDER === 'smtp';
+  }
+
+  /**
+   * Issue (or re-issue) a verification code. One live code per account, a
+   * resend cooldown so a stranger cannot flood someone's inbox from a fresh
+   * registration.
+   */
+  async sendVerificationCode(userId: string): Promise<EmailVerificationSendResponse> {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (user == null) throw AppException.notFound('User not found');
+    if (user.emailVerifiedAt != null || !this.verificationRequired()) {
+      return { sent: false, cooldownSeconds: 0 };
+    }
+
+    const cooldownKey = `auth:verify-send:${userId}`;
+    const armed = await this.redis.set(
+      cooldownKey,
+      '1',
+      'EX',
+      EMAIL_VERIFICATION.RESEND_COOLDOWN_SECONDS,
+      'NX',
+    );
+    if (armed == null) {
+      const ttl = await this.redis.ttl(cooldownKey);
+      throw new AppException(
+        ErrorCode.RATE_LIMITED,
+        'Verification code already sent',
+        HttpStatus.TOO_MANY_REQUESTS,
+        { retryAfterSeconds: Math.max(ttl, 1) },
+      );
+    }
+
+    await this.retireVerificationCodes(userId);
+    const code = String(randomInt(100000, 1000000));
+    await this.prisma.emailVerification.create({
+      data: {
+        userId,
+        email: user.email,
+        codeHash: sha256(code),
+        expiresAt: new Date(Date.now() + VERIFICATION_CODE_TTL_MS),
+      },
+    });
+    await this.mail.send({
+      to: user.email,
+      subject: 'Masalım e-posta doğrulama kodun',
+      text: `E-posta doğrulama kodun: ${code}\nKod 15 dakika geçerlidir.`,
+    });
+    return { sent: true, cooldownSeconds: EMAIL_VERIFICATION.RESEND_COOLDOWN_SECONDS };
+  }
+
+  /**
+   * Confirm the mailbox. Same guess budget as password reset: five misses burn
+   * the live code. A successful verification releases the signup gift that
+   * registration withheld.
+   */
+  async verifyEmail(userId: string, code: string): Promise<VerifyEmailResponse> {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (user == null) throw AppException.notFound('User not found');
+    if (user.emailVerifiedAt != null) return { verified: true, giftGranted: false };
+
+    if (await this.lockout.codeAttemptsExhausted('verify', userId)) {
+      await this.retireVerificationCodes(userId);
+      throw invalidResetCode();
+    }
+    const verification = await this.prisma.emailVerification.findFirst({
+      where: {
+        userId,
+        email: user.email,
+        codeHash: sha256(code),
+        usedAt: null,
+        expiresAt: { gt: new Date() },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+    if (verification == null) {
+      const attempts = await this.lockout.recordCodeFailure('verify', userId);
+      if (attempts >= EMAIL_VERIFICATION.MAX_ATTEMPTS) {
+        await this.retireVerificationCodes(userId);
+      }
+      throw invalidResetCode();
+    }
+
+    const now = new Date();
+    const [, updated] = await this.prisma.$transaction([
+      this.prisma.emailVerification.update({
+        where: { id: verification.id },
+        data: { usedAt: now },
+      }),
+      this.prisma.user.update({ where: { id: userId }, data: { emailVerifiedAt: now } }),
+    ]);
+    await this.lockout.clearCodeAttempts('verify', userId);
+    const giftGranted = await this.maybeGrantSignupGift(updated, { socialVerified: false });
+    return { verified: true, giftGranted };
+  }
+
   private async findOrCreateSocialUser(
     provider: AuthProvider,
     providerUserId: string,
@@ -218,29 +367,47 @@ export class AuthService {
       }
     }
 
+    // The provider vouched for the address (or there is only a placeholder,
+    // which nobody could verify) — nothing left for the user to confirm.
     const placeholderEmail = `${provider.toLowerCase()}-${providerUserId}@users.masalim.app`;
     const created = await this.prisma.user.create({
       data: {
         email: trustedEmail ?? placeholderEmail,
         name: fullName ?? 'Masalım Kullanıcısı',
+        emailVerifiedAt: trustedEmail != null ? new Date() : null,
         identities: { create: { provider, providerUserId } },
       },
     });
-    await this.grantSignupGift(created.id);
+    await this.maybeGrantSignupGift(created, { socialVerified: true });
     return created;
   }
 
-  /** Tanışma hediyesi: every new account starts with a small credit gift. */
-  private async grantSignupGift(userId: string): Promise<void> {
-    await this.entitlements
-      .grantCredits(
-        userId,
+  /**
+   * Tanışma hediyesi: every new account starts with a small credit gift — but
+   * only once the mailbox is proven (or the provider vouched for it), else a
+   * throw-away address farm would mint free credits. Idempotent on the ledger
+   * key, so verifying after registration grants exactly once.
+   */
+  private async maybeGrantSignupGift(
+    user: { id: string; emailVerifiedAt: Date | null },
+    opts: { socialVerified: boolean },
+  ): Promise<boolean> {
+    const eligible =
+      !this.verificationRequired() || opts.socialVerified || user.emailVerifiedAt != null;
+    if (!eligible) return false;
+    try {
+      return await this.entitlements.grantCredits(
+        user.id,
         SIGNUP_GIFT_CREDITS,
         CreditReason.SIGNUP_GIFT,
-        { type: 'user', id: userId },
-        `gift:${userId}`,
-      )
-      .catch(() => undefined); // a failed gift must never block registration
+        { type: 'user', id: user.id },
+        `gift:${user.id}`,
+      );
+    } catch (error) {
+      // A failed gift must never block registration or verification.
+      this.logger.warn({ err: error, userId: user.id }, 'signup gift could not be granted');
+      return false;
+    }
   }
 
   /**
@@ -273,6 +440,17 @@ export class AuthService {
       where: { userId, usedAt: null },
       data: { usedAt: new Date() },
     });
+  }
+
+  private async retireVerificationCodes(userId: string): Promise<void> {
+    await this.prisma.emailVerification.updateMany({
+      where: { userId, usedAt: null },
+      data: { usedAt: new Date() },
+    });
+  }
+
+  private appleNonceKey(nonce: string): string {
+    return `auth:apple-nonce:${sha256(nonce)}`;
   }
 
   private async buildSession(user: User): Promise<AuthSession> {

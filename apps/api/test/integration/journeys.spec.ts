@@ -368,6 +368,20 @@ describe('critical journeys (integration)', () => {
       .set(...auth)
       .send({ storyId: draft.body.id })
       .expect(201);
+    // Print-quality PDF is a Premium feature (HD_BOOK_EXPORT): FREE → 403.
+    const gatedRender = await http()
+      .post(`/books/${book.body.id}/render`)
+      .set(...V)
+      .set(...auth)
+      .send({ kind: 'print_pdf' })
+      .expect(403);
+    expect(gatedRender.body.error.code).toBe('ENTITLEMENT_REQUIRED');
+    await http()
+      .post('/subscription/mock/purchase')
+      .set(...V)
+      .set(...auth)
+      .send({ productId: 'masalim_premium_monthly' })
+      .expect(201);
     const render = await http()
       .post(`/books/${book.body.id}/render`)
       .set(...V)

@@ -95,7 +95,11 @@ const modelForVendor = (
       inject: [ENV],
       useFactory: (env: Env): PushProvider =>
         env.PUSH_PROVIDER === 'expo'
-          ? new ExpoPushProvider({ accessToken: env.EXPO_ACCESS_TOKEN || undefined })
+          ? new ExpoPushProvider({
+              accessToken: env.EXPO_ACCESS_TOKEN || undefined,
+              onError: (message, error) =>
+                logger.warn(`${message}: ${error instanceof Error ? error.message : String(error)}`),
+            })
           : new MockPushProvider(),
     },
     {

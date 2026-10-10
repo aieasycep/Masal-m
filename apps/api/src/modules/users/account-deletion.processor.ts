@@ -196,6 +196,7 @@ export class AccountDeletionProcessor implements OnModuleInit, OnApplicationShut
       this.prisma.playbackPosition.deleteMany({ where: { userId } }),
       this.prisma.favorite.deleteMany({ where: { userId } }),
       this.prisma.passwordReset.deleteMany({ where: { userId } }),
+      this.prisma.emailVerification.deleteMany({ where: { userId } }),
       this.prisma.refreshToken.deleteMany({ where: { userId } }),
       this.prisma.authIdentity.deleteMany({ where: { userId } }),
       this.prisma.user.update({

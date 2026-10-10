@@ -51,6 +51,8 @@ export class UsersService {
       timezone: user.timezone,
       onboardingCompleted: user.onboardingCompleted,
       subscriptionPlan: user.subscriptionPlan,
+      // Social-only accounts carry a placeholder address — nothing to verify.
+      emailVerified: user.emailVerifiedAt != null || user.email.endsWith('@users.masalim.app'),
       notificationPrefs: (user.notificationPrefs as Me['notificationPrefs']) ?? {},
       pendingDeletion: pending
         ? {
@@ -63,7 +65,23 @@ export class UsersService {
   }
 
   async updateMe(userId: string, input: UpdateMeInput): Promise<Me> {
-    if (input.avatarObjectKey != null) assertOwnAvatarKey(userId, input.avatarObjectKey);
+    let previousAvatarKey: string | null = null;
+    if (input.avatarObjectKey !== undefined) {
+      if (input.avatarObjectKey != null) {
+        assertOwnAvatarKey(userId, input.avatarObjectKey);
+        // A signed PUT URL proves nothing was uploaded: refuse a dangling key
+        // instead of serving a broken avatar forever.
+        if (!(await this.storage.exists(input.avatarObjectKey))) {
+          throw AppException.validation('Avatar upload not found');
+        }
+      }
+      const current = await this.prisma.user.findUnique({
+        where: { id: userId },
+        select: { avatarKey: true },
+      });
+      if (current == null) throw AppException.notFound('User not found');
+      previousAvatarKey = current.avatarKey;
+    }
     await this.prisma.user.update({
       where: { id: userId },
       data: {
@@ -75,6 +93,10 @@ export class UsersService {
         notificationPrefs: input.notificationPrefs,
       },
     });
+    // The replaced (or cleared) picture is garbage now — best effort.
+    if (previousAvatarKey != null && previousAvatarKey !== input.avatarObjectKey) {
+      await this.storage.deleteObject(previousAvatarKey).catch(() => undefined);
+    }
     return this.getMe(userId);
   }
 
