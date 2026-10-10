@@ -367,6 +367,52 @@ Local `.env` = `.env.example` + generated JWT secrets (already present, gitignor
   refresh, 426 handling, Premium quota calendar-month vs billing period,
   narration per-chunk cache, illustration retry idempotency, page-count ceiling,
   nginx vhost cp-before-certbot window, sslip hostname, DB backups.
+- **DEFERRED HARDENING BATCH (Oct 10, PR #17, commits 31113d3…)** — user: "kaldığın
+  yerden devam et"; scope = everything needing no external input (AskUserQuestion
+  decisions: sslip stays but hostname is ONE setting; e-mail verification auto-on with
+  SMTP, gift only after verify, old accounts see a banner; nightly on-server backups
+  14 days; FREE user buying `_member` pack → pro-rated credits; cloned voice needs
+  Premium at narration time; print_pdf = Premium). Executed as Track 0 (shared files,
+  me) + parallel same-tree Agent subagents B/C/D/E/F with strict file ownership and
+  per-track DBs (`masalim_b/c/d`, Redis db 1/3/2; helper
+  scratchpad/track-env.sh) + Track A (me). Landed: schema additions
+  (User.emailVerifiedAt, EmailVerification, Subscription.currentPeriodStartedAt,
+  AIJob.result, Payment.providerTransactionId; migration followup_hardening);
+  `test/integration/helpers.ts` `createApp(overrides)` + 3 new journey files
+  (journeys-auth/-jobs/-commerce, run `--runInBand` — they share DB/Redis and flip
+  `physical_books`); e-mail verification (`POST /auth/email/verification|verify`,
+  only enforced when MAIL_PROVIDER=smtp); Apple nonce (`POST /auth/apple/nonce`,
+  Redis GETDEL, sha256 compare; mobile hashes with @noble/hashes — nonce REQUIRED);
+  push token format + 10/user cap + ticket receipts (`push:tickets` list → hourly
+  maintenance); uploads must exist in storage; `JobsService.enqueue` P2002-safe;
+  book render key `book:{id}:render:{kind}` + HD gate; story output persisted in
+  `AIJob.result` before moderation (retry never re-bills Opus) + page normalization
+  (`packages/ai/src/story/normalize.ts`) + windowed moderation; narration chunk cache
+  (`StorageKeys.narrationChunkCache`), illustration rows created after upload (no
+  'pending'); `MaintenanceModule` (queue `maintenance`, hourly/daily schedulers:
+  auth-row prune, push receipts, orphan uploads, voice raw retention); AIUsageLog for
+  TTS/director/alignment/moderation/clone; Premium quota anchored to billing period;
+  order transition rules (`ORDER_STATUS_TRANSITIONS`) in OrdersService + admin;
+  snapshot/print hand-off split; iyzico refund tx id; admin nonce CSP via
+  `apps/admin/src/middleware.ts` (routes now dynamic) + security headers; mobile:
+  single `signOut()` (device-scoped logout), update-required gate (426),
+  RevenueCat identify/logOut with platform keys, push projectId (release builds
+  skip push without `extra.eas.projectId`), verify-email screen + banner,
+  api-client refresh semantics (`TransientError`, sign-out only on 401/403).
+  Deploy: `vars.MASALIM_DOMAIN` (+ MASALIM_SERVER_HOST, MASALIM_SSH_HOST_KEY) feeds
+  both workflows, `deploy/nginx-masalim.conf.tpl` (hash-compare, no reload before
+  certbot, .bak restore), `deploy/set-domain.sh` (write-once .env follows the var),
+  `deploy/backup.sh` + `masalim-backup.cron` (03:30, pg_dump -Fc + mc mirror +
+  hard-link snapshots, 14 d, `--check`; workflow input `run_backup`), non-root
+  images (USER node, boot without pnpm, HOME=/tmp/home), compose hardening
+  (no-new-privileges, cap_drop ALL, read_only+tmpfs, scoped secrets, log caps, api
+  healthcheck), MinIO/mc pinned to RELEASE tags (CI `infra-checks` job verifies
+  manifests, shellcheck, compose config, nginx template, backup dry run), /health
+  503 when db/redis down. Docs: go-live §2/§3/§5/§7/§8, deploy-server variables +
+  backup/restore. STILL EXTERNAL: EAS projectId + FCM creds, RevenueCat keys, SMTP,
+  real domain DNS, Play keystore, ANTHROPIC_API_KEY. Follow-ups: Chromium seccomp
+  sandbox, admin token → httpOnly cookie realm, off-server backup copy,
+  `push_token_unavailable` analytics event, 426 `details.minSupportedVersion`.
 - **keepalive.yml REMOVED (Sep 14)**. The repo's DEFAULT BRANCH is the claude
   branch (`git ls-remote --symref origin HEAD`), so GitHub cron ran it there
   every ~2–4 h (never the 10-min schedule) and reported a `ping` check on PR

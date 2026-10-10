@@ -182,7 +182,7 @@ function codeTable<Row extends CodeRow>(rows: Row[], nextId: () => string) {
       rows.find(
         (r) =>
           r.userId === where.userId &&
-          (where.email == null || (r as VerificationRow).email === where.email) &&
+          (where.email == null || (r as unknown as VerificationRow).email === where.email) &&
           r.codeHash === where.codeHash &&
           r.usedAt === null &&
           r.expiresAt > where.expiresAt.gt,
