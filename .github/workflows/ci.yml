@@ -125,10 +125,14 @@ jobs:
       # etiket sabitlerken buradaki listeye bak. Bu adım asla düşürmez.
       - name: Newest MinIO/mc releases on quay.io (info)
         run: |
+          sudo apt-get install -y skopeo >/dev/null 2>&1 || true
           for repo in minio/minio minio/mc; do
-            printf 'quay.io/%s etiketleri: ' "$repo"
-            curl -sS --max-time 20 "https://quay.io/api/v1/repository/$repo/tag/?limit=6&onlyActiveTags=true" \
-              | python3 -c "import sys,json;print(', '.join(t['name'] for t in json.load(sys.stdin).get('tags',[])))" || echo '?'
+            printf 'quay.io/%s en yeni RELEASE etiketleri: ' "$repo"
+            skopeo list-tags "docker://quay.io/$repo" 2>/dev/null \
+              | python3 -c "import sys,json;t=sorted(x for x in json.load(sys.stdin).get('Tags',[]) if x.startswith('RELEASE.'));print(', '.join(t[-5:]) if t else '(yok)')" || echo '?'
+            printf 'quay API ham yanıt: '
+            curl -sS --max-time 20 "https://quay.io/api/v1/repository/$repo/tag/?limit=5&onlyActiveTags=true" | head -c 300 || true
+            echo
           done
           docker manifest inspect postgres:16-alpine >/dev/null && echo "manifest inspect çalışıyor (postgres:16-alpine)" || true
           for img in $(grep -hE '^\s*image:\s*quay.io/minio/' deploy/docker-compose.server.yml | awk '{print $2}'); do
