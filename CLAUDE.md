@@ -412,6 +412,11 @@ Local `.env` = `.env.example` + generated JWT secrets (already present, gitignor
   backup/restore. STILL EXTERNAL: EAS projectId + FCM creds, RevenueCat keys, SMTP,
   real domain DNS, Play keystore, ANTHROPIC_API_KEY. Follow-ups: Chromium seccomp
   sandbox, admin token → httpOnly cookie realm, off-server backup copy,
+  **MinIO: community images were REMOVED from Docker Hub and quay.io (Oct 2026)** —
+  server compose keeps `minio/minio:latest`/`minio/mc:latest` with `pull_policy: never`
+  (cached image; CI pin check accepts `unpinned-ok:` annotated lines); fresh servers
+  cannot be set up → go-live §9 proposes moving media to R2/B2 (S3 provider already
+  supported),
   `push_token_unavailable` analytics event, 426 `details.minSupportedVersion`.
 - **keepalive.yml REMOVED (Sep 14)**. The repo's DEFAULT BRANCH is the claude
   branch (`git ls-remote --symref origin HEAD`), so GitHub cron ran it there

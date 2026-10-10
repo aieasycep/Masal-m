@@ -115,6 +115,19 @@ saklanır (`/opt/masalim/backups`). Ayrıntı ve geri dönme komutları:
 `docs/deploy-server.md` → "Yedekleme". Sunucunun kendisi kaybolursa yedek de
 gider; dış depo (Backblaze B2 / Cloudflare R2) istersen tek secret'la eklenir.
 
+## 9. Medya deposu (MinIO) — canlıya geçmeden önce karar
+
+Sunucudaki medya deposu MinIO'nun topluluk sürümü. MinIO, Ekim 2026 itibarıyla hazır
+konteyner imajlarını yayınlamayı bıraktı (Docker Hub ve quay.io depoları kaldırıldı).
+Sunucu daha önce indirdiği imajla çalışmaya devam ediyor ve dağıtım bu imajı yeniden
+indirmeye çalışmıyor; ama yeni bir sunucu kurulamaz ve güvenlik güncellemesi gelmez.
+Öneri: canlıya geçmeden önce medyayı yönetilen bir S3 uyumlu depoya taşı (Cloudflare
+R2 ya da Backblaze B2; 10 GB'a kadar ücretsiz). Uygulama bunu zaten destekliyor —
+sunucudaki `.env`'de `STORAGE_ENDPOINT`, `STORAGE_ACCESS_KEY`, `STORAGE_SECRET_KEY`,
+`STORAGE_BUCKET`, `STORAGE_REGION`, `STORAGE_FORCE_PATH_STYLE=false` değişir; mevcut
+medyayı `mc mirror` ile taşırım. Bu aynı zamanda sunucu dışı yedek sorununu da çözer
+(§8). Hesabı açıp anahtarları GitHub secret olarak eklediğinde söyle.
+
 ## Bu PR'da yapılanlar (güvenlik denetimi, Ekim 2026)
 
 Hesap ele geçirme, kredi atlatma, başkasının dosyasına erişim, şifre sıfırlama

@@ -70,8 +70,11 @@ services:
       retries: 30
 
   minio:
-    # Sürüme sabit; MinIO imajları yalnızca quay.io'da (Docker Hub deposu kaldırıldı). CI "infra-checks" etiketi doğrular.
-    image: quay.io/minio/minio:RELEASE.2025-04-22T22-12-26Z
+    # MinIO topluluk imajları Ekim 2026'da Docker Hub ve quay.io'dan kaldırıldı; sunucu
+    # daha önce indirdiği imajla çalışır (pull_policy: never → yeniden indirme denenmez).
+    # Canlıya geçmeden önce yönetilen S3 deposuna geçiş: docs/go-live.md §9.
+    image: minio/minio:latest # unpinned-ok: MinIO topluluk imajları artık yayınlanmıyor (Docker Hub/quay.io depoları kaldırıldı, Ekim 2026); sunucu daha önce indirdiği imajı kullanır — bkz. docs/go-live.md §9
+    pull_policy: never
     restart: unless-stopped
     logging: *logging
     security_opt:
@@ -93,7 +96,8 @@ services:
   # Tek seferlik: masalim-media bucket'ını oluşturur (varsa dokunmaz).
   # deploy/backup.sh de medya aynası için bu servisi `run` eder.
   minio-init:
-    image: quay.io/minio/mc:RELEASE.2025-04-16T18-13-26Z
+    image: minio/mc:latest # unpinned-ok: MinIO topluluk imajları artık yayınlanmıyor (Docker Hub/quay.io depoları kaldırıldı, Ekim 2026); sunucu daha önce indirdiği imajı kullanır — bkz. docs/go-live.md §9
+    pull_policy: never
     restart: 'no'
     logging: *logging
     depends_on:

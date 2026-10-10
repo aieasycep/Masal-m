@@ -123,27 +123,17 @@ jobs:
       # Bilgi: en yeni MinIO/mc sürümleri (etiket sabitlerken bak); asla düşürmez.
       # Bilgi: MinIO imajları artık yalnızca quay.io'da (Docker Hub deposu kaldırıldı);
       # etiket sabitlerken buradaki listeye bak. Bu adım asla düşürmez.
-      - name: Newest MinIO/mc releases on quay.io (info)
-        run: |
-          # `latest` imajının kendi sürüm damgası = quay.io'da kesin var olan bir RELEASE etiketi.
-          for repo in minio/minio minio/mc; do
-            printf 'quay.io/%s:latest sürümü: ' "$repo"
-            if docker pull -q "quay.io/$repo:latest" >/dev/null 2>&1; then
-              docker run --rm "quay.io/$repo:latest" --version 2>&1 | grep -m1 -i 'version' || echo '(sürüm satırı yok)'
-            else
-              echo '(latest çekilemedi)'
-            fi
-          done
-          docker manifest inspect postgres:16-alpine >/dev/null && echo "manifest inspect çalışıyor (postgres:16-alpine)" || true
-          for img in $(grep -hE '^\s*image:\s*quay.io/minio/' deploy/docker-compose.server.yml | awk '{print $2}'); do
-            docker manifest inspect "$img" >/dev/null 2>/tmp/mi.err && echo "✓ $img" || echo "✗ $img: $(tr '\n' ' ' </tmp/mi.err | head -c 200)"
-          done
-
+      # `unpinned-ok: <neden>` açıklamalı satırlar uyarıyla geçer (MinIO imajları
+      # artık yayınlanmadığı için sunucu önbellekteki imajı kullanıyor).
       - name: Pinned images exist (no :latest, no untagged)
         run: |
           set -e
-          images=$(grep -hE '^\s*image:' deploy/docker-compose.server.yml docker-compose.yml | awk '{print $2}' | sort -u)
-          for img in $images; do
+          grep -hE '^\s*image:' deploy/docker-compose.server.yml docker-compose.yml | sort -u | while read -r line; do
+            img=$(echo "$line" | awk '{print $2}')
+            if echo "$line" | grep -q 'unpinned-ok'; then
+              echo "::warning::$img sürüme sabitlenmedi — $(echo "$line" | sed 's/.*unpinned-ok: *//')"
+              continue
+            fi
             tag="${img##*:}"
             if [ "$tag" = "$img" ] || [ "$tag" = "latest" ]; then
               echo "::error::Sürüme sabitlenmemiş imaj: $img"

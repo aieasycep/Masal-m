@@ -216,6 +216,10 @@ local http://minio:9000 "$MINIO_ROOT_USER" "$MINIO_ROOT_PASSWORD" && mc mirror
   kökle çalışır; postgres/minio yalnızca kendi şifrelerini görür; konteyner
   logları 20 MB × 5 ile sınırlı. Dağıtım sonunda "Dağıtım sonrası doğrulama"
   adımı bunları log'a yazar.
+- **MinIO imajı:** MinIO topluluk imajları Ekim 2026'da Docker Hub ve quay.io'dan
+  kaldırıldı. Compose dosyasında `minio/minio:latest` + `pull_policy: never` —
+  sunucu önbellekteki imajla çalışır, dağıtım yeniden indirmeye çalışmaz. Yeni
+  sunucu kurulumu için önce `docs/go-live.md` §9 (yönetilen S3 deposuna geçiş).
 - **nginx/certbot:** sanal sunucu şablonu (`deploy/nginx-masalim.conf.tpl`)
   alan adıyla render edilir; render değişmediyse ve sertifika yerindeyse dosyaya
   dokunulmaz. Değiştiyse dosya yazılır ama reload edilmez — TLS bloklarını
