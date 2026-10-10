@@ -196,7 +196,13 @@ export class PaymentsService {
       }
       await this.prisma.payment.update({
         where: { id: payment.id },
-        data: { status: PaymentStatus.SUCCEEDED, rawResponse: sanitize(verdict.rawResponse) },
+        data: {
+          status: PaymentStatus.SUCCEEDED,
+          // Refunds must name the provider's transaction id, which only the
+          // verify response carries — keep it with the payment.
+          providerTransactionId: verdict.providerTransactionId,
+          rawResponse: sanitize(verdict.rawResponse),
+        },
       });
       await this.orders.markPaid(payment.orderId);
       return { status: PaymentStatus.SUCCEEDED, orderId: payment.orderId };
@@ -219,10 +225,11 @@ export class PaymentsService {
       where: { orderId, status: PaymentStatus.SUCCEEDED },
     });
     if (payment?.providerPaymentId == null) return;
-    const { refunded } = await this.paymentProvider.refund(
-      payment.providerPaymentId,
-      payment.amount.toFixed(2),
-    );
+    const { refunded } = await this.paymentProvider.refund({
+      providerPaymentId: payment.providerPaymentId,
+      amount: payment.amount.toFixed(2),
+      providerTransactionId: payment.providerTransactionId,
+    });
     if (refunded) {
       await this.prisma.payment.update({
         where: { id: payment.id },

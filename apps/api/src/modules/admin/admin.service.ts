@@ -32,6 +32,7 @@ import type { Env } from '../../config/env';
 import { JobsService } from '../../jobs/jobs.service';
 import { QUEUE_FOR_JOB_TYPE, type QueueJobData } from '../../jobs/queues';
 import { REDIS } from '../../redis/redis.module';
+import { OrdersService, assertOrderTransition } from '../orders/orders.service';
 import type { AuthenticatedAdmin } from './admin-auth.guard';
 import { ADMIN_TOKEN_TTL, adminSigningSecret, type AdminTokenPayload } from './admin-token';
 
@@ -47,6 +48,7 @@ export class AdminService {
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
     private readonly jobs: JobsService,
+    private readonly orders: OrdersService,
     @Inject(REDIS) private readonly redis: Redis,
     @Inject(ENV) private readonly env: Env,
   ) {}
@@ -503,23 +505,25 @@ export class AdminService {
     };
   }
 
+  /**
+   * Manual order update. A status change goes through OrdersService.transition
+   * (lifecycle guard + timeline) so the panel can never skip or revive a state;
+   * `trackingNumber` undefined = untouched, null = cleared.
+   */
   async patchOrder(orderId: string, input: AdminOrderPatchInput) {
     const row = await this.prisma.order.findUnique({ where: { id: orderId } });
     if (row == null) throw AppException.notFound('Order not found');
-    const timeline =
-      input.status != null && input.status !== row.status
-        ? [
-            ...((row.statusTimeline as Array<{ status: string; at: string }>) ?? []),
-            { status: input.status, at: new Date().toISOString() },
-          ]
-        : undefined;
+    const nextStatus = input.status;
+    if (nextStatus != null && nextStatus !== row.status) {
+      assertOrderTransition(row.status, nextStatus);
+      const updated = await this.orders.transition(orderId, nextStatus, {
+        trackingNumber: input.trackingNumber,
+      });
+      return { id: updated.id, status: updated.status, trackingNumber: updated.trackingNumber };
+    }
     const updated = await this.prisma.order.update({
       where: { id: orderId },
-      data: {
-        status: input.status,
-        trackingNumber: input.trackingNumber,
-        ...(timeline ? { statusTimeline: timeline } : {}),
-      },
+      data: { trackingNumber: input.trackingNumber },
     });
     return { id: updated.id, status: updated.status, trackingNumber: updated.trackingNumber };
   }

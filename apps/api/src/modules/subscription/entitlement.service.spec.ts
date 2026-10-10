@@ -1,6 +1,6 @@
 import { CreditReason, ErrorCode, SubscriptionPlan, SubscriptionStatus } from '@masalim/types';
 import { Prisma } from '@masalim/database';
-import { EntitlementService } from './entitlement.service';
+import { EntitlementService, latestMonthlyAnchorAtOrBefore } from './entitlement.service';
 import { AppException } from '../../common/errors/app.exception';
 import type { PrismaService } from '../../prisma/prisma.service';
 
@@ -34,6 +34,8 @@ function buildPrisma(options: {
     status: SubscriptionStatus;
     plan: SubscriptionPlan;
     expiresAt: Date | null;
+    startedAt?: Date;
+    currentPeriodStartedAt?: Date | null;
   } | null;
   balance?: number;
 }) {
@@ -56,7 +58,14 @@ function buildPrisma(options: {
   const client = {
     subscription: {
       findUnique: async () =>
-        options.subscription == null ? null : { userId: 'u1', ...options.subscription },
+        options.subscription == null
+          ? null
+          : {
+              userId: 'u1',
+              startedAt: new Date(0),
+              currentPeriodStartedAt: null,
+              ...options.subscription,
+            },
     },
     user: {
       findUnique: async () => ({ creditBalance: state.balance }),
@@ -310,5 +319,146 @@ describe('EntitlementService — credit engine (§37)', () => {
     expect(replay).toBe(false);
     expect(state.balance).toBe(12);
     expect(state.ledger).toHaveLength(1);
+  });
+});
+
+describe('latestMonthlyAnchorAtOrBefore (D.1)', () => {
+  const anchor = new Date('2026-03-15T09:30:00.000Z');
+
+  it('returns the anchor itself inside the first period', () => {
+    expect(latestMonthlyAnchorAtOrBefore(new Date('2026-03-20T00:00:00Z'), anchor)).toEqual(anchor);
+  });
+
+  it('steps whole months forward keeping the day-of-month and time', () => {
+    expect(latestMonthlyAnchorAtOrBefore(new Date('2026-05-20T00:00:00Z'), anchor)).toEqual(
+      new Date('2026-05-15T09:30:00.000Z'),
+    );
+    expect(latestMonthlyAnchorAtOrBefore(new Date('2027-01-02T00:00:00Z'), anchor)).toEqual(
+      new Date('2026-12-15T09:30:00.000Z'),
+    );
+  });
+
+  it('does not step past now on the renewal day itself', () => {
+    expect(latestMonthlyAnchorAtOrBefore(new Date('2026-04-15T09:00:00Z'), anchor)).toEqual(anchor);
+    expect(latestMonthlyAnchorAtOrBefore(new Date('2026-04-15T09:30:00Z'), anchor)).toEqual(
+      new Date('2026-04-15T09:30:00.000Z'),
+    );
+  });
+
+  it('clamps the day to the target month without losing the original day later', () => {
+    const jan31 = new Date('2026-01-31T00:00:00.000Z');
+    expect(latestMonthlyAnchorAtOrBefore(new Date('2026-03-01T00:00:00Z'), jan31)).toEqual(
+      new Date('2026-02-28T00:00:00.000Z'),
+    );
+    expect(latestMonthlyAnchorAtOrBefore(new Date('2026-03-31T01:00:00Z'), jan31)).toEqual(
+      new Date('2026-03-31T00:00:00.000Z'),
+    );
+  });
+
+  it('returns a future anchor unchanged', () => {
+    const future = new Date('2026-03-16T00:00:00Z');
+    expect(latestMonthlyAnchorAtOrBefore(new Date('2026-03-15T00:00:00Z'), future)).toEqual(future);
+  });
+});
+
+describe('EntitlementService — quota period follows the billing period (D.1)', () => {
+  const premiumAnchoredAt = (anchor: Date) => ({
+    status: SubscriptionStatus.ACTIVE,
+    plan: SubscriptionPlan.PREMIUM,
+    expiresAt: null,
+    startedAt: anchor,
+    currentPeriodStartedAt: anchor,
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  it('PREMIUM: a spend on the 20th and one on the 3rd of next month share one period row', async () => {
+    const anchor = new Date('2026-02-15T08:00:00.000Z');
+    const { prisma, state } = buildPrisma({ subscription: premiumAnchoredAt(anchor) });
+    const service = new EntitlementService(prisma);
+
+    jest.useFakeTimers().setSystemTime(new Date('2026-02-20T12:00:00Z'));
+    await service.consumeCredits('u1', 3, CreditReason.STORY_SPEND, STORY_REF);
+    jest.setSystemTime(new Date('2026-03-03T12:00:00Z'));
+    await service.consumeCredits('u1', 6, CreditReason.STORY_SPEND, { type: 'story', id: 's2' });
+
+    expect(state.usage).toHaveLength(1);
+    expect(state.usage[0]).toMatchObject({ periodStart: anchor, count: 9 });
+    expect((await service.resolve('u1')).credits.quota).toEqual({ limit: 30, used: 9 });
+    expect(state.balance).toBe(0);
+  });
+
+  it('FREE: the quota stays on the UTC calendar month', async () => {
+    const { prisma, state } = buildPrisma({ subscription: null, balance: 10 });
+    const service = new EntitlementService(prisma);
+
+    jest.useFakeTimers().setSystemTime(new Date('2026-02-20T12:00:00Z'));
+    await service.consumeCredits('u1', 3, CreditReason.STORY_SPEND, STORY_REF);
+    jest.setSystemTime(new Date('2026-03-03T12:00:00Z'));
+    await service.consumeCredits('u1', 3, CreditReason.STORY_SPEND, { type: 'story', id: 's2' });
+
+    expect(state.usage.map((row) => row.periodStart.toISOString())).toEqual([
+      '2026-02-01T00:00:00.000Z',
+      '2026-03-01T00:00:00.000Z',
+    ]);
+    expect(state.usage.map((row) => row.count)).toEqual([3, 3]);
+    expect(state.balance).toBe(10); // both months fully covered by quota
+  });
+
+  it('a refund after the period rolled over lands in the CURRENT period', async () => {
+    const anchor = new Date('2026-02-15T08:00:00.000Z');
+    const { prisma, state } = buildPrisma({ subscription: premiumAnchoredAt(anchor) });
+    const service = new EntitlementService(prisma);
+
+    jest.useFakeTimers().setSystemTime(new Date('2026-02-20T12:00:00Z'));
+    await service.consumeCredits('u1', 3, CreditReason.STORY_SPEND, STORY_REF);
+    // Next billing period (from Mar 15): a new spend opens the new period row.
+    jest.setSystemTime(new Date('2026-03-16T12:00:00Z'));
+    await service.consumeCredits('u1', 3, CreditReason.STORY_SPEND, { type: 'story', id: 's2' });
+    await service.refundCreditsForRef('u1', 'story', 's1');
+
+    const byPeriod = Object.fromEntries(
+      state.usage.map((row) => [row.periodStart.toISOString(), row.count]),
+    );
+    expect(byPeriod).toEqual({
+      '2026-02-15T08:00:00.000Z': 3, // the old period is history
+      '2026-03-15T08:00:00.000Z': 0, // the allowance comes back where it is usable
+    });
+    expect(state.ledger.at(-1)).toMatchObject({ reason: CreditReason.REFUND, quotaPart: -3 });
+  });
+
+  it('missed renewal webhooks: the period steps forward from a stale anchor', async () => {
+    const staleAnchor = new Date('2025-12-15T08:00:00.000Z'); // last RENEWAL seen 3 months ago
+    const { prisma, state } = buildPrisma({ subscription: premiumAnchoredAt(staleAnchor) });
+    const service = new EntitlementService(prisma);
+
+    jest.useFakeTimers().setSystemTime(new Date('2026-03-20T12:00:00Z'));
+    await service.consumeCredits('u1', 3, CreditReason.STORY_SPEND, STORY_REF);
+
+    expect(state.usage).toHaveLength(1);
+    expect(state.usage[0]?.periodStart).toEqual(new Date('2026-03-15T08:00:00.000Z'));
+  });
+
+  it('falls back to startedAt when no period anchor was recorded', async () => {
+    const startedAt = new Date('2026-01-10T06:00:00.000Z');
+    const { prisma, state } = buildPrisma({
+      subscription: {
+        status: SubscriptionStatus.ACTIVE,
+        plan: SubscriptionPlan.PREMIUM,
+        expiresAt: null,
+        startedAt,
+        currentPeriodStartedAt: null,
+      },
+    });
+    jest.useFakeTimers().setSystemTime(new Date('2026-03-20T12:00:00Z'));
+    await new EntitlementService(prisma).consumeCredits(
+      'u1',
+      3,
+      CreditReason.STORY_SPEND,
+      STORY_REF,
+    );
+    expect(state.usage[0]?.periodStart).toEqual(new Date('2026-03-10T06:00:00.000Z'));
   });
 });

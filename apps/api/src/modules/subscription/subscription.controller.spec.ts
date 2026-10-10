@@ -60,6 +60,26 @@ describe('SubscriptionController.webhook', () => {
     );
   });
 
+  it('maps purchased_at_ms into the normalized purchasedAtMs (null when the store omits it)', async () => {
+    const { controller, subscriptions } = buildController('staging');
+
+    const withPurchase = event('PRODUCTION');
+    withPurchase.event.purchased_at_ms = 1_699_999_000_000;
+    await controller.webhook('rc-secret', withPurchase);
+    await controller.webhook('rc-secret', event('PRODUCTION'));
+
+    expect(subscriptions.applyEvent).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({ purchasedAtMs: 1_699_999_000_000 }),
+      'revenuecat',
+    );
+    expect(subscriptions.applyEvent).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({ purchasedAtMs: null }),
+      'revenuecat',
+    );
+  });
+
   it('rejects a wrong, wrong-length or missing secret with 401 (no timingSafeEqual throw)', async () => {
     const { controller, subscriptions } = buildController('production');
 

@@ -112,6 +112,10 @@ export class NarrationsService {
 
     let voiceKey: string;
     if (input.voiceProfileId != null) {
+      // A cloned parent voice is a Premium feature at narration time too, not
+      // only at clone time: a lapsed subscriber keeps the profile but cannot
+      // narrate with it until they are Premium again (owner decision).
+      await this.entitlements.requireFeature(userId, EntitlementKey.PARENT_VOICE_CLONE);
       const profile = await this.voiceProfiles.findOwned(userId, input.voiceProfileId);
       if (profile.status !== VoiceProfileStatus.READY || profile.providerVoiceId == null) {
         throw new AppException(

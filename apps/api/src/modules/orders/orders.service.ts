@@ -3,6 +3,7 @@ import { randomBytes } from 'node:crypto';
 import {
   AIJobType,
   ErrorCode,
+  ORDER_STATUS_TRANSITIONS,
   OrderStatus,
   PaymentStatus,
 } from '@masalim/types';
@@ -35,6 +36,23 @@ function orderNumber(): string {
   const now = new Date();
   const date = `${now.getUTCFullYear()}${String(now.getUTCMonth() + 1).padStart(2, '0')}${String(now.getUTCDate()).padStart(2, '0')}`;
   return `MSL-${date}-${randomBytes(3).toString('hex').toUpperCase()}`;
+}
+
+/**
+ * Order lifecycle guard: every status write (worker, print sync, admin panel)
+ * must follow ORDER_STATUS_TRANSITIONS — a PENDING order cannot be "shipped",
+ * a terminal order cannot be revived. Same status is a no-op, not an error.
+ */
+export function assertOrderTransition(from: OrderStatus, to: OrderStatus): void {
+  if (from === to) return;
+  if (!ORDER_STATUS_TRANSITIONS[from].includes(to)) {
+    throw new AppException(
+      ErrorCode.VALIDATION_FAILED,
+      `Order cannot move from ${from} to ${to}`,
+      HttpStatus.CONFLICT,
+      { from, to },
+    );
+  }
 }
 
 @Injectable()
@@ -182,6 +200,7 @@ export class OrdersService {
     });
   }
 
+  /** The ONLY status writer: validates the transition and appends to the timeline. */
   async transition(
     orderId: string,
     status: OrderStatus,
@@ -189,6 +208,7 @@ export class OrdersService {
   ): Promise<OrderWithRelations> {
     const order = await this.prisma.order.findUnique({ where: { id: orderId } });
     if (order == null) throw AppException.notFound('Order not found');
+    assertOrderTransition(order.status, status);
     const timeline = [
       ...((order.statusTimeline as Array<{ status: string; at: string }>) ?? []),
       { status, at: new Date().toISOString() },
@@ -236,7 +256,9 @@ export class OrdersService {
       currency: 'TRY',
       status: row.status,
       paymentStatus: row.paymentStatus,
-      shippingAddress: snapshotAddress ? { id: row.shippingAddressId ?? '', isDefault: false, ...snapshotAddress } : null,
+      shippingAddress: snapshotAddress
+        ? { id: row.shippingAddressId ?? '', isDefault: false, ...snapshotAddress }
+        : null,
       trackingNumber: row.trackingNumber,
       carrier: row.carrier,
       trackingUrl: row.trackingUrl,

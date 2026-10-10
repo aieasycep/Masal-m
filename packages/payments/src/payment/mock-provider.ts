@@ -25,12 +25,19 @@ export class MockPaymentProvider implements PaymentProvider {
   async verifyPayment(providerToken: string): Promise<VerifyPaymentResult> {
     const record = this.payments.get(providerToken);
     if (record == null) {
-      return { status: 'FAILED', providerPaymentId: providerToken, paidAmount: null, rawResponse: { mock: true, reason: 'unknown token' } };
+      return {
+        status: 'FAILED',
+        providerPaymentId: providerToken,
+        paidAmount: null,
+        providerTransactionId: null,
+        rawResponse: { mock: true, reason: 'unknown token' },
+      };
     }
     return {
       status: record.fail ? 'FAILED' : 'SUCCEEDED',
       providerPaymentId: providerToken,
       paidAmount: record.fail ? null : record.amount,
+      providerTransactionId: record.fail ? null : 'mock-tx',
       rawResponse: { mock: true },
     };
   }

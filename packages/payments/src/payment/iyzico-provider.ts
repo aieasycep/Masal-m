@@ -4,6 +4,7 @@ import {
   type CreatePaymentInput,
   type CreatePaymentResult,
   type PaymentProvider,
+  type RefundInput,
   type VerifyPaymentResult,
 } from './types';
 
@@ -90,13 +91,17 @@ export class IyzicoPaymentProvider implements PaymentProvider {
     const response = await this.request<{
       status: string;
       paymentStatus?: string;
-      paymentId?: string;
+      paymentId?: string | number;
       paidPrice?: number | string;
       basketId?: string;
+      itemTransactions?: Array<{ paymentTransactionId?: string | number }>;
       errorMessage?: string;
     }>('/payment/iyzipos/checkoutform/auth/ecom/detail', { token: providerToken, locale: 'tr' });
 
     const succeeded = response.status === 'success' && response.paymentStatus === 'SUCCESS';
+    // One basket item per order (§34) → one item transaction; its id is what
+    // /payment/refund expects, not the checkout-form token.
+    const transactionId = response.itemTransactions?.[0]?.paymentTransactionId;
     return {
       status: succeeded
         ? 'SUCCEEDED'
@@ -106,17 +111,18 @@ export class IyzicoPaymentProvider implements PaymentProvider {
       providerPaymentId: String(response.paymentId ?? providerToken),
       paidAmount: normalizeAmount(response.paidPrice),
       basketId: response.basketId ?? null,
+      providerTransactionId: transactionId == null ? null : String(transactionId),
       rawResponse: sanitize(response),
     };
   }
 
-  async refund(providerPaymentId: string, amount: string): Promise<{ refunded: boolean }> {
+  async refund(input: RefundInput): Promise<{ refunded: boolean }> {
     const response = await this.request<{ status: string; errorMessage?: string }>(
       '/payment/refund',
       {
         locale: 'tr',
-        paymentTransactionId: providerPaymentId,
-        price: amount,
+        paymentTransactionId: input.providerTransactionId ?? input.providerPaymentId,
+        price: input.amount,
         currency: 'TRY',
         conversationId: randomUUID(),
       },

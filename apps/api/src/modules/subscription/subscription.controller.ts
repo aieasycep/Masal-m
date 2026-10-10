@@ -31,6 +31,8 @@ const revenueCatWebhookSchema = z.object({
     product_id: z.string().nullish(),
     event_timestamp_ms: z.number().int(),
     expiration_at_ms: z.number().int().nullish(),
+    /** Purchase/renewal time — anchors the Premium quota period (D.1). */
+    purchased_at_ms: z.number().int().nullish(),
     environment: z.enum(['SANDBOX', 'PRODUCTION']).default('PRODUCTION'),
   }),
 });
@@ -115,6 +117,7 @@ export class SubscriptionController {
         productId: body.event.product_id ?? 'unknown',
         eventTimeMs: body.event.event_timestamp_ms,
         expirationAtMs: body.event.expiration_at_ms ?? null,
+        purchasedAtMs: body.event.purchased_at_ms ?? null,
         environment: body.event.environment,
         eventId: body.event.id ?? null,
       }),
@@ -142,6 +145,7 @@ export class SubscriptionController {
             productId: body.productId,
             eventTimeMs: Date.now(),
             expirationAtMs: null,
+            purchasedAtMs: Date.now(),
             environment: 'SANDBOX',
             eventId: `mock:${randomUUID()}`,
           }
@@ -151,6 +155,7 @@ export class SubscriptionController {
             productId: body.productId,
             eventTimeMs: Date.now(),
             expirationAtMs: Date.now() + 30 * 24 * 3600 * 1000,
+            purchasedAtMs: Date.now(),
             environment: 'SANDBOX',
           },
       'mock',
@@ -168,6 +173,7 @@ export class SubscriptionController {
         productId: 'masalim_premium_monthly',
         eventTimeMs: Date.now(),
         expirationAtMs: Date.now(),
+        purchasedAtMs: null,
         environment: 'SANDBOX',
       },
       'mock',

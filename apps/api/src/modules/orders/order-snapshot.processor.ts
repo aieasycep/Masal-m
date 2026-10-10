@@ -11,6 +11,7 @@ import { ErrorCode, OrderStatus } from '@masalim/types';
 import type { PrintProvider } from '@masalim/payments';
 import type { StorageProvider } from '@masalim/storage';
 import { StorageKeys } from '@masalim/storage';
+import type { Prisma } from '@masalim/database';
 import { PrismaService } from '../../prisma/prisma.service';
 import { REDIS } from '../../redis/redis.module';
 import { ENV } from '../../config/config.module';
@@ -20,11 +21,28 @@ import { JobsService } from '../../jobs/jobs.service';
 import { QueueName, type QueueJobData } from '../../jobs/queues';
 import { OrdersService } from './orders.service';
 
+type SnapshotOrder = Prisma.OrderGetPayload<{
+  include: { book: { include: { pages: true } } };
+}>;
+
+type ShippingSnapshot = {
+  fullName: string;
+  phone: string;
+  addressLine: string;
+  city: string;
+  district: string;
+  postalCode: string;
+};
+
 /**
  * Order snapshot worker (§81): copies every production asset (print PDF,
  * cover, page images) to the immutable orders/{id}/ prefix — deletion
  * workflows exclude orders/* — then hands the order to the print provider.
  * The snapshot stores object KEYS, never signed URLs.
+ *
+ * Both halves are idempotent on their own: a retry after a failed print
+ * hand-off skips the (already stored) snapshot instead of short-circuiting
+ * the whole job and leaving the order stuck in PAID.
  */
 @Injectable()
 export class OrderSnapshotProcessor implements OnModuleInit, OnApplicationShutdown {
@@ -43,11 +61,10 @@ export class OrderSnapshotProcessor implements OnModuleInit, OnApplicationShutdo
 
   onModuleInit(): void {
     if (this.env.WORKER_MODE === 'separate') return;
-    this.worker = new Worker<QueueJobData>(
-      QueueName.ORDER_SNAPSHOT,
-      (job) => this.process(job),
-      { connection: this.redis, concurrency: 2 },
-    );
+    this.worker = new Worker<QueueJobData>(QueueName.ORDER_SNAPSHOT, (job) => this.process(job), {
+      connection: this.redis,
+      concurrency: 2,
+    });
     this.worker.on('failed', (job, error) => {
       this.logger.error({ err: error, aiJobId: job?.data.aiJobId }, 'order snapshot failed');
     });
@@ -64,69 +81,16 @@ export class OrderSnapshotProcessor implements OnModuleInit, OnApplicationShutdo
       await this.jobs.fail(aiJob.id, ErrorCode.NOT_FOUND, 'Order missing');
       throw new UnrecoverableError('Order missing');
     }
-    if (order.snapshotReady) {
+    if (order.snapshotReady && order.printProviderOrderId != null) {
       await this.jobs.complete(aiJob.id, order.id);
       return;
     }
 
     await this.jobs.markRunning(aiJob.id, 10);
     try {
-      const prefix = StorageKeys.orderSnapshot(order.id);
-      const sources: Array<{ source: string; name: string }> = [];
-      if (order.book.printPdfKey != null) {
-        sources.push({ source: order.book.printPdfKey, name: 'print.pdf' });
-      }
-      if (order.book.coverImageKey != null) {
-        sources.push({ source: order.book.coverImageKey, name: 'cover' });
-      }
-      for (const page of order.book.pages) {
-        if (page.imageKey != null) {
-          sources.push({ source: page.imageKey, name: `page-${page.pageNumber}` });
-        }
-      }
-
-      const copied: Record<string, string> = {};
-      for (const [index, item] of sources.entries()) {
-        const ext = item.source.includes('.') ? item.source.slice(item.source.lastIndexOf('.')) : '';
-        const destination = `${prefix}/${item.name}${item.name.includes('.') ? '' : ext}`;
-        await this.storage.copyObject(item.source, destination);
-        copied[item.name] = destination;
-        await this.jobs.setProgress(aiJob.id, 10 + Math.round(((index + 1) / sources.length) * 60));
-      }
-
-      const existingSnapshot = (order.bookSnapshot ?? {}) as Record<string, unknown>;
-      await this.prisma.order.update({
-        where: { id: order.id },
-        data: {
-          bookSnapshot: { ...existingSnapshot, objects: copied },
-          snapshotReady: true,
-        },
-      });
-      await this.jobs.setProgress(aiJob.id, 80);
-
-      // Hand off to the print provider using the immutable snapshot PDF.
-      const address = order.addressSnapshot as {
-        fullName: string; phone: string; addressLine: string;
-        city: string; district: string; postalCode: string;
-      };
-      const pdfKey = copied['print.pdf'];
-      if (pdfKey == null) {
-        await this.jobs.fail(aiJob.id, ErrorCode.ORDER_CREATION_FAILED, 'Print PDF missing');
-        return;
-      }
-      const printOrder = await this.printProvider.createOrder({
-        orderNumber: order.orderNumber,
-        quantity: order.quantity,
-        bookSize: order.bookSize,
-        coverType: order.coverType,
-        pageCount: order.book.pages.length,
-        printPdfUrl: await this.storage.getSignedUrl(pdfKey, 7 * 24 * 3600),
-        shipping: { ...address, country: 'TR' },
-      });
-      await this.orders.transition(order.id, OrderStatus.IN_PRODUCTION, {
-        printProviderOrderId: printOrder.providerOrderId,
-      });
-      await this.jobs.complete(aiJob.id, order.id);
+      const objects = await this.ensureSnapshot(aiJob.id, order);
+      const handedOff = await this.ensurePrintHandoff(aiJob.id, order, objects);
+      if (handedOff) await this.jobs.complete(aiJob.id, order.id);
     } catch (error) {
       const isLastAttempt = job.attemptsMade + 1 >= (job.opts.attempts ?? 1);
       if (isLastAttempt) {
@@ -138,6 +102,91 @@ export class OrderSnapshotProcessor implements OnModuleInit, OnApplicationShutdo
       }
       throw error;
     }
+  }
+
+  /**
+   * Copy the production assets to orders/{id}/ once. Returns the snapshot's
+   * object map (name → key) — the stored one when the snapshot already exists,
+   * so a retry never re-copies.
+   */
+  private async ensureSnapshot(
+    aiJobId: string,
+    order: SnapshotOrder,
+  ): Promise<Record<string, string>> {
+    const existingSnapshot = (order.bookSnapshot ?? {}) as {
+      objects?: Record<string, string>;
+    } & Record<string, unknown>;
+    if (order.snapshotReady) {
+      await this.jobs.setProgress(aiJobId, 80);
+      return existingSnapshot.objects ?? {};
+    }
+
+    const prefix = StorageKeys.orderSnapshot(order.id);
+    const sources: Array<{ source: string; name: string }> = [];
+    if (order.book.printPdfKey != null) {
+      sources.push({ source: order.book.printPdfKey, name: 'print.pdf' });
+    }
+    if (order.book.coverImageKey != null) {
+      sources.push({ source: order.book.coverImageKey, name: 'cover' });
+    }
+    for (const page of order.book.pages) {
+      if (page.imageKey != null) {
+        sources.push({ source: page.imageKey, name: `page-${page.pageNumber}` });
+      }
+    }
+
+    const copied: Record<string, string> = {};
+    for (const [index, item] of sources.entries()) {
+      const ext = item.source.includes('.') ? item.source.slice(item.source.lastIndexOf('.')) : '';
+      const destination = `${prefix}/${item.name}${item.name.includes('.') ? '' : ext}`;
+      await this.storage.copyObject(item.source, destination);
+      copied[item.name] = destination;
+      await this.jobs.setProgress(aiJobId, 10 + Math.round(((index + 1) / sources.length) * 60));
+    }
+
+    await this.prisma.order.update({
+      where: { id: order.id },
+      data: {
+        bookSnapshot: { ...existingSnapshot, objects: copied },
+        snapshotReady: true,
+      },
+    });
+    await this.jobs.setProgress(aiJobId, 80);
+    return copied;
+  }
+
+  /**
+   * Hand the order to the print provider using the immutable snapshot PDF and
+   * move it to IN_PRODUCTION. Skipped when a provider order already exists.
+   * Returns false (job marked FAILED, not retried) when the snapshot holds no
+   * print PDF — nothing a retry could fix.
+   */
+  private async ensurePrintHandoff(
+    aiJobId: string,
+    order: SnapshotOrder,
+    objects: Record<string, string>,
+  ): Promise<boolean> {
+    if (order.printProviderOrderId != null) return true;
+
+    const pdfKey = objects['print.pdf'];
+    if (pdfKey == null) {
+      await this.jobs.fail(aiJobId, ErrorCode.ORDER_CREATION_FAILED, 'Print PDF missing');
+      return false;
+    }
+    const address = order.addressSnapshot as ShippingSnapshot;
+    const printOrder = await this.printProvider.createOrder({
+      orderNumber: order.orderNumber,
+      quantity: order.quantity,
+      bookSize: order.bookSize,
+      coverType: order.coverType,
+      pageCount: order.book.pages.length,
+      printPdfUrl: await this.storage.getSignedUrl(pdfKey, 7 * 24 * 3600),
+      shipping: { ...address, country: 'TR' },
+    });
+    await this.orders.transition(order.id, OrderStatus.IN_PRODUCTION, {
+      printProviderOrderId: printOrder.providerOrderId,
+    });
+    return true;
   }
 
   async onApplicationShutdown(): Promise<void> {

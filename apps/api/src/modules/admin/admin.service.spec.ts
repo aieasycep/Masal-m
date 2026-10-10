@@ -2,11 +2,12 @@ import { HttpStatus } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as argon2 from 'argon2';
 import type Redis from 'ioredis';
-import { AdminRole, ErrorCode } from '@masalim/types';
+import { AdminRole, ErrorCode, OrderStatus } from '@masalim/types';
 import { AppException } from '../../common/errors/app.exception';
 import type { Env } from '../../config/env';
 import type { JobsService } from '../../jobs/jobs.service';
 import type { PrismaService } from '../../prisma/prisma.service';
+import type { OrdersService } from '../orders/orders.service';
 import type { AuthenticatedAdmin } from './admin-auth.guard';
 import { adminSigningSecret } from './admin-token';
 import { AdminService } from './admin.service';
@@ -51,7 +52,13 @@ function buildRedis() {
   return { redis: redis as unknown as Redis, counters, calls: redis };
 }
 
-async function buildService() {
+interface OrderRow {
+  id: string;
+  status: OrderStatus;
+  trackingNumber: string | null;
+}
+
+async function buildService(options: { orderStatus?: OrderStatus } = {}) {
   const admin: AdminRow = {
     id: 'admin-1',
     email: ADMIN_EMAIL,
@@ -60,8 +67,22 @@ async function buildService() {
     passwordHash: await argon2.hash(CURRENT_PASSWORD),
   };
   const audits: AuditRow[] = [];
+  const order: OrderRow = {
+    id: 'o1',
+    status: options.orderStatus ?? OrderStatus.PENDING,
+    trackingNumber: null,
+  };
 
   const prisma = {
+    order: {
+      findUnique: jest.fn(async ({ where }: { where: { id: string } }) =>
+        where.id === order.id ? { ...order } : null,
+      ),
+      update: jest.fn(async ({ data }: { data: Partial<OrderRow> }) => {
+        if (data.trackingNumber !== undefined) order.trackingNumber = data.trackingNumber;
+        return { ...order };
+      }),
+    },
     adminUser: {
       findUnique: jest.fn(async ({ where }: { where: { id?: string; email?: string } }) => {
         const match =
@@ -88,9 +109,36 @@ async function buildService() {
   const { redis, counters, calls } = buildRedis();
   const env = { JWT_SECRET } as Env;
   const jwt = new JwtService({});
-  const service = new AdminService(prisma, jwt, {} as JobsService, redis, env);
+  const orders = {
+    transition: jest.fn(
+      async (orderId: string, status: OrderStatus, extra: { trackingNumber?: string | null }) => {
+        order.status = status;
+        if (extra.trackingNumber !== undefined) order.trackingNumber = extra.trackingNumber;
+        return { ...order, id: orderId };
+      },
+    ),
+  };
+  const service = new AdminService(
+    prisma,
+    jwt,
+    {} as JobsService,
+    orders as unknown as OrdersService,
+    redis,
+    env,
+  );
   const authenticated: AuthenticatedAdmin = { id: admin.id, email: admin.email, role: admin.role };
-  return { service, admin, audits, counters, redisCalls: calls, jwt, authenticated };
+  return {
+    service,
+    admin,
+    audits,
+    counters,
+    redisCalls: calls,
+    jwt,
+    authenticated,
+    order,
+    orders,
+    prisma,
+  };
 }
 
 async function expectAppException(
@@ -245,5 +293,66 @@ describe('AdminService.login lockout', () => {
     expect(payload).toMatchObject({ sub: admin.id, type: 'admin' });
     // role is intentionally NOT a token claim — the guard re-reads it from the DB
     expect(payload.role).toBeUndefined();
+  });
+});
+
+describe('AdminService.patchOrder — lifecycle guard (D.4)', () => {
+  it('refuses an illegal transition with 409 VALIDATION_FAILED and writes nothing', async () => {
+    const { service, order, orders, prisma } = await buildService({
+      orderStatus: OrderStatus.PENDING,
+    });
+
+    await expectAppException(
+      service.patchOrder('o1', { status: OrderStatus.SHIPPED }),
+      ErrorCode.VALIDATION_FAILED,
+      HttpStatus.CONFLICT,
+    );
+    await service
+      .patchOrder('o1', { status: OrderStatus.SHIPPED })
+      .catch((error: AppException) =>
+        expect(error.details).toEqual({ from: OrderStatus.PENDING, to: OrderStatus.SHIPPED }),
+      );
+    expect(orders.transition).not.toHaveBeenCalled();
+    expect(prisma.order.update).not.toHaveBeenCalled();
+    expect(order.status).toBe(OrderStatus.PENDING);
+  });
+
+  it('delegates a legal status change to OrdersService.transition (timeline owner)', async () => {
+    const { service, order, orders, prisma } = await buildService({
+      orderStatus: OrderStatus.PAID,
+    });
+
+    const result = await service.patchOrder('o1', { status: OrderStatus.IN_PRODUCTION });
+
+    expect(orders.transition).toHaveBeenCalledWith('o1', OrderStatus.IN_PRODUCTION, {
+      trackingNumber: undefined,
+    });
+    expect(prisma.order.update).not.toHaveBeenCalled();
+    expect(result).toEqual({ id: 'o1', status: OrderStatus.IN_PRODUCTION, trackingNumber: null });
+    expect(order.status).toBe(OrderStatus.IN_PRODUCTION);
+  });
+
+  it('updates the tracking number alone without touching the lifecycle', async () => {
+    const { service, orders, prisma } = await buildService({
+      orderStatus: OrderStatus.SHIPPED,
+    });
+
+    const result = await service.patchOrder('o1', {
+      status: OrderStatus.SHIPPED,
+      trackingNumber: 'TRK-1',
+    });
+
+    expect(orders.transition).not.toHaveBeenCalled();
+    expect(prisma.order.update).toHaveBeenCalledTimes(1);
+    expect(result).toEqual({ id: 'o1', status: OrderStatus.SHIPPED, trackingNumber: 'TRK-1' });
+  });
+
+  it('404s an unknown order', async () => {
+    const { service } = await buildService();
+    await expectAppException(
+      service.patchOrder('ghost', { status: OrderStatus.CANCELLED }),
+      ErrorCode.NOT_FOUND,
+      HttpStatus.NOT_FOUND,
+    );
   });
 });

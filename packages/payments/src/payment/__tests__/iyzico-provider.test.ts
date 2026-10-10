@@ -61,5 +61,75 @@ describe('IyzicoPaymentProvider.verifyPayment', () => {
     expect(verdict.status).toBe('FAILED');
     expect(verdict.paidAmount).toBeNull();
     expect(verdict.basketId).toBeNull();
+    expect(verdict.providerTransactionId).toBeNull();
+  });
+
+  it('captures the basket item transaction id a refund must name (numeric ids stringified)', async () => {
+    stubDetail({
+      status: 'success',
+      paymentStatus: 'SUCCESS',
+      paymentId: 12345,
+      paidPrice: 649,
+      itemTransactions: [{ paymentTransactionId: 67890, price: 649 }],
+    });
+
+    const verdict = await provider.verifyPayment('tok');
+    expect(verdict.providerPaymentId).toBe('12345');
+    expect(verdict.providerTransactionId).toBe('67890');
+  });
+});
+
+describe('IyzicoPaymentProvider.refund', () => {
+  const provider = new IyzicoPaymentProvider({
+    apiKey: 'k',
+    secretKey: 's',
+    baseUrl: 'https://sandbox-api.iyzipay.com',
+  });
+
+  function stubRefund(body: Record<string, unknown>) {
+    const fetchMock = vi.fn(
+      async (_url: string, _init?: RequestInit) =>
+        new Response(JSON.stringify(body), { status: 200 }),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    return fetchMock;
+  }
+
+  const sentBody = (fetchMock: ReturnType<typeof stubRefund>) =>
+    JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body)) as Record<string, unknown>;
+
+  it('sends the captured transaction id as paymentTransactionId', async () => {
+    const fetchMock = stubRefund({ status: 'success' });
+
+    await expect(
+      provider.refund({
+        providerPaymentId: 'checkout-token',
+        amount: '649.00',
+        providerTransactionId: '67890',
+      }),
+    ).resolves.toEqual({ refunded: true });
+
+    expect(String(fetchMock.mock.calls[0]?.[0])).toContain('/payment/refund');
+    expect(sentBody(fetchMock)).toMatchObject({
+      paymentTransactionId: '67890',
+      price: '649.00',
+      currency: 'TRY',
+    });
+  });
+
+  it('falls back to the payment id when no transaction id was captured', async () => {
+    const fetchMock = stubRefund({ status: 'success' });
+
+    await provider.refund({ providerPaymentId: 'checkout-token', amount: '649.00' });
+
+    expect(sentBody(fetchMock).paymentTransactionId).toBe('checkout-token');
+  });
+
+  it('surfaces a provider failure as PaymentError', async () => {
+    stubRefund({ status: 'failure', errorMessage: 'Transaction not found' });
+
+    await expect(
+      provider.refund({ providerPaymentId: 'checkout-token', amount: '649.00' }),
+    ).rejects.toThrow('iyzico refund failed: Transaction not found');
   });
 });
