@@ -120,15 +120,21 @@ jobs:
           docker compose -f docker-compose.yml config -q
           echo "✓ compose dosyaları geçerli"
 
+      # Bilgi: en yeni MinIO/mc sürümleri (etiket sabitlerken bak); asla düşürmez.
+      - name: Newest MinIO/mc releases (info)
+        run: |
+          docker run --rm minio/minio:latest --version 2>&1 | head -n 2 || true
+          docker run --rm minio/mc:latest --version 2>&1 | head -n 2 || true
+          curl -sS --max-time 20 "https://hub.docker.com/v2/repositories/minio/minio/tags/?page_size=3&ordering=last_updated" | head -c 600 || true
+          echo
+          docker manifest inspect postgres:16-alpine >/dev/null && echo "manifest inspect çalışıyor (postgres:16-alpine)" || true
+          for img in $(grep -hE '^\s*image:\s*minio/' deploy/docker-compose.server.yml | awk '{print $2}'); do
+            docker manifest inspect "$img" >/dev/null 2>/tmp/mi.err && echo "✓ $img" || echo "✗ $img: $(tr '\n' ' ' </tmp/mi.err | head -c 200)"
+          done
+
       - name: Pinned images exist (no :latest, no untagged)
         run: |
           set -e
-          # Bilgi: Docker Hub'daki en yeni MinIO/mc sürümleri (etiket seçerken bak).
-          for repo in minio/minio minio/mc; do
-            printf 'Bilgi — %s en yeni etiketler: ' "$repo"
-            curl -sS --max-time 20 "https://hub.docker.com/v2/repositories/$repo/tags?page_size=3&ordering=last_updated&name=RELEASE" \
-              | python3 -c "import sys,json;print(', '.join(r['name'] for r in json.load(sys.stdin).get('results',[])))" || echo '?'
-          done
           images=$(grep -hE '^\s*image:' deploy/docker-compose.server.yml docker-compose.yml | awk '{print $2}' | sort -u)
           for img in $images; do
             tag="${img##*:}"
