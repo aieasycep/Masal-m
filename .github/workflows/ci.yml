@@ -125,14 +125,10 @@ jobs:
       # etiket sabitlerken buradaki listeye bak. Bu adım asla düşürmez.
       - name: Newest MinIO/mc releases on quay.io (info)
         run: |
-          sudo apt-get install -y skopeo >/dev/null 2>&1 || true
+          # `latest` imajının kendi sürüm damgası = quay.io'da kesin var olan bir RELEASE etiketi.
           for repo in minio/minio minio/mc; do
-            printf 'quay.io/%s en yeni RELEASE etiketleri: ' "$repo"
-            skopeo list-tags "docker://quay.io/$repo" 2>/dev/null \
-              | python3 -c "import sys,json;t=sorted(x for x in json.load(sys.stdin).get('Tags',[]) if x.startswith('RELEASE.'));print(', '.join(t[-5:]) if t else '(yok)')" || echo '?'
-            printf 'quay API ham yanıt: '
-            curl -sS --max-time 20 "https://quay.io/api/v1/repository/$repo/tag/?limit=5&onlyActiveTags=true" | head -c 300 || true
-            echo
+            printf 'quay.io/%s:latest sürümü: ' "$repo"
+            docker run --rm "quay.io/$repo:latest" --version 2>&1 | head -n 1 || true
           done
           docker manifest inspect postgres:16-alpine >/dev/null && echo "manifest inspect çalışıyor (postgres:16-alpine)" || true
           for img in $(grep -hE '^\s*image:\s*quay.io/minio/' deploy/docker-compose.server.yml | awk '{print $2}'); do
